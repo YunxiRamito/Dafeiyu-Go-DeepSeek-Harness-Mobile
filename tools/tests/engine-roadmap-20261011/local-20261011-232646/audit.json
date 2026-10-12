@@ -1,0 +1,663 @@
+{
+  "observed_at": "2026-10-11T23:26:47.8833946+08:00",
+  "project": "G:\\DeepSeek DSH\\DSH Works\\Project\\Dafeiyu-Go\\Dafeiyu-Go-DeepSeek-Harness-Mobile",
+  "scope": "Static source/hash/ELF data only; no behavioral test, runtime launch, Gradle, ADB, account, model or private application data.",
+  "git_directory_present": false,
+  "sources": [
+    {
+      "path": "HANDOVER.md",
+      "sha256": "6e126a86c0b2adbf70c017b828ed9b2e4e5d810c31fa59d0cd9202e429fb00c2",
+      "lines": 379
+    },
+    {
+      "path": "app/build.gradle.kts",
+      "sha256": "274d5868f33669edf5c1b2b9715302c4d38612a5f93b9f44aeeb2b7b9d3a148c",
+      "lines": 63
+    },
+    {
+      "path": "app/src/main/AndroidManifest.xml",
+      "sha256": "9ae4b93513dfaa0feda2d137dca3f4a506f3edb0f2a614cc974bbf36b40cf77f",
+      "lines": 27
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/MainActivity.kt",
+      "sha256": "d3284955d89a4d016f1e360ca8b1b1d6388982f7adf9aee13a9f6ccf654e28e1",
+      "lines": 541
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/DemoRepository.kt",
+      "sha256": "88587efd093d7efa72031998016f5d6fd7a0ab2ae0db3d5cab86f26dd7add566",
+      "lines": 2490
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialToolContract.kt",
+      "sha256": "d4817537f04fa6a377a70feb10fdb545ac4cd8dda28e0c7d94e6d1634e7efdbd",
+      "lines": 227
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialToolDispatcher.kt",
+      "sha256": "be68dafa0dfebc73d8dba8537331f9ca381f358e1675aee6f0a0c00cc75c974e",
+      "lines": 322
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialToolSession.kt",
+      "sha256": "f29906931f3c57931d586fe9e57826152661d420f4bdb9d93b28ee058d6bb4e7",
+      "lines": 195
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialToolOutputStore.kt",
+      "sha256": "e708b39d81aa68e6356698579a84a2f6b918360a44dcc1874e93883fadffe972",
+      "lines": 162
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialWebClient.kt",
+      "sha256": "89ecc8e3c2a10c889a04115c3176155e6c26eeaf60f467944ec19cd9e8bf59c5",
+      "lines": 362
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/DeepSeekChatClient.kt",
+      "sha256": "d1bf732515a8ddd96cbf3c8b91cabbe3c997e500c1a0b361b2bcd13374b5a23b",
+      "lines": 432
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/ConversationAttachmentStore.kt",
+      "sha256": "d604c4bd685ca93a53913bf6c7e34c49b3c649b89e53fb19bf9389b07a8e9e59",
+      "lines": 458
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialChatHistory.kt",
+      "sha256": "19e976ccaa89bb8bbadb22e4d9e7eeac56f0d908fa1948827c0173dd03a15d3d",
+      "lines": 84
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/AttachmentPanel.kt",
+      "sha256": "bbba864a166111431ab778860ca7c1c6f11ef415f68b40221c47fed1697c87ea",
+      "lines": 380
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/ScannerScreen.kt",
+      "sha256": "3a228530c87bba719608850c1dfd23f62b45ad66dc113279286d067e906306d4",
+      "lines": 268
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/BackgroundTaskEngine.kt",
+      "sha256": "4451b3587da1d51bc9b2ec39f14374c79201c0bbe013d7664780477cab6a971f",
+      "lines": 340
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/BackgroundTaskModels.kt",
+      "sha256": "8bb1e04d1615e13494a476befb0e6ba3ca3cddf3cd62acd121d96df7f21d9f69",
+      "lines": 73
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/BackgroundTaskCredentialBoundary.kt",
+      "sha256": "aec53c73ced95ca43172ddcc5116762bdaba6dcb689d7a299222aa82828220d6",
+      "lines": 35
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/ConnectionPluginPackage.kt",
+      "sha256": "8ee61c17dace39c1da762bfb43a4f3f716df9997e3c615583802a74d0bb50bba",
+      "lines": 171
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/LocalPluginBridge.kt",
+      "sha256": "b088f3b06646cae99f41582d18fcdcfef16cc7f337fdce56ee2a4d914fb94fd5",
+      "lines": 162
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/LocalPluginIpcPolicy.kt",
+      "sha256": "4fdd25b4e8e570ac576cb0583be9f895dd9ac0e21ed3d12c736b14aabf2716b7",
+      "lines": 163
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AriesConnectionProvider.kt",
+      "sha256": "7b4fe36d31fe7aad2121d3280ff68a581fd99c0fc591c6cadf4cb231488666be",
+      "lines": 645
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/DeveloperCenterPresenceClient.kt",
+      "sha256": "41c9f31ffc2eed4040b6158cdeb369a8c81dd50a195398bde375e56a5f6081dd",
+      "lines": 444
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/SettingsScreens.kt",
+      "sha256": "6ffbfedf49672b79c1271acc6009350ef47ccd76451e8cdf394ecf1d5f7533fd",
+      "lines": 3168
+    },
+    {
+      "path": "mobile-dsh-plugin/package.json",
+      "sha256": "566233370c4f0eb7b7548936aa8986ff998e1193e936e83c756fff644ae0a1c9",
+      "lines": 35
+    },
+    {
+      "path": "mobile-dsh-plugin/HOST-CONTRACT.md",
+      "sha256": "8a3dab88b0c99c923655533e6659b6be7fc6872874cad710f198f46b79307bcf",
+      "lines": 78
+    },
+    {
+      "path": "mobile-dsh-plugin/EVIDENCE.md",
+      "sha256": "655f00c70aadc8ccf272a04017f39e9a51f62dc987dd37ec7123006db766e2f9",
+      "lines": 46
+    },
+    {
+      "path": "mobile-dsh-plugin/README.md",
+      "sha256": "1b4a9e236c3d0d2111f08ad4115fe18c151aecd8e36ab972a0594a49c76d6110",
+      "lines": 60
+    },
+    {
+      "path": "mobile-dsh-plugin/src/core.js",
+      "sha256": "c076c76a31b0500b1e41d0f87b1968b0b3e2829d5c2176327ae9b8b1bfb53853",
+      "lines": 220
+    },
+    {
+      "path": "mobile-dsh-plugin/src/client.js",
+      "sha256": "eb0c749a8df0fe2d16eb1125c5bfb5d1c6718546782e460fa3d1ed21f77822ac",
+      "lines": 248
+    },
+    {
+      "path": "mobile-dsh-plugin/src/index.js",
+      "sha256": "f9805ac81af421a9d4e8437306104bb92db25d562eec81ad8fba724d80b7cecc",
+      "lines": 3
+    },
+    {
+      "path": "mobile-dsh-plugin/lib/client.js",
+      "sha256": "c6424d665644d51e3358bebd656092f5f4761cf782d961fa387c90690883e799",
+      "lines": 466
+    },
+    {
+      "path": "tools/prepare-node-runtime.ps1",
+      "sha256": "e0c651983a72a8ca26086ed1c64645563716fb570242d31cc9074ea3e5f1de93",
+      "lines": 73
+    },
+    {
+      "path": "tools/prepare-connection-plugin.ps1",
+      "sha256": "28a89eca94d075f463523d02e0ef21ff1f87e6c3e2ce099280939a27d39e377f",
+      "lines": 39
+    }
+  ],
+  "runtime": {
+    "root": "G:\\DeepSeek DSH\\DSH Works\\Project\\Dafeiyu-Go\\Temp_Android\\runtime",
+    "present": true,
+    "lock": {
+      "protocol": "dafeiyu-android-node.v1",
+      "executable_sha256": "1ee21eebda8ba05919050fe0d2b84b773a5cb2d2d1a42a27bddfb5eaa1ee182e",
+      "architecture": "arm64-v8a",
+      "node_version": "24.18.0",
+      "packages": [
+        {
+          "version": "24.18.0-1",
+          "source": "https://packages.termux.dev/apt/termux-main/pool/main/n/nodejs-lts/nodejs-lts_24.18.0-1_aarch64.deb",
+          "name": "nodejs-lts",
+          "sha256": "490f4d08c45b25a7ea7db6ee466ebb3ee61f07083260b85332704ed018f59a87"
+        },
+        {
+          "version": "30",
+          "source": "https://packages.termux.dev/apt/termux-main/pool/main/libc/libc++/libc++_30_aarch64.deb",
+          "name": "libc++",
+          "sha256": "53d0b84a7ba7459024257cb94d5b136fe13ef858567f65a8064b35950799f2ca"
+        },
+        {
+          "version": "1:3.6.5",
+          "source": "https://packages.termux.dev/apt/termux-main/pool/main/o/openssl/openssl_1:3.6.5_aarch64.deb",
+          "name": "openssl",
+          "sha256": "a2fb7856875e63ef6b90442752e05974813372c3ca86d2513a78ea43c67a0f8b"
+        },
+        {
+          "version": "1.34.8",
+          "source": "https://packages.termux.dev/apt/termux-main/pool/main/c/c-ares/c-ares_1.34.8_aarch64.deb",
+          "name": "c-ares",
+          "sha256": "7681fc23e822d7988ba8b2adf3468f93ae68f724dda365cff1385096a9fa87e6"
+        },
+        {
+          "version": "78.3",
+          "source": "https://packages.termux.dev/apt/termux-main/pool/main/libi/libicu/libicu_78.3_aarch64.deb",
+          "name": "libicu",
+          "sha256": "f536403f65a08fe0df6e7304184e902d54def77d5c3bd5edfd9109d57601d276"
+        },
+        {
+          "version": "3.54.0",
+          "source": "https://packages.termux.dev/apt/termux-main/pool/main/libs/libsqlite/libsqlite_3.54.0_aarch64.deb",
+          "name": "libsqlite",
+          "sha256": "9adf91e118fcf4d449f0fb9668485d895916c4f76c2407da17ba114406f43a58"
+        },
+        {
+          "version": "1.3.2",
+          "source": "https://packages.termux.dev/apt/termux-main/pool/main/z/zlib/zlib_1.3.2_aarch64.deb",
+          "name": "zlib",
+          "sha256": "75e7d0af17fcc3b40004309fdc00a1ddb9ae08346dce5e269902c34ac3966ac9"
+        }
+      ],
+      "libraries": [
+        {
+          "sha256": "05bef9d3901910c3ff8ab450b03bc8b28383d363a2290f2f7b9aed7331ea6ff7",
+          "packaged": "librt_libc___shared_so.so",
+          "name": "libc++_shared.so"
+        },
+        {
+          "sha256": "5dddfd86746aabaca2c13eea108c8968811a4f9dcccf5889e34ebff6be920949",
+          "packaged": "librt_libcrypto_so.so",
+          "name": "libcrypto.so"
+        },
+        {
+          "sha256": "5dddfd86746aabaca2c13eea108c8968811a4f9dcccf5889e34ebff6be920949",
+          "packaged": "librt_libcrypto_so_3.so",
+          "name": "libcrypto.so.3"
+        },
+        {
+          "sha256": "595ce9fe0189a24ceae2eaa07721ac428a6df26794f5bfcfe4347013cbd4b9f2",
+          "packaged": "librt_libssl_so.so",
+          "name": "libssl.so"
+        },
+        {
+          "sha256": "595ce9fe0189a24ceae2eaa07721ac428a6df26794f5bfcfe4347013cbd4b9f2",
+          "packaged": "librt_libssl_so_3.so",
+          "name": "libssl.so.3"
+        },
+        {
+          "sha256": "68733ce8d4bb1bdc87d8ec550c58c70f3dcdb0f8c48d86b83235f536cb736e83",
+          "packaged": "librt_libcares_so.so",
+          "name": "libcares.so"
+        },
+        {
+          "sha256": "71a7479056941b610589f82698cdfb220c169dce9bc7c78ef6a6e74d07b1e8fd",
+          "packaged": "librt_libicudata_so_78_3.so",
+          "name": "libicudata.so.78.3"
+        },
+        {
+          "sha256": "3140b2b28d16a6486a65663f1c47a94a4bb0d9def51612f8e941414bd50c7a0e",
+          "packaged": "librt_libicui18n_so_78_3.so",
+          "name": "libicui18n.so.78.3"
+        },
+        {
+          "sha256": "7d7aa87a56f1919450f9539257b78dc71959083482a30ce9e56d5ff9d024202e",
+          "packaged": "librt_libicuio_so_78_3.so",
+          "name": "libicuio.so.78.3"
+        },
+        {
+          "sha256": "b7038a3a1696e8e2fde4fc3fc924d0fa8a753aa939cfeb83cb51ffb0ce7ded58",
+          "packaged": "librt_libicutest_so_78_3.so",
+          "name": "libicutest.so.78.3"
+        },
+        {
+          "sha256": "132e6d528338976c0305351360daf3ef53f71a85eb4380ade175750b9680ee55",
+          "packaged": "librt_libicutu_so_78_3.so",
+          "name": "libicutu.so.78.3"
+        },
+        {
+          "sha256": "91bcef1faba58b755d4870aaea95814d1753961fd72365c4701cfd4461e3584c",
+          "packaged": "librt_libicuuc_so_78_3.so",
+          "name": "libicuuc.so.78.3"
+        },
+        {
+          "sha256": "0459f6ccbc54fcca2dc9c10858f6fa006f8e68709ad0913d7c143a09ec6605e8",
+          "packaged": "librt_libsqlite3_54_0_so.so",
+          "name": "libsqlite3.54.0.so"
+        },
+        {
+          "sha256": "dd9e19af8ed4361487191bd0aa355657a447d2c94838a0eb615e0e18207701ae",
+          "packaged": "librt_libsqlite3_so_3_54_0.so",
+          "name": "libsqlite3.so.3.54.0"
+        },
+        {
+          "sha256": "c47748ed4b6ca6a2ecd664bab04795f3493956ab1f5cddc4ba0efa737ef3b711",
+          "packaged": "librt_libz_so_1_3_2.so",
+          "name": "libz.so.1.3.2"
+        }
+      ]
+    },
+    "entries": [
+      "assets\\connection-plugin\\dafeiyu-go-connect-0.2.0.tgz",
+      "assets\\connection-plugin\\manifest.json",
+      "assets\\node-runtime\\runtime-lock.json"
+    ],
+    "hashes": [
+      {
+        "file": "libnode_exec.so",
+        "exists": true,
+        "expected": "1ee21eebda8ba05919050fe0d2b84b773a5cb2d2d1a42a27bddfb5eaa1ee182e",
+        "actual": "1ee21eebda8ba05919050fe0d2b84b773a5cb2d2d1a42a27bddfb5eaa1ee182e",
+        "matches": true
+      },
+      {
+        "file": "librt_libc___shared_so.so",
+        "exists": true,
+        "expected": "05bef9d3901910c3ff8ab450b03bc8b28383d363a2290f2f7b9aed7331ea6ff7",
+        "actual": "05bef9d3901910c3ff8ab450b03bc8b28383d363a2290f2f7b9aed7331ea6ff7",
+        "matches": true
+      },
+      {
+        "file": "librt_libcrypto_so.so",
+        "exists": true,
+        "expected": "5dddfd86746aabaca2c13eea108c8968811a4f9dcccf5889e34ebff6be920949",
+        "actual": "5dddfd86746aabaca2c13eea108c8968811a4f9dcccf5889e34ebff6be920949",
+        "matches": true
+      },
+      {
+        "file": "librt_libcrypto_so_3.so",
+        "exists": true,
+        "expected": "5dddfd86746aabaca2c13eea108c8968811a4f9dcccf5889e34ebff6be920949",
+        "actual": "5dddfd86746aabaca2c13eea108c8968811a4f9dcccf5889e34ebff6be920949",
+        "matches": true
+      },
+      {
+        "file": "librt_libssl_so.so",
+        "exists": true,
+        "expected": "595ce9fe0189a24ceae2eaa07721ac428a6df26794f5bfcfe4347013cbd4b9f2",
+        "actual": "595ce9fe0189a24ceae2eaa07721ac428a6df26794f5bfcfe4347013cbd4b9f2",
+        "matches": true
+      },
+      {
+        "file": "librt_libssl_so_3.so",
+        "exists": true,
+        "expected": "595ce9fe0189a24ceae2eaa07721ac428a6df26794f5bfcfe4347013cbd4b9f2",
+        "actual": "595ce9fe0189a24ceae2eaa07721ac428a6df26794f5bfcfe4347013cbd4b9f2",
+        "matches": true
+      },
+      {
+        "file": "librt_libcares_so.so",
+        "exists": true,
+        "expected": "68733ce8d4bb1bdc87d8ec550c58c70f3dcdb0f8c48d86b83235f536cb736e83",
+        "actual": "68733ce8d4bb1bdc87d8ec550c58c70f3dcdb0f8c48d86b83235f536cb736e83",
+        "matches": true
+      },
+      {
+        "file": "librt_libicudata_so_78_3.so",
+        "exists": true,
+        "expected": "71a7479056941b610589f82698cdfb220c169dce9bc7c78ef6a6e74d07b1e8fd",
+        "actual": "71a7479056941b610589f82698cdfb220c169dce9bc7c78ef6a6e74d07b1e8fd",
+        "matches": true
+      },
+      {
+        "file": "librt_libicui18n_so_78_3.so",
+        "exists": true,
+        "expected": "3140b2b28d16a6486a65663f1c47a94a4bb0d9def51612f8e941414bd50c7a0e",
+        "actual": "3140b2b28d16a6486a65663f1c47a94a4bb0d9def51612f8e941414bd50c7a0e",
+        "matches": true
+      },
+      {
+        "file": "librt_libicuio_so_78_3.so",
+        "exists": true,
+        "expected": "7d7aa87a56f1919450f9539257b78dc71959083482a30ce9e56d5ff9d024202e",
+        "actual": "7d7aa87a56f1919450f9539257b78dc71959083482a30ce9e56d5ff9d024202e",
+        "matches": true
+      },
+      {
+        "file": "librt_libicutest_so_78_3.so",
+        "exists": true,
+        "expected": "b7038a3a1696e8e2fde4fc3fc924d0fa8a753aa939cfeb83cb51ffb0ce7ded58",
+        "actual": "b7038a3a1696e8e2fde4fc3fc924d0fa8a753aa939cfeb83cb51ffb0ce7ded58",
+        "matches": true
+      },
+      {
+        "file": "librt_libicutu_so_78_3.so",
+        "exists": true,
+        "expected": "132e6d528338976c0305351360daf3ef53f71a85eb4380ade175750b9680ee55",
+        "actual": "132e6d528338976c0305351360daf3ef53f71a85eb4380ade175750b9680ee55",
+        "matches": true
+      },
+      {
+        "file": "librt_libicuuc_so_78_3.so",
+        "exists": true,
+        "expected": "91bcef1faba58b755d4870aaea95814d1753961fd72365c4701cfd4461e3584c",
+        "actual": "91bcef1faba58b755d4870aaea95814d1753961fd72365c4701cfd4461e3584c",
+        "matches": true
+      },
+      {
+        "file": "librt_libsqlite3_54_0_so.so",
+        "exists": true,
+        "expected": "0459f6ccbc54fcca2dc9c10858f6fa006f8e68709ad0913d7c143a09ec6605e8",
+        "actual": "0459f6ccbc54fcca2dc9c10858f6fa006f8e68709ad0913d7c143a09ec6605e8",
+        "matches": true
+      },
+      {
+        "file": "librt_libsqlite3_so_3_54_0.so",
+        "exists": true,
+        "expected": "dd9e19af8ed4361487191bd0aa355657a447d2c94838a0eb615e0e18207701ae",
+        "actual": "dd9e19af8ed4361487191bd0aa355657a447d2c94838a0eb615e0e18207701ae",
+        "matches": true
+      },
+      {
+        "file": "librt_libz_so_1_3_2.so",
+        "exists": true,
+        "expected": "c47748ed4b6ca6a2ecd664bab04795f3493956ab1f5cddc4ba0efa737ef3b711",
+        "actual": "c47748ed4b6ca6a2ecd664bab04795f3493956ab1f5cddc4ba0efa737ef3b711",
+        "matches": true
+      }
+    ],
+    "elf": [
+      {
+        "file": "libnode_exec.so",
+        "machine": 183,
+        "interpreter": "/system/bin/linker64",
+        "needed": [
+          "libz.so.1",
+          "libcares.so",
+          "libsqlite3.so",
+          "libcrypto.so.3",
+          "libssl.so.3",
+          "libicui18n.so.78",
+          "libicuuc.so.78",
+          "libc.so",
+          "libm.so",
+          "libdl.so",
+          "libc++_shared.so"
+        ],
+        "soname": null,
+        "rpath_runpath": [
+          "/data/data/com.termux/files/usr/lib"
+        ]
+      },
+      {
+        "file": "librt_libc___shared_so.so",
+        "machine": 183,
+        "interpreter": null,
+        "needed": [
+          "libc.so",
+          "libm.so",
+          "libdl.so"
+        ],
+        "soname": "libc++_shared.so",
+        "rpath_runpath": []
+      },
+      {
+        "file": "librt_libcrypto_so.so",
+        "machine": 183,
+        "interpreter": null,
+        "needed": [
+          "libdl.so",
+          "libc.so"
+        ],
+        "soname": "libcrypto.so.3",
+        "rpath_runpath": [
+          "/data/data/com.termux/files/usr/lib"
+        ]
+      },
+      {
+        "file": "librt_libcrypto_so_3.so",
+        "machine": 183,
+        "interpreter": null,
+        "needed": [
+          "libdl.so",
+          "libc.so"
+        ],
+        "soname": "libcrypto.so.3",
+        "rpath_runpath": [
+          "/data/data/com.termux/files/usr/lib"
+        ]
+      },
+      {
+        "file": "librt_libssl_so.so",
+        "machine": 183,
+        "interpreter": null,
+        "needed": [
+          "libcrypto.so.3",
+          "libc.so"
+        ],
+        "soname": "libssl.so.3",
+        "rpath_runpath": [
+          "/data/data/com.termux/files/usr/lib"
+        ]
+      },
+      {
+        "file": "librt_libssl_so_3.so",
+        "machine": 183,
+        "interpreter": null,
+        "needed": [
+          "libcrypto.so.3",
+          "libc.so"
+        ],
+        "soname": "libssl.so.3",
+        "rpath_runpath": [
+          "/data/data/com.termux/files/usr/lib"
+        ]
+      },
+      {
+        "file": "librt_libcares_so.so",
+        "machine": 183,
+        "interpreter": null,
+        "needed": [
+          "libc.so"
+        ],
+        "soname": "libcares.so",
+        "rpath_runpath": [
+          "/data/data/com.termux/files/usr/lib"
+        ]
+      },
+      {
+        "file": "librt_libicudata_so_78_3.so",
+        "machine": 183,
+        "interpreter": null,
+        "needed": [],
+        "soname": "libicudata.so.78",
+        "rpath_runpath": [
+          "/data/data/com.termux/files/usr/lib"
+        ]
+      },
+      {
+        "file": "librt_libicui18n_so_78_3.so",
+        "machine": 183,
+        "interpreter": null,
+        "needed": [
+          "libicuuc.so.78",
+          "libc.so",
+          "libm.so",
+          "libc++_shared.so",
+          "libdl.so"
+        ],
+        "soname": "libicui18n.so.78",
+        "rpath_runpath": [
+          "/data/data/com.termux/files/usr/lib"
+        ]
+      },
+      {
+        "file": "librt_libicuio_so_78_3.so",
+        "machine": 183,
+        "interpreter": null,
+        "needed": [
+          "libicuuc.so.78",
+          "libicui18n.so.78",
+          "libc.so",
+          "libc++_shared.so",
+          "libdl.so"
+        ],
+        "soname": "libicuio.so.78",
+        "rpath_runpath": [
+          "/data/data/com.termux/files/usr/lib"
+        ]
+      },
+      {
+        "file": "librt_libicutest_so_78_3.so",
+        "machine": 183,
+        "interpreter": null,
+        "needed": [
+          "libicutu.so.78",
+          "libicuuc.so.78",
+          "libc.so",
+          "libc++_shared.so",
+          "libdl.so"
+        ],
+        "soname": "libicutest.so.78",
+        "rpath_runpath": [
+          "/data/data/com.termux/files/usr/lib"
+        ]
+      },
+      {
+        "file": "librt_libicutu_so_78_3.so",
+        "machine": 183,
+        "interpreter": null,
+        "needed": [
+          "libicui18n.so.78",
+          "libicuuc.so.78",
+          "libc.so",
+          "libc++_shared.so",
+          "libdl.so"
+        ],
+        "soname": "libicutu.so.78",
+        "rpath_runpath": [
+          "/data/data/com.termux/files/usr/lib"
+        ]
+      },
+      {
+        "file": "librt_libicuuc_so_78_3.so",
+        "machine": 183,
+        "interpreter": null,
+        "needed": [
+          "libicudata.so.78",
+          "libc.so",
+          "libm.so",
+          "libc++_shared.so",
+          "libdl.so"
+        ],
+        "soname": "libicuuc.so.78",
+        "rpath_runpath": [
+          "/data/data/com.termux/files/usr/lib"
+        ]
+      },
+      {
+        "file": "librt_libsqlite3_54_0_so.so",
+        "machine": 183,
+        "interpreter": null,
+        "needed": [
+          "libz.so.1",
+          "libm.so",
+          "libdl.so",
+          "libc.so"
+        ],
+        "soname": null,
+        "rpath_runpath": [
+          "/data/data/com.termux/files/usr/lib:/data/data/com.termux/files/usr/lib:/data/data/com.termux/files/usr/lib"
+        ]
+      },
+      {
+        "file": "librt_libsqlite3_so_3_54_0.so",
+        "machine": 183,
+        "interpreter": null,
+        "needed": [
+          "libz.so.1",
+          "libm.so",
+          "libdl.so",
+          "libc.so"
+        ],
+        "soname": null,
+        "rpath_runpath": [
+          "/data/data/com.termux/files/usr/lib:/data/data/com.termux/files/usr/lib"
+        ]
+      },
+      {
+        "file": "librt_libz_so_1_3_2.so",
+        "machine": 183,
+        "interpreter": null,
+        "needed": [
+          "libc.so"
+        ],
+        "soname": "libz.so.1",
+        "rpath_runpath": [
+          "/data/data/com.termux/files/usr/lib"
+        ]
+      }
+    ],
+    "abi_directories": [
+      "arm64-v8a"
+    ]
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "checked_at": "2026-10-12T00:21:01.3160277+08:00",
+  "snapshots": [
+    {
+      "path": "source/LICENSE",
+      "hash_matches": true,
+      "pinned_http_200": true
+    },
+    {
+      "path": "source/README.md",
+      "hash_matches": true,
+      "pinned_http_200": true
+    },
+    {
+      "path": "source/liquidglass/build.gradle.kts",
+      "hash_matches": true,
+      "pinned_http_200": true
+    },
+    {
+      "path": "source/liquidglass/src/main/java/com/example/liquidglass/BackdropCapture.kt",
+      "hash_matches": true,
+      "pinned_http_200": true
+    },
+    {
+      "path": "source/liquidglass/src/main/java/com/example/liquidglass/GlassLensRenderer.kt",
+      "hash_matches": true,
+      "pinned_http_200": true
+    },
+    {
+      "path": "source/liquidglass/src/main/java/com/example/liquidglass/GlassMaterial.kt",
+      "hash_matches": true,
+      "pinned_http_200": true
+    },
+    {
+      "path": "source/liquidglass/src/main/java/com/example/liquidglass/LiquidGlassButton.kt",
+      "hash_matches": true,
+      "pinned_http_200": true
+    },
+    {
+      "path": "source/liquidglass/src/main/java/com/example/liquidglass/LiquidGlassView.kt",
+      "hash_matches": true,
+      "pinned_http_200": true
+    }
+  ],
+  "powershell_parse": "PASS",
+  "scalar_geometry": "PASS",
+  "license_three_copies": "MATCH",
+  "production_edit": false,
+  "jvm_gradle_adb": false,
+  "current_head_recheck": "BLOCKED",
+  "network_requests_during_validation": 0
+}

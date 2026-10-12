@@ -1,0 +1,1250 @@
+{
+  "date": "2026-10-12",
+  "recordedAt": "2026-10-12T16:31:15.6785990+08:00",
+  "scope": "0.1.24 UI fixes, real download sources, PRoot Ubuntu component installation and official run_script integration; build/package/offline checks and preserve-data delivery, actual arm64 guest execution and visual acceptance pending",
+  "apk": {
+    "path": "G:\\DeepSeek DSH\\DSH Works\\Project\\Dafeiyu-Go\\Temp_Android\\Dist\\Dafeiyu-Go-Mobile-0.1.24.apk",
+    "bytes": 105345742,
+    "sha256": "c98eea936eb243e888f00d87a47aee6ba83b40ef266d78a3881d9f12ff75129c",
+    "package": "com.dafeiyu.mobile.preview",
+    "version": "0.1.24",
+    "versionCode": 25,
+    "minSdk": 30,
+    "targetSdk": 35,
+    "debuggable": true,
+    "certificateSha256": "52fc036fd6fe45d400f354235068aab29cb27ca6f68e42c53368a5b00c887b23"
+  },
+  "validation": {
+    "implementation": "Completed",
+    "build": "assembleDebug + lintDebug final6 BUILD SUCCESSFUL in 3m50s",
+    "lint": {
+      "errors": 0,
+      "warnings": 143,
+      "information": 5
+    },
+    "offline": {
+      "linuxSecurity": 26,
+      "downloadAndTool": 13,
+      "officialWebRegression": 27,
+      "workspaceDeletion": 28,
+      "glassBehavior": 47,
+      "sidebarGesture": 35,
+      "sidebarFusion": 12
+    },
+    "packageAudit": "PASS signature/version/native file hashes/fixed sources and licenses",
+    "emulator": {
+      "serial": "emulator-5558",
+      "install": "Success install -r",
+      "version": "0.1.24/code25",
+      "launch": "Status ok",
+      "linuxExecution": "unsupported native x86_64",
+      "visual": "Pending user acceptance"
+    },
+    "phone": {
+      "serial": "adb-3B15AP01NZT00000-0X4cpb._adb-tls-connect._tcp",
+      "model": "PKB110",
+      "install": "Success install -r",
+      "version": "0.1.24/code25",
+      "lastUpdateTime": "2026-10-12 16:29:35",
+      "startedByAgent": false,
+      "linuxExecution": "Pending user installation and actual runtime/script/cancellation verification",
+      "visual": "Pending user acceptance"
+    },
+    "limits": [
+      "No paid model calls",
+      "No screenshots or UI taps",
+      "No clear-data or permission grants",
+      "Windows full guest extraction blocked by legal Linux colon filename",
+      "No real TLS/CDN/backend device download verification",
+      "DSH CLI/web host and connection loader not integrated by this release"
+    ]
+  },
+  "acceptanceReport": "G:\\DeepSeek DSH\\DSH Works\\Project\\Dafeiyu-Go\\Temp_Android\\qa\\delivery-0.1.24.json",
+  "buildLog": "G:\\DeepSeek DSH\\DSH Works\\Project\\Dafeiyu-Go\\Temp_Android\\build-0.1.24-final6.log",
+  "inputsSnapshot": "Post-build source/configuration hash snapshot. Acceptance describes the actual checks; hashes alone are not proof of a build or device test.",
+  "inputs": [
+    {
+      "path": "app/src/main/AndroidManifest.xml",
+      "bytes": 1671,
+      "sha256": "9ae4b93513dfaa0feda2d137dca3f4a506f3edb0f2a614cc974bbf36b40cf77f"
+    },
+    {
+      "path": "app/src/main/assets/third-party/dsha/LICENSE",
+      "bytes": 1074,
+      "sha256": "e0ddc2f4a383d900a26e3148a19c256e9dbe06585a274307509e9714636be0b1"
+    },
+    {
+      "path": "app/src/main/assets/third-party/dsha/NOTICE.md",
+      "bytes": 680,
+      "sha256": "015a4c87e5fce31870f62c941f7933e89c47155c384d207ea3b0a1bb74716211"
+    },
+    {
+      "path": "app/src/main/assets/third-party/dsha/UPSTREAM-NOTICES.md",
+      "bytes": 14840,
+      "sha256": "4a259b40b45e3108841a8ea3738ebde8a68ac77d96480475788e114fbea87597"
+    },
+    {
+      "path": "app/src/main/assets/third-party/liquid-glass/LICENSE",
+      "bytes": 1070,
+      "sha256": "b7b41578ce6b8d42fd7ebbb89d7c85d0e7085cdeabf8920d8e1b68b77d60f682"
+    },
+    {
+      "path": "app/src/main/assets/third-party/liquid-glass/NOTICE.txt",
+      "bytes": 1701,
+      "sha256": "23bf404051a0476e4edd5e1dfca42dae8a2e132bdf2a167585095dd01ac9541a"
+    },
+    {
+      "path": "app/src/main/assets/third-party/pc-download-source/LICENSE",
+      "bytes": 1103,
+      "sha256": "5d964c1f006f8bd6aa9a535fa5f58ce981d7e984dd9e1a6a0b5925acb45a5046"
+    },
+    {
+      "path": "app/src/main/assets/third-party/pc-download-source/NOTICE.md",
+      "bytes": 474,
+      "sha256": "11ca429141cc333e5d7991809b882fc97013b7c9a624b25ba12b99dd39ad9018"
+    },
+    {
+      "path": "app/src/main/assets/third-party/sf-symbols/NOTICE.md",
+      "bytes": 1214,
+      "sha256": "5ae919fbd0b75b7687592e27ef29b0d6a7445776fe45e5cd6684c70be6c2ae5d"
+    },
+    {
+      "path": "app/src/main/assets/third-party/sf-symbols/SOURCE-README.md",
+      "bytes": 2089,
+      "sha256": "09739db3c114d7df11dd54cbf432d4fa97ab5e809717d6ec159d7c7cd490e63c"
+    },
+    {
+      "path": "app/src/main/assets/third-party/swift-docc-icons/LICENSE.txt",
+      "bytes": 11964,
+      "sha256": "2d2826d899f129cd6a9912bcd10761b7c4169bf32b7e92d8e47a13812c0e7343"
+    },
+    {
+      "path": "app/src/main/assets/third-party/swift-docc-icons/NOTICE.txt",
+      "bytes": 2387,
+      "sha256": "57067e0dc6b4f4db27f6b32c69869c85d3607c4c255d83bb41bc5ca0591f3544"
+    },
+    {
+      "path": "app/src/main/assets/third-party/zxing/LICENSE.txt",
+      "bytes": 11587,
+      "sha256": "72b36ea8e266d561bb16190795e09d729038fd12b1ca3d369ae365c99aba15e3"
+    },
+    {
+      "path": "app/src/main/assets/third-party/zxing/NOTICE.txt",
+      "bytes": 231,
+      "sha256": "47d2523f6ae4c3ea86681b99e25619806e5a654e4208a4c009656b67ca3a910a"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AndroidBackupStore.kt",
+      "bytes": 28275,
+      "sha256": "37eff94a7ff377d418e4876d65ef3bdd64dbbff726caf1027d63c2ad976d059a"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AndroidMessagesClient.kt",
+      "bytes": 36733,
+      "sha256": "de16ddc018cda861983bf11ef941d088a1fccc9c30297490d246d25cad6610f5"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/ArchiveCleanupWorker.kt",
+      "bytes": 1657,
+      "sha256": "9ec6f920a49c045d65f0fd963f8d287e005e106a1377825729af89ca40598baf"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AriesClient.kt",
+      "bytes": 29413,
+      "sha256": "ac2c33c96edfb287488392b59c1654e70fe04f37fcbf55f3a6e0f68bebae92e3"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AriesConnectionProvider.kt",
+      "bytes": 39050,
+      "sha256": "60ff6cbea06c4fd58f772bfced2db385c3e9ad55d5b91d6c5ac1022c0bddf213"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AriesCrypto.kt",
+      "bytes": 12634,
+      "sha256": "91fa99b5847c7f9da03de0ce89c840d5947eb8824fd0d34c4402c9e91bf754b5"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AriesDeviceName.kt",
+      "bytes": 2688,
+      "sha256": "6f17b346fde160ce892b7b9e63c90b82e4d9bbc412c1fb5549fd6c9595c088e5"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AriesGroupStore.kt",
+      "bytes": 18772,
+      "sha256": "940722020d5de96ead25347325e039a7f8c0bd48fbb8895a1e061c3bce4485d2"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AriesIdentityStore.kt",
+      "bytes": 9489,
+      "sha256": "acd54fadaad125808b69d231c8c84cc240d1cfce22605cca18c542e91956911d"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AriesMembershipState.kt",
+      "bytes": 3487,
+      "sha256": "7196649239e6c9635a8d65765441c666ed4007f0ba4ddf10ee808ad68a553f15"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AriesProtocolPolicy.kt",
+      "bytes": 5039,
+      "sha256": "709c49ba45e874612a78dd4c73c5a512b8f78ac8992a27a35ca073cfa8f74134"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AriesProviderScope.kt",
+      "bytes": 2750,
+      "sha256": "70962590c65ba92cad97e1622cf4c6875deb5f043b9f86542e3afae1beba1c62"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AriesProviderVault.kt",
+      "bytes": 3356,
+      "sha256": "d6eed2bcbe9533da0fcbd90ad2c7d80b7a10c0c44446b2fea27ed2a7d6047b63"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AssistantStreamAdapters.kt",
+      "bytes": 24280,
+      "sha256": "13ad023e9043795c21ac130f279829859abb5d48b408b60093858d27182f65e2"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AssistantStreamProtocol.kt",
+      "bytes": 37134,
+      "sha256": "1c04ff5f6408eea443d46f74d4278e2255bde913a52c0d750f4b2d0c9e1731ca"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/AssistantStreamSnapshotJson.kt",
+      "bytes": 13251,
+      "sha256": "4fe3f391e80aeb8aab04155e18c6cca761fa3f8a1ceadfd9d521e81ef11d0ebf"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/BackgroundTaskAndroidStore.kt",
+      "bytes": 1851,
+      "sha256": "abcce272209b4e5d87449d1973b25bea382468d9288c2ffbe209964c2980db4c"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/BackgroundTaskCredentialBoundary.kt",
+      "bytes": 1181,
+      "sha256": "aec53c73ced95ca43172ddcc5116762bdaba6dcb689d7a299222aa82828220d6"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/BackgroundTaskEngine.kt",
+      "bytes": 15574,
+      "sha256": "4451b3587da1d51bc9b2ec39f14374c79201c0bbe013d7664780477cab6a971f"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/BackgroundTaskJson.kt",
+      "bytes": 3105,
+      "sha256": "fd4885ab9ec087e25241bbe2cf61919e7c10ff0cce716399b72bc87772d7af67"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/BackgroundTaskModels.kt",
+      "bytes": 3105,
+      "sha256": "8bb1e04d1615e13494a476befb0e6ba3ca3cddf3cd62acd121d96df7f21d9f69"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/BalanceStore.kt",
+      "bytes": 10133,
+      "sha256": "888c706dfb9f5708c3778c2e5b3b4561a413c73de5178da4127fba9d3a41ae32"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/CacheStore.kt",
+      "bytes": 10454,
+      "sha256": "8f2dc205ef1ced2121f7834cd2a160e6c243b2d8b7ebee32c78667b8e41f23c6"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/ChatMessage.kt",
+      "bytes": 366,
+      "sha256": "6709dbd4f04d53523f4f08ba3c38dfb54d9ac80f4347204e2aa5b3879a0fc8af"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/ChatRunMetrics.kt",
+      "bytes": 10720,
+      "sha256": "c586372d3a41c284c7f251172960d3c2265f23a55ba026dd4a3268e5c7ae0ae9"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/ComponentDownloadClient.kt",
+      "bytes": 10073,
+      "sha256": "8c38dd070c32fd1d51528758c70562944fd7dae55ae01c82b6746814550f2848"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/ConnectionPackageValidator.kt",
+      "bytes": 13846,
+      "sha256": "15e2207d9ba411f479a9819f3106fe400651c60d9cedadc4b9f0f8b2a25e6e2c"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/ConnectionPluginPackage.kt",
+      "bytes": 8483,
+      "sha256": "8ee61c17dace39c1da762bfb43a4f3f716df9997e3c615583802a74d0bb50bba"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/ConversationAttachment.kt",
+      "bytes": 617,
+      "sha256": "92cf7629c33604ded027ad51276ed851921e93960eef7bcba1c0a8af7e3ca726"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/ConversationAttachmentStore.kt",
+      "bytes": 21537,
+      "sha256": "d604c4bd685ca93a53913bf6c7e34c49b3c649b89e53fb19bf9389b07a8e9e59"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/DeepSeekBalanceClient.kt",
+      "bytes": 10337,
+      "sha256": "f936c63ceec6e2e6e9fee930643915acef9c9e9d4e0abdfb60b6f1bf8236b347"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/DeepSeekChatClient.kt",
+      "bytes": 21902,
+      "sha256": "d1bf732515a8ddd96cbf3c8b91cabbe3c997e500c1a0b361b2bcd13374b5a23b"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/DeepSeekChatProtocol.kt",
+      "bytes": 11866,
+      "sha256": "88359d476f0fb1e95c5423b42f8a589722b619341cbbe7fb69e328e4d67e5150"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/DeepSeekThinkingPolicy.kt",
+      "bytes": 529,
+      "sha256": "b7008405f88a56f35e86a88e2e2937a99629e543eb4bfd3309eb7750ae9ce81c"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/DemoRepository.kt",
+      "bytes": 137146,
+      "sha256": "e74465923f3bd44cc7e0a729c7f3bb41433a0cb0843bda948a65c9985148fbed"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/DeveloperCenterClient.kt",
+      "bytes": 43992,
+      "sha256": "b507f803aa843a0d80d4814d91820d563fb834dd06e96bc5edf07836ec7a698c"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/DeveloperCenterPresenceClient.kt",
+      "bytes": 19995,
+      "sha256": "41c9f31ffc2eed4040b6158cdeb369a8c81dd50a195398bde375e56a5f6081dd"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/LinuxArchiveExtractor.kt",
+      "bytes": 10420,
+      "sha256": "884f8200c5faa43e6f9d9686e6738fb86020771a0a8f4f15beb6439b471948b7"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/LinuxRuntimeContract.kt",
+      "bytes": 2239,
+      "sha256": "c70b210601a59732141c57e99ac735713ba2a66a1c876663ee7a9a67d5f642b8"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/LinuxRuntimeManager.kt",
+      "bytes": 31006,
+      "sha256": "37e9f7b71bc76579f7cc3284424c387ee49a1a0711301750b5043ff8bdecb847"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/LocalPluginBridge.kt",
+      "bytes": 7704,
+      "sha256": "b088f3b06646cae99f41582d18fcdcfef16cc7f337fdce56ee2a4d914fb94fd5"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/LocalPluginIpcPolicy.kt",
+      "bytes": 7213,
+      "sha256": "4fdd25b4e8e570ac576cb0583be9f895dd9ac0e21ed3d12c736b14aabf2716b7"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/NoticeStore.kt",
+      "bytes": 11067,
+      "sha256": "ae49bc5706cefbc9fa6e2731cf76080eec6480348f986a5b76799cca084df257"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/NotificationSettingsStore.kt",
+      "bytes": 11182,
+      "sha256": "922491e127d9741a7762b43b64394ac0859b3c2deb54ba3c4f9407263a8cb48b"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialChatHistory.kt",
+      "bytes": 4936,
+      "sha256": "19e976ccaa89bb8bbadb22e4d9e7eeac56f0d908fa1948827c0173dd03a15d3d"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialLinuxScriptProvider.kt",
+      "bytes": 1550,
+      "sha256": "6894996d7514cf5d1af1d69d40ec8750472779836b3c1efe08e253d7f573a47a"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialToolContract.kt",
+      "bytes": 13030,
+      "sha256": "ce23998a71e3693ffe03384ab865207f956377774c2807b00718a24728fb8513"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialToolDispatcher.kt",
+      "bytes": 19724,
+      "sha256": "68c278ce81e2b88907df78eb2b3fd56efb5816fa2f04df92b8f90c4433ee92d2"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialToolOutputStore.kt",
+      "bytes": 7433,
+      "sha256": "e708b39d81aa68e6356698579a84a2f6b918360a44dcc1874e93883fadffe972"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialToolSession.kt",
+      "bytes": 12705,
+      "sha256": "f38ac5acf845ec8bdc5787e8d77e04b0105f512f160503edd2b4a35f224295f9"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialToolWeatherAdapter.kt",
+      "bytes": 590,
+      "sha256": "1eead29632b9469fcf01740de347f43e4f77868a3cc5371f8f15c551a283c841"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialWeatherClient.kt",
+      "bytes": 17491,
+      "sha256": "6c12ed5099046fc0f72bda18da52b59e35de8f0d13e2877a440a6c4e07d6edad"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialWebClient.kt",
+      "bytes": 18465,
+      "sha256": "89ecc8e3c2a10c889a04115c3176155e6c26eeaf60f467944ec19cd9e8bf59c5"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/SettingsContract.kt",
+      "bytes": 3749,
+      "sha256": "efcc212de224646086ee09480cc941807b6bd156ab34374d30ca6b1d1355cccc"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/SettingsRuntimeStore.kt",
+      "bytes": 9934,
+      "sha256": "f6456593e7e9f94325ceab10092e45f5c335b77620591bc0d6227e99c2bd116c"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/UsageStore.kt",
+      "bytes": 9825,
+      "sha256": "4241248280df738812c2a8de14d56ede1c86770668ebd3262399b597b19b2acf"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/WorkspaceDeletePolicy.kt",
+      "bytes": 1357,
+      "sha256": "47e3c17b89e9992c0e430bbc7533895b716a0cf15844ce24cbb7ad0932a03e0f"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/WorkspaceStore.kt",
+      "bytes": 27368,
+      "sha256": "c1a75997ea240a9e278d518d7f846e382b05190ad1d60379c53c09aecbd1dec8"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/MainActivity.kt",
+      "bytes": 31997,
+      "sha256": "f8758ea084fa75b04d059024a53b2e1b80363be12b330e8678c4e9e90fd4bfdb"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/ActivityReceiptDetails.kt",
+      "bytes": 15565,
+      "sha256": "acd1e625cb8ef7763841e17dc04ee7507022025b91aa73e300f620d0140cdc2d"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/AnchoredGlassMenu.kt",
+      "bytes": 14018,
+      "sha256": "9b9661fbc7af13e381dde6637f0b54faa7855ab14f9da1a6c40b81e7b751b444"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/AssistantActivityFeed.kt",
+      "bytes": 21284,
+      "sha256": "9a90d90978ff006ee2c2060aad204508ddaaa945e57b83b1eb762bd91e6f51d7"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/AssistantActivitySummary.kt",
+      "bytes": 37156,
+      "sha256": "f64568b0349a8c8dc2b4af0abd3d5b6ccd291f365744858e64c7290aa1cbe8d9"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/AttachmentPanel.kt",
+      "bytes": 21199,
+      "sha256": "bbba864a166111431ab778860ca7c1c6f11ef415f68b40221c47fed1697c87ea"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/BackgroundTasksScreen.kt",
+      "bytes": 20393,
+      "sha256": "a041a8c3b0655108850060fc60f8b21cfe09ccbb0403285eefa5301b35193302"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/CameraQrScanner.kt",
+      "bytes": 29071,
+      "sha256": "8a91834f02b43268d9ab9cf70b5626ad7b0afd58c0d35175845d88abdff3da8b"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/ChatRunInfoBar.kt",
+      "bytes": 6750,
+      "sha256": "e23f87b87bbda2c35b9d67f7ba0ae364a887f2e7689ead1eb27f63b9700116e6"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/ChatScreen.kt",
+      "bytes": 48432,
+      "sha256": "164b70e2a010c402c07dc5cce129a4b66699c0bc5e6a5625a5be64ece96bce0a"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/AgentsTaskActions.kt",
+      "bytes": 9420,
+      "sha256": "26cf06a89ec86d0a1e00a6f963ba0086e629af9250582d0dd2ac7f7c4cf87253"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/ChatMarkdown.kt",
+      "bytes": 23192,
+      "sha256": "91b05bbe02742080987d57d7401c01e9434c6c48a75d3563fb99c73defa2dbfe"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/FishComponents.kt",
+      "bytes": 11905,
+      "sha256": "50fe13a2e3dc875d4f81b89e3cc2466d22433b40744ffdcbc440302e8b1d0d04"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/GlassButtonDeformation.kt",
+      "bytes": 12155,
+      "sha256": "463935766ef6221895a811566acedd4e611318ed3950d661c60cfe44bc2d3785"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/GlassButtonShadow.kt",
+      "bytes": 4823,
+      "sha256": "068c5c81a537e0ddabaf44b928cf4396636a892f8d3caf2124affbb86ce86a1c"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/GlassDrag.kt",
+      "bytes": 4067,
+      "sha256": "02c3fcee464a5e4e6358fe05a42319a87f686aef290a13072eb6e28dda5cee1a"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/GlassHaptics.kt",
+      "bytes": 768,
+      "sha256": "df43d442e9d2f06afd15c7697fc65c6100f609ffa095b4149304da0803b19ec5"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/GlassLensGeometry.kt",
+      "bytes": 1801,
+      "sha256": "1c43a866423b93191dbdc45ac0e75c96933635370637a07aed62d0e63818b16e"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/GlassMaterialProfile.kt",
+      "bytes": 9740,
+      "sha256": "5e3e1c7fd88e71abc858117ca45b9a9bf1fadaad5829c142ddfbd735d3f98ae3"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/GlassMotion.kt",
+      "bytes": 1456,
+      "sha256": "ef53a8c5be132fc59fdf3bb801548b605a2608a26c87e0bfd43df0e36c103ca7"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/GlassPairLensShader.kt",
+      "bytes": 23085,
+      "sha256": "3176772d8f5d8b96a3084901241d2a399c39e88f71e33103fcd6377a090df14d"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/GlassSurface.kt",
+      "bytes": 39706,
+      "sha256": "d622c1493ba4c058dd196036d978cc80b139be216ce77509b803a32f24f1b31d"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/LiquidGlassBridge.kt",
+      "bytes": 4748,
+      "sha256": "182fff47325612688f8e3e85ee4f7be610ea9ed1b90f0756851465925c515fc1"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/LiquidGlassButtonPair.kt",
+      "bytes": 12790,
+      "sha256": "a7031518250038ff2e667080b075c7d5df7a8d94400f42873a49151017d0f095"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/LiquidGlassFusionSurface.kt",
+      "bytes": 11670,
+      "sha256": "98e192c0c90cfe60c72c1a3b217f502a9589c775df95c72b510a7b97c514da1a"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/LivePageGlassMaterial.kt",
+      "bytes": 7021,
+      "sha256": "45afb294d7bc0dbc33a919409e4bd2ff7fe47328c9a447e37a49ae866e8c7b3a"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/NewSessionActions.kt",
+      "bytes": 5532,
+      "sha256": "adb38fc4a03a53ea3040b8ddc658ed91aaea3b7e0e5f25814bade40d2b9416a5"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/ScrollingGlassHeader.kt",
+      "bytes": 8846,
+      "sha256": "1749d3b49080dadd039755bee46870a439ccae197ec4b90cb29f338738de0134"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/SettingsPageTransition.kt",
+      "bytes": 15174,
+      "sha256": "5e7a7677f7be48e89bd61eb9760dc3107b64df79aaa2b69b75c15e180bbacc4c"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/SidebarTransition.kt",
+      "bytes": 10382,
+      "sha256": "1d3b3584cf7ee72cabcfb563698fd920983f55c5f302214b65db0cb7f2572a65"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/components/StreamRevealText.kt",
+      "bytes": 5486,
+      "sha256": "5ea426383b0aca524834d45ab860bf3cfc66a71ceb73cc8f94a511a6cf69851a"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/ConnectionPluginSection.kt",
+      "bytes": 12353,
+      "sha256": "a1229d0e06d6f724b1700ae712488e43bb69287b5d5efe77b758383e0f489517"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/ConversationArchiveScreen.kt",
+      "bytes": 5958,
+      "sha256": "3911239221d4a4bda8487796915f62de8761d9409212b6b83a8a591ea71191b2"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/ExtensionsScreen.kt",
+      "bytes": 43042,
+      "sha256": "35fbc4ec9ea8685f723005295ef3f330bbafb6911b73ae25dad655d1225098ab"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/FontSettingsScreen.kt",
+      "bytes": 10914,
+      "sha256": "cfa05511067bfade2020e47b7ea13969e415180f26c66c97f2df894545b257fb"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/FrontendPreviews.kt",
+      "bytes": 914,
+      "sha256": "b2b128c8f38391a2c6f09e118060c380c1b1fd9b09ad295a28eb6ef54cd68886"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/GeneratedFilePreview.kt",
+      "bytes": 1445,
+      "sha256": "c2fcbb09ec2db8e9c2c5162c98cc3963ce67e5516355854d7138584262fbb6a7"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/GeneratedFiles.kt",
+      "bytes": 9771,
+      "sha256": "753b5338c7c15ecc26e853feb8a4de77b4dbb16be518760e56985ce932f6edd6"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/LinuxComponentsContent.kt",
+      "bytes": 21402,
+      "sha256": "73d1c80624f3e7d611f74d31fd4021b0796b27ec4d878fd09e0d0437e915696c"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/ModelMenu.kt",
+      "bytes": 7672,
+      "sha256": "dcc6af80a79cc9c2cc72f96b050040e107c270eb2ebc88aa7de6d7b382507d1a"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/PageParts.kt",
+      "bytes": 9567,
+      "sha256": "8ad03e7f8adf69ee8cedad8e1c9799921007f7b6b9ab72309a6ec4873b0411ee"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/PairingScreen.kt",
+      "bytes": 64546,
+      "sha256": "331a40a285a94accf9afb07e8172001a70d1f96a182abb45fc7898fc25d6cdcc"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/PermissionScreen.kt",
+      "bytes": 25063,
+      "sha256": "b4f74b4e7ec74018e50ac6c54a183ab626d27e79f3572abc5096d401ffb5971f"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/RunScreen.kt",
+      "bytes": 9428,
+      "sha256": "dde5c67d1f1e0d677b75f8f1a5922424b3b554492ed9c9684615b0843f8d8e8b"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/SandboxMenu.kt",
+      "bytes": 4337,
+      "sha256": "a08006cdad863c969a18d2b8fb389b4fb5f2bdf5aba2312aa247ab05ef56f106"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/ScannerScreen.kt",
+      "bytes": 16367,
+      "sha256": "31999e6644a1a3f2593087115cb3a260c7b68181694e5b576c6a5a1fd773d39a"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/SettingsScreens.kt",
+      "bytes": 169036,
+      "sha256": "4cbfec8887bd6a41667112159ad3d4e2d84d7f04141196d4d4471367a3bbb4d4"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/SettingsScreens.kt.bak",
+      "bytes": 170338,
+      "sha256": "fe386f8bb5f5813af19edc38a103a61d8e33b2323e02bc96b709df6d7d8100db"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/theme/FishTheme.kt",
+      "bytes": 8114,
+      "sha256": "dd39c37e114ad8f096952494a2097f929de80a0c4bdf7c8fcf47b53547669f5a"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/TitleMorphHeader.kt",
+      "bytes": 3060,
+      "sha256": "a4f57b6d1f1ca368d88aadc2ed871f41b1e836ac13f56757ab560fbd072b2f35"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/WorkspaceSidebar.kt",
+      "bytes": 51136,
+      "sha256": "b6d0a1e7b756107f18508199d4a978ae881dd4e24c7f23a7c18505a03ad47b41"
+    },
+    {
+      "path": "app/src/main/res/drawable-nodpi/app_icon.png",
+      "bytes": 47046,
+      "sha256": "443be6225ba5740898420fa9aa0ff68e8ea0a4fa107607ecb2e449699bb62fbe"
+    },
+    {
+      "path": "app/src/main/res/drawable-nodpi/ic_whale_512.png",
+      "bytes": 167808,
+      "sha256": "36108e9ec59fbf7957ff34b90ee2c4215525a4c9a656692e15367ffa0a534bb3"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_arrow.xml",
+      "bytes": 535,
+      "sha256": "c43f114a642621ccbe5dc473b148498a79e46e7610f116cfcad5563e513faa91"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_chat.xml",
+      "bytes": 657,
+      "sha256": "a00ace453b7c782584e3a20d65acd59a6facadba602879ac5d59d232011c74c4"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_check.xml",
+      "bytes": 467,
+      "sha256": "c0113d514a7666fbdc00f1c64a62ca0a3424707f83b37c92f56b5f33d0241f02"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_chevron.xml",
+      "bytes": 573,
+      "sha256": "6e0088e137f338ae57a590d669b247b3dcc66ae396c12ccc4c228da5f5860aa3"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_close.xml",
+      "bytes": 537,
+      "sha256": "6916291f71b9f117fcb7c905a0c21f8c87b5f03fea4dec7a6a304dd5e5c7595b"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_collection.xml",
+      "bytes": 773,
+      "sha256": "8c9091acafc62994cbf0e70f71f534e145f03aca9af35395f9ce1b49e6738e73"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_document.xml",
+      "bytes": 500,
+      "sha256": "2cddba71a6c31920ba737a097c8017a4d702edb8dec86862017bc2c9215d28b4"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_download.xml",
+      "bytes": 774,
+      "sha256": "17d9632dede4e5da7a628c1d43cc9dfc0e5e4e498c31076b1df10370e9c6ab61"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_link.xml",
+      "bytes": 1286,
+      "sha256": "19e2a6bacb5c7d998fe4eee98190bbd4b1ae3d415685456007260fcb43d62f00"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_more.xml",
+      "bytes": 510,
+      "sha256": "3cb0b54c35cb992d923d695729d54c2b43a087fad7b38f7d54735f9bd4d4cd99"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_pause.xml",
+      "bytes": 714,
+      "sha256": "99a0aa59d7361b1d1a2aeb4c54e68d46e084c00da4aeff1ee10dc661b3419a34"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_play.xml",
+      "bytes": 709,
+      "sha256": "94dc04e7c0e979ac52380b988f5ad56365263c83da55c8450339f2ceda983552"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_plus.xml",
+      "bytes": 524,
+      "sha256": "742412363746e7c6d5def453be38661962ea82db7c758ae94e39c95d9661af34"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_search.xml",
+      "bytes": 662,
+      "sha256": "0eb7d59c1fb8695b332b3be83199614d4a2091268a60416442826da88041ed6e"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_sidebar.xml",
+      "bytes": 689,
+      "sha256": "a2bd6aaed167794d2e24b34030ae052656be95bd37799b780b75f08f85059687"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_technology.xml",
+      "bytes": 745,
+      "sha256": "69a02b02f1482af73f6c770415b4edf5790cdb235a4cda90424585cc1b98ea55"
+    },
+    {
+      "path": "app/src/main/res/drawable/apple_timer.xml",
+      "bytes": 774,
+      "sha256": "c144aca37c2ff34a7aa19f15d0883a2727d9e949fef872b13c18172b735c7b25"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_deepseek.xml",
+      "bytes": 3704,
+      "sha256": "f447c5031138957cf5987e2437d7bb9b51ada6b4507d7bbef304a4232e7e72f1"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_whale.xml",
+      "bytes": 454,
+      "sha256": "ff3ba2d4e3e962ca424256653264d81c2a65046fce1db9aa7e219b47fc6ee92b"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_add.xml",
+      "bytes": 941,
+      "sha256": "c1458a29ddb9a23f82f8ed98da9417e48c19d9a1275c3ed1e27845dbc922fce7"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_archive.xml",
+      "bytes": 1321,
+      "sha256": "921fb736b08494214ed0feb0b4c92d818a22766bad6382d38ba35ee1a15ddb75"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_arrow.xml",
+      "bytes": 1116,
+      "sha256": "3d58bd849d1dd1e452c67a5117fea4bb00017471bb79ef2bee17712fca0c52a2"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_attach.xml",
+      "bytes": 1376,
+      "sha256": "1c388c3abd8f57316989e544fb113e77fd4ad778ce4a6a29ad3a8303d6c4b948"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_back.xml",
+      "bytes": 945,
+      "sha256": "a642e031aa71a7bdbd5750ab59daa9b66405aa5dee8d77dbeaed29cfacddc171"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_bell.xml",
+      "bytes": 1692,
+      "sha256": "823c3346b89c3eee527347411cbe0a08d849ec7d44b6e7fa68723e78da220987"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_camera.xml",
+      "bytes": 2005,
+      "sha256": "97e82c970924feabbacd4cf930950c19ad51bd61b98117d6c7c7c28a79ec4a92"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_chat.xml",
+      "bytes": 1186,
+      "sha256": "6b6f48e08457208628c1566d63821d1accc94104dc5d1d487a59b1d398bd0423"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_check.xml",
+      "bytes": 941,
+      "sha256": "d6404443b7b7713af1d1043572d938eb2d388a27f078ee7e8641f33f8cda6918"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_chevron.xml",
+      "bytes": 939,
+      "sha256": "25a8804efa05dc0e91466dfcbd36b6b45410e7cb3434cbfa2e3c66e5f2f7d93c"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_chevrondown.xml",
+      "bytes": 933,
+      "sha256": "529377410d52895bf94c499cc71563f4b7d6708afe89322d9c560780847a2372"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_close.xml",
+      "bytes": 1005,
+      "sha256": "e0fba2c4496a26ec2d2ab6668e680a5dc05893bd0e5f5436c475d193d2348478"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_document.xml",
+      "bytes": 1548,
+      "sha256": "90fe54f234b5ec12c06c86aa832390d6dc03be268b455ac41a5fe3708b4b1ed0"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_download.xml",
+      "bytes": 1526,
+      "sha256": "67ea43789def25914d499daecd85b1f10477501a09d0f25c9701477207850949"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_edit.xml",
+      "bytes": 1169,
+      "sha256": "743a03e005a86cff15cb76266bee515a285aa086185cae7c959b6da5407ac0a0"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_flashlight.xml",
+      "bytes": 1398,
+      "sha256": "9b7dfbb3a9e939c00efc9acb55dc2a5bcc8c0168fb80c52abf9d9e0edf6dcf70"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_flashlightoff.xml",
+      "bytes": 1398,
+      "sha256": "9f5a10b8e1711ce62f78d5c7e183de36586ff79ff12312f6acb6a0b8a97273fa"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_folder.xml",
+      "bytes": 1202,
+      "sha256": "7c411976b1530781eb3b6df4d7ad63e459e71133dc4f92a95da95a3b9e686a57"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_folderedit.xml",
+      "bytes": 2888,
+      "sha256": "fb851728ac81fde2f03a1516f56af7df74a8c8447055f9c3c15cd1fb8ea0ae23"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_grid.xml",
+      "bytes": 2300,
+      "sha256": "86c195279ba34587ed7f861b6ba5ccb7c58b98b6debcfdbbfb80d09c842c90b4"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_groupchat.xml",
+      "bytes": 1746,
+      "sha256": "fa45701e30335192bdcdb63187e1b7c82778c6ae82cd7b9791381aae9d26a57b"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_info_circle.xml",
+      "bytes": 822,
+      "sha256": "0bbad1a069dbacd4ce0714404437c86b8e3c2bd19ae204abb5c9281c2304ef6d"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_link.xml",
+      "bytes": 1529,
+      "sha256": "799ae94ae2211e56ffdf2a3340d1f5d412217e471a43b3b70ce75b68282dba96"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_lock.xml",
+      "bytes": 1182,
+      "sha256": "6d8805afe5560123ccde4e7b22b89edb214d0c926f25f2ecc5b446e9d2545ae4"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_menu.xml",
+      "bytes": 1590,
+      "sha256": "1a11886a2e713789642a8487a56b8afcd3e2a677b8db5e4cc98eccef5a53b649"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_model.xml",
+      "bytes": 2779,
+      "sha256": "b9ed2c6d41b573ef54e3d78a7f5f243f5e357efd707061023e7613c05f718b28"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_moon.xml",
+      "bytes": 1361,
+      "sha256": "da5dbb6413e534642c0c01d07ef70f6607b86514b77d7ba2e8d1e0a89390458d"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_more.xml",
+      "bytes": 1084,
+      "sha256": "e55e62987c0f215c92f44e774dc02d4585a5b00eb6e5a5149bc2b89c12f2c627"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_pair.xml",
+      "bytes": 1990,
+      "sha256": "3f609d6e1225a8e3cac7c329f8607d932dcfc3ee6219320c6cce64a418f79038"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_pause.xml",
+      "bytes": 958,
+      "sha256": "8c075c8e84f386e5a9613d2db80d4e664d05af61057049999e4fc0dd9702b7f9"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_photo.xml",
+      "bytes": 1293,
+      "sha256": "5af9b781383d7953d318321dac9f3b49e862237be5c6ddee59c378e6ee4f317d"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_play.xml",
+      "bytes": 823,
+      "sha256": "85eebbcfec6ad3cdf336853eadc38dcfd529e487afc97737bfe02376a190db04"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_scan.xml",
+      "bytes": 3694,
+      "sha256": "75c4ad199b24ec16e0dd333db73d7f722da8d45b3ee3f27d0c24e85eab67c4cf"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_search.xml",
+      "bytes": 1123,
+      "sha256": "c0645a9dde438c7c415f47f8627d296269b83b986d2b76ae366f18b2f5726d2e"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_send.xml",
+      "bytes": 1109,
+      "sha256": "44ad351c722f5f9c62c1270ecac4075cc644c69179d54260fab104d95c6e1c2b"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_settings.xml",
+      "bytes": 3574,
+      "sha256": "5ed4d31c12f832f44ba2cccedc34aff707a78b41b5656fd47a1cf4838ca8331d"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_stop.xml",
+      "bytes": 720,
+      "sha256": "aae1199440d34c8b4dff7f3c8e1af3befde19a526a1d2e3084a42361eac8c331"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_stopwatch.xml",
+      "bytes": 1570,
+      "sha256": "e8c0e5bf260f8e3a4bcab161e0f8555492b061e0708fb3912db33daf1d96ac78"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_sun.xml",
+      "bytes": 2680,
+      "sha256": "d36658707a2b46d530be6516e80e2e68b517ebb1a11cc8e60ce0b386ce05ae0a"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_terminal.xml",
+      "bytes": 1364,
+      "sha256": "1463b0a5ec8baf7f6003f4984020f6051a888d64179d66f12ee17fff27730ac1"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_trash.xml",
+      "bytes": 1849,
+      "sha256": "823db43c5c8c5cf7e9efba1dece20f55082314f3d264796353ac9589551e1b4a"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_unlock.xml",
+      "bytes": 1271,
+      "sha256": "5202a2f1342ee3861c48181a6cc8bc00c8b4d23dba98a11053bf7b7473db3205"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_usage.xml",
+      "bytes": 1863,
+      "sha256": "ceb3020d4ea3895154fdf767a0012aa2958c7dc5475528c6f7d6e99baced9639"
+    },
+    {
+      "path": "app/src/main/res/drawable/sf_viewfinder.xml",
+      "bytes": 1777,
+      "sha256": "ee78fc4e1326193a0d8f8de0bc6fbe425e6a46d4609258337d6c27bb918f9c52"
+    },
+    {
+      "path": "app/src/main/res/raw/dafeiyu_download_ca.crt",
+      "bytes": 1578,
+      "sha256": "ec28390fc1d00344f8e95810a15d6cd8d67890dc9b0c7c12fa7d0af7204429cc"
+    },
+    {
+      "path": "app/src/main/res/values/styles.xml",
+      "bytes": 489,
+      "sha256": "8bd28d399df2635dfad33d91e3ea71c64db62054e873336fccb8d3c5574c2951"
+    },
+    {
+      "path": "app/src/main/res/xml/attachment_paths.xml",
+      "bytes": 189,
+      "sha256": "4e8cb2c2edfc9104a0d6c58be8bbe02ac0aad75ba017dd7578ceaa01e5ecb7e1"
+    },
+    {
+      "path": "app/src/main/res/xml/backup_rules.xml",
+      "bytes": 123,
+      "sha256": "df0caf5a169e312492ceaa3d7e6e053c831da3fc2038b99d83967c444549621f"
+    },
+    {
+      "path": "app/src/main/res/xml/data_extraction_rules.xml",
+      "bytes": 191,
+      "sha256": "ec0f1c6431c2434ac85c7933dd0fe21c430e9601ec4db70d0112557cbebf9993"
+    },
+    {
+      "path": "app/build.gradle.kts",
+      "bytes": 2352,
+      "sha256": "30c5c545135ca105f71567f18a50e882ed8a0982dc597c4894f613c4d1272e50"
+    },
+    {
+      "path": "build.gradle.kts",
+      "bytes": 552,
+      "sha256": "e2d2dfba18ea0c9f62c05e66ca083db711f2151fef912ad6da06b9b1383c1016"
+    },
+    {
+      "path": "settings.gradle.kts",
+      "bytes": 288,
+      "sha256": "386bc009189253a4e6061dcc862b4ed4cb7edb5719584fe3109544775f09b713"
+    },
+    {
+      "path": "gradle.properties",
+      "bytes": 233,
+      "sha256": "117904c8f4f953f48aa720c59ce13d1e25e6a04aba411fb134296a4a86097312"
+    },
+    {
+      "path": "tools/build.ps1",
+      "bytes": 2726,
+      "sha256": "7f73109af1d375f700755bb6caa375f9d19bfd6ebf4164cc29a8b144786198df"
+    }
+  ],
+  "externalInputsScope": "Gradle main sourceSets runtime/assets and runtime/jniLibs only; downloads and unpack staging are not packaged inputs.",
+  "externalInputs": [
+    {
+      "path": "runtime/assets/connection-plugin/dafeiyu-go-connect-0.2.0.tgz",
+      "bytes": 88680,
+      "sha256": "9df7085cd5fa9ecf0e6f9a31aace8d0272ef60c4a9aef12a2ea96efafdf6aa1b"
+    },
+    {
+      "path": "runtime/assets/connection-plugin/manifest.json",
+      "bytes": 381,
+      "sha256": "1dd9c410f09ddf085c050ab60b188103749a95f07c14bf6652d51e518b0845cc"
+    },
+    {
+      "path": "runtime/assets/linux-runtime/licenses/DSHA-MIT.txt",
+      "bytes": 1074,
+      "sha256": "e0ddc2f4a383d900a26e3148a19c256e9dbe06585a274307509e9714636be0b1"
+    },
+    {
+      "path": "runtime/assets/linux-runtime/licenses/GPL-3.0.txt",
+      "bytes": 35149,
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+    },
+    {
+      "path": "runtime/assets/linux-runtime/licenses/LGPL-3.0.txt",
+      "bytes": 7652,
+      "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+    },
+    {
+      "path": "runtime/assets/linux-runtime/licenses/libandroid-shmem-BSD-3-Clause.txt",
+      "bytes": 1529,
+      "sha256": "0dd43abe17196b0224cb0b159819af798cd508a82a21e5870126fff4e899a7eb"
+    },
+    {
+      "path": "runtime/assets/linux-runtime/licenses/node-v24.19.0-LICENSE.txt",
+      "bytes": 157606,
+      "sha256": "148eacf7863ef4329224a29398623077200a27194aa075569faf4a0a85566ca5"
+    },
+    {
+      "path": "runtime/assets/linux-runtime/licenses/proot-COPYING.txt",
+      "bytes": 19106,
+      "sha256": "0ffa6454acbe7e410ac6f0007df83b9b3161fe55484c1f4b87487c0f2d228a6d"
+    },
+    {
+      "path": "runtime/assets/linux-runtime/licenses/talloc-library-copyright.txt",
+      "bytes": 1056,
+      "sha256": "665fce5b1cb7c4b60abcffd7b48bb2d50ffc37ddc56538fcdd6323c971b636c6"
+    },
+    {
+      "path": "runtime/assets/linux-runtime/licenses/talloc-LICENSE.txt",
+      "bytes": 7651,
+      "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768"
+    },
+    {
+      "path": "runtime/assets/linux-runtime/NOTICE.txt",
+      "bytes": 1337,
+      "sha256": "d76bbc182b80c93b5e48c42f6cb5602129abd52b8b4c018c7856c6e1e18e9f4e"
+    },
+    {
+      "path": "runtime/assets/linux-runtime/runtime-lock.json",
+      "bytes": 4105,
+      "sha256": "3c44a2fb79040be67cb2e9347e793d492a48014ada18928884d754eee10bbaad"
+    },
+    {
+      "path": "runtime/assets/linux-runtime/sources/libandroid-shmem-v0.7.tar.gz",
+      "bytes": 8891,
+      "sha256": "1e5ff8459bc0a8c229dd8a94b27d119987e09ef3414331c2b5ebfff20b98e867"
+    },
+    {
+      "path": "runtime/assets/linux-runtime/sources/proot-v5.1.107.96.zip",
+      "bytes": 489963,
+      "sha256": "75f654fe60dea92dabff2bf083ae8bfe4f91baa6a1a374786a6bf391015eebaa"
+    },
+    {
+      "path": "runtime/assets/linux-runtime/sources/talloc-2.5.0.tar.gz",
+      "bytes": 690172,
+      "sha256": "912afa237510ae542a7733998eb18a12bcda35ab6729c8e2ddb43e8d0ebab007"
+    },
+    {
+      "path": "runtime/assets/linux-runtime/sources/termux-packages-3e13ceaa.zip",
+      "bytes": 15984042,
+      "sha256": "31987ac168b14d636c6cd5ed76edcc598c2d28a01b345d6279f8e11c28190c4f"
+    },
+    {
+      "path": "runtime/assets/node-runtime/runtime-lock.json",
+      "bytes": 4796,
+      "sha256": "55d65cf9433f44ab274d1cf8362087bca8afdc77c688f25b03fd96eac23d2795"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/liblinux_androidshmem.so",
+      "bytes": 14432,
+      "sha256": "84475798e07c8174dbbfaec70a827fdb02f19ffa69a589380c13e7507fd0e731"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/liblinux_proot.so",
+      "bytes": 247488,
+      "sha256": "1545b85b312505db6eb6908ff8b2ded0a77a3bd689c50ae85aa7c1d8445dd717"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/liblinux_prootloader.so",
+      "bytes": 18136,
+      "sha256": "cbdef0e652c2b78af25d867e1719fdebbb0915e25aae2dd35b3b5c1835f6b551"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/liblinux_prootloader32.so",
+      "bytes": 6244,
+      "sha256": "c429996fee730e1a4fe12625b22dab5a5bc2847a4cae274d36fd4a19cd8299a8"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/liblinux_talloc.so",
+      "bytes": 33592,
+      "sha256": "742b438c4d09e276985a61d44164c9de207b6d8cc268f3018cb3001961bcb309"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/libnode_exec.so",
+      "bytes": 45318136,
+      "sha256": "1ee21eebda8ba05919050fe0d2b84b773a5cb2d2d1a42a27bddfb5eaa1ee182e"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/librt_libc___shared_so.so",
+      "bytes": 1423696,
+      "sha256": "05bef9d3901910c3ff8ab450b03bc8b28383d363a2290f2f7b9aed7331ea6ff7"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/librt_libcares_so.so",
+      "bytes": 256776,
+      "sha256": "68733ce8d4bb1bdc87d8ec550c58c70f3dcdb0f8c48d86b83235f536cb736e83"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/librt_libcrypto_so_3.so",
+      "bytes": 5213680,
+      "sha256": "5dddfd86746aabaca2c13eea108c8968811a4f9dcccf5889e34ebff6be920949"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/librt_libcrypto_so.so",
+      "bytes": 5213680,
+      "sha256": "5dddfd86746aabaca2c13eea108c8968811a4f9dcccf5889e34ebff6be920949"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/librt_libicudata_so_78_3.so",
+      "bytes": 33108832,
+      "sha256": "71a7479056941b610589f82698cdfb220c169dce9bc7c78ef6a6e74d07b1e8fd"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/librt_libicui18n_so_78_3.so",
+      "bytes": 3358568,
+      "sha256": "3140b2b28d16a6486a65663f1c47a94a4bb0d9def51612f8e941414bd50c7a0e"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/librt_libicuio_so_78_3.so",
+      "bytes": 80136,
+      "sha256": "7d7aa87a56f1919450f9539257b78dc71959083482a30ce9e56d5ff9d024202e"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/librt_libicutest_so_78_3.so",
+      "bytes": 97008,
+      "sha256": "b7038a3a1696e8e2fde4fc3fc924d0fa8a753aa939cfeb83cb51ffb0ce7ded58"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/librt_libicutu_so_78_3.so",
+      "bytes": 228896,
+      "sha256": "132e6d528338976c0305351360daf3ef53f71a85eb4380ade175750b9680ee55"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/librt_libicuuc_so_78_3.so",
+      "bytes": 2029568,
+      "sha256": "91bcef1faba58b755d4870aaea95814d1753961fd72365c4701cfd4461e3584c"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/librt_libsqlite3_54_0_so.so",
+      "bytes": 1293744,
+      "sha256": "0459f6ccbc54fcca2dc9c10858f6fa006f8e68709ad0913d7c143a09ec6605e8"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/librt_libsqlite3_so_3_54_0.so",
+      "bytes": 1224016,
+      "sha256": "dd9e19af8ed4361487191bd0aa355657a447d2c94838a0eb615e0e18207701ae"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/librt_libssl_so_3.so",
+      "bytes": 880976,
+      "sha256": "595ce9fe0189a24ceae2eaa07721ac428a6df26794f5bfcfe4347013cbd4b9f2"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/librt_libssl_so.so",
+      "bytes": 880976,
+      "sha256": "595ce9fe0189a24ceae2eaa07721ac428a6df26794f5bfcfe4347013cbd4b9f2"
+    },
+    {
+      "path": "runtime/jniLibs/arm64-v8a/librt_libz_so_1_3_2.so",
+      "bytes": 72880,
+      "sha256": "c47748ed4b6ca6a2ecd664bab04795f3493956ab1f5cddc4ba0efa737ef3b711"
+    }
+  ]
+}

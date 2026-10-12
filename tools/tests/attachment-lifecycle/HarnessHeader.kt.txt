@@ -1,0 +1,40 @@
+package com.dafeiyu.mobile.data
+
+import android.content.Context
+import android.net.Uri
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.File
+
+// Only external repository state is substituted; attachment fields/methods follow verbatim.
+class DemoRepository(context: Context, val viewModelScope: CoroutineScope, indexRoot: File) {
+    var workspaceMode = WorkspaceMode.Lite
+    var selectedConversationId = "initial"
+    var composerGeneration = 0
+    var workspaceInitialized = true
+    private val attachmentStore: ConversationAttachmentStore? = ConversationAttachmentStore(context)
+    private val workspaceStore: WorkspaceStore? = WorkspaceStore(indexRoot)
+    private val conversationMessages = mutableMapOf<String, MutableList<ChatMessage>>()
+    val attachmentChoices = listOf(AttachmentPreview("preview-image", "example.png"))
+    val notices = mutableListOf<String>()
+    fun updateNotice(message: String) { notices.add(message) }
+    fun catalog() {
+        attachmentStore!!.list().forEach {
+            importedAttachments[it.id] = previewAttachment(it, includeText = false)
+        }
+    }
+    fun history(ids: List<String>) { conversationMessages["initial"] = mutableListOf(ChatMessage(ids)) }
+    fun metadataHasText() = importedAttachments.values.any { it.textContent != null }
+    fun cleanupBusy() = attachmentCleanupBusy
+    fun selectedBytes() = attachmentPreviews.sumOf { it.sizeBytes }
+    fun selectedTextBytes() = attachmentPreviews.sumOf {
+        it.textContent?.toByteArray(Charsets.UTF_8)?.size?.toLong() ?: 0L
+    }
+    private fun <K, V> mutableStateMapOf() = mutableMapOf<K, V>()
+    private fun <T> mutableStateListOf() = mutableListOf<T>()
+    private fun mutableIntStateOf(value: Int) = TestIntState(value)
+

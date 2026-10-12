@@ -1,0 +1,105 @@
+{
+  "recordedDate": "2026-10-10",
+  "method": "git shallow clone and read-only source inspection; no APK build or device validation",
+  "repository": "https://github.com/DSH-APP/DSHA",
+  "commit": "18eaee90616808455abb225a8ae8ce5ab37c7f40",
+  "committedAt": "2026-10-10T05:52:01Z",
+  "app": {
+    "package": "com.dsh.client",
+    "versionCode": 170,
+    "versionName": "0.2.21-20261009.0750-dsh0.2.0-rc.2",
+    "standardMinSdk": 30,
+    "lowMinSdk": 23,
+    "compileSdk": 37,
+    "targetSdk": 37,
+    "abi": "arm64-v8a",
+    "sourceLanguage": "Java 17"
+  },
+  "runtime": {
+    "dsh": "0.2.0-rc.2",
+    "pnpm": "10.34.5",
+    "ubuntuBaseVersion": 10,
+    "rootfsBundledInGit": false,
+    "dshRuntimeBundledInGit": false
+  },
+  "inputs": [
+    {
+      "path": "README.md",
+      "bytes": 26349,
+      "sha256": "3c096e746c63aa9599eaaca94e843adcdbbcd53732c5eb531ed05573b48c4a57",
+      "sourceUrl": "https://github.com/DSH-APP/DSHA/blob/18eaee90616808455abb225a8ae8ce5ab37c7f40/README.md"
+    },
+    {
+      "path": "AGENTS.md",
+      "bytes": 21767,
+      "sha256": "1338e4f55dbae01b1c333727b9450d4d5f3a4d10d18eec562523cdb1ac64fbd7",
+      "sourceUrl": "https://github.com/DSH-APP/DSHA/blob/18eaee90616808455abb225a8ae8ce5ab37c7f40/AGENTS.md"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1074,
+      "sha256": "e0ddc2f4a383d900a26e3148a19c256e9dbe06585a274307509e9714636be0b1",
+      "sourceUrl": "https://github.com/DSH-APP/DSHA/blob/18eaee90616808455abb225a8ae8ce5ab37c7f40/LICENSE"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "bytes": 14840,
+      "sha256": "4a259b40b45e3108841a8ea3738ebde8a68ac77d96480475788e114fbea87597",
+      "sourceUrl": "https://github.com/DSH-APP/DSHA/blob/18eaee90616808455abb225a8ae8ce5ab37c7f40/THIRD_PARTY_NOTICES.md"
+    },
+    {
+      "path": "app/build.gradle",
+      "bytes": 20600,
+      "sha256": "b3b7f12bc8bc8fbbb50c0252b24b31ccfb316a750be02aaa52360ab79b53b51a",
+      "sourceUrl": "https://github.com/DSH-APP/DSHA/blob/18eaee90616808455abb225a8ae8ce5ab37c7f40/app/build.gradle"
+    },
+    {
+      "path": "app/src/main/AndroidManifest.xml",
+      "bytes": 12476,
+      "sha256": "3b4d8d36c32b3d0bd35c46fefcc0100664b85d2b173e1ac1dfe6b38e148f3c3f",
+      "sourceUrl": "https://github.com/DSH-APP/DSHA/blob/18eaee90616808455abb225a8ae8ce5ab37c7f40/app/src/main/AndroidManifest.xml"
+    },
+    {
+      "path": "tools/runtime-tools.lock.json",
+      "bytes": 427,
+      "sha256": "dc6b58c0e3d514ff56242646d5db222d0e2b826321aa6ef1343ac2a405ab808b",
+      "sourceUrl": "https://github.com/DSH-APP/DSHA/blob/18eaee90616808455abb225a8ae8ce5ab37c7f40/tools/runtime-tools.lock.json"
+    },
+    {
+      "path": "tools/dsh-runtime/package.json",
+      "bytes": 7065,
+      "sha256": "4885ec233c3786b2ce17c396f64b3e922d3202b8a50a67a60e199c7d9e130b61",
+      "sourceUrl": "https://github.com/DSH-APP/DSHA/blob/18eaee90616808455abb225a8ae8ce5ab37c7f40/tools/dsh-runtime/package.json"
+    },
+    {
+      "path": "tools/dsh-runtime/package-lock.json",
+      "bytes": 422886,
+      "sha256": "a3cf19ad8320ca415ae4eeff288d649645c3637dd9d08b1dd8588d3013c2ea2d",
+      "sourceUrl": "https://github.com/DSH-APP/DSHA/blob/18eaee90616808455abb225a8ae8ce5ab37c7f40/tools/dsh-runtime/package-lock.json"
+    },
+    {
+      "path": "docs/security-model.md",
+      "bytes": 5428,
+      "sha256": "5cc94c90ca500f3064dc78f67d559b006a432094d19a2896dcf444b7e28df785",
+      "sourceUrl": "https://github.com/DSH-APP/DSHA/blob/18eaee90616808455abb225a8ae8ce5ab37c7f40/docs/security-model.md"
+    },
+    {
+      "path": "app/src/main/java/com/deepseekharness/app/runtime/ContainerRuntime.java",
+      "bytes": 11789,
+      "sha256": "460cc91c2cb77bb710790d1c161f93830a4453df9edc96080194b0a22a892199",
+      "sourceUrl": "https://github.com/DSH-APP/DSHA/blob/18eaee90616808455abb225a8ae8ce5ab37c7f40/app/src/main/java/com/deepseekharness/app/runtime/ContainerRuntime.java"
+    },
+    {
+      "path": "app/src/main/java/com/deepseekharness/app/HarnessService.java",
+      "bytes": 19999,
+      "sha256": "043e418e694d776430f6178bf99caa8b92d9fb4ef01d71e7e99b4c5c54bba4ec",
+      "sourceUrl": "https://github.com/DSH-APP/DSHA/blob/18eaee90616808455abb225a8ae8ce5ab37c7f40/app/src/main/java/com/deepseekharness/app/HarnessService.java"
+    },
+    {
+      "path": "app/src/main/java/com/deepseekharness/app/data/KeyVault.java",
+      "bytes": 5994,
+      "sha256": "e0c57984dc86fceffd03d6318ece91540fe5a44adca31794cbfbc90940860d42",
+      "sourceUrl": "https://github.com/DSH-APP/DSHA/blob/18eaee90616808455abb225a8ae8ce5ab37c7f40/app/src/main/java/com/deepseekharness/app/data/KeyVault.java"
+    }
+  ]
+}

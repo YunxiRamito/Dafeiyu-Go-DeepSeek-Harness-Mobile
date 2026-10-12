@@ -1,0 +1,4 @@
+ZXing Core 3.5.3
+Copyright (C) ZXing authors. Apache License 2.0.
+Dependency metadata verified from the published com.google.zxing:core:3.5.3 POM.
+Used only for on-device QR decoding. No remote API or automatic payload execution.

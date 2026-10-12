@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "intended_version": "0.1.19",
+  "intended_version_code": 20,
+  "device_status": "DEFERRED until main-agent FINAL_READY and APK gate",
+  "model_called": false,
+  "total_budget_bytes": 524288,
+  "per_message_character_budget": 8192,
+  "origin": [
+    {
+      "path": "network-tool-cases.json",
+      "bytes": 3784,
+      "sha256": "12b12d4e62f4bd182213b42ea7c6f05f3d7b76ef7e43a6a0940d0e27c5138220"
+    },
+    {
+      "path": "official-tool-outputs/18000000-0000-4000-8000-000000000001/content.txt",
+      "bytes": 54,
+      "sha256": "9157e2b93fba6c8cb856ff5a3aa568d8a7f119bcf57af7937260bd1227cf1590"
+    },
+    {
+      "path": "official-tool-outputs/18000000-0000-4000-8000-000000000001/metadata.json",
+      "bytes": 166,
+      "sha256": "6fe15cbc25fc0b76ac580d2f9ef66fc81c7422e1f6bbc96e098cdfc2b141569b"
+    },
+    {
+      "path": "official-tool-outputs/18000000-0000-4000-8000-000000000002/content.txt",
+      "bytes": 54,
+      "sha256": "56211de15e25956ca727d2df7f076cc2911099bb0032ce3ca4720289e09c6d56"
+    },
+    {
+      "path": "official-tool-outputs/18000000-0000-4000-8000-000000000002/metadata.json",
+      "bytes": 197,
+      "sha256": "edde3102693540ff42db6d5af8799dfac89ce5f38298152eafc2773c40e5e977"
+    },
+    {
+      "path": "tasks.json",
+      "bytes": 25,
+      "sha256": "3904fc76a078b7a0e085d4290346a857362aeb170caa6c850823e3ef580bb5eb"
+    },
+    {
+      "path": "workspace-index.json",
+      "bytes": 9092,
+      "sha256": "19cdcf9d220f12cadc15f5609317451dd6b6fdc3d911b2bbaeeb5c97629a5217"
+    }
+  ],
+  "fixture": [
+    {
+      "path": "official-tool-outputs/18000000-0000-4000-8000-000000000001/content.txt",
+      "bytes": 54,
+      "sha256": "9157e2b93fba6c8cb856ff5a3aa568d8a7f119bcf57af7937260bd1227cf1590"
+    },
+    {
+      "path": "official-tool-outputs/18000000-0000-4000-8000-000000000001/metadata.json",
+      "bytes": 199,
+      "sha256": "277aa2011a47b59b045b6e119c1cad55c1960d455cdcb4925f28af247deb81db"
+    },
+    {
+      "path": "official-tool-outputs/18000000-0000-4000-8000-000000000002/content.txt",
+      "bytes": 54,
+      "sha256": "56211de15e25956ca727d2df7f076cc2911099bb0032ce3ca4720289e09c6d56"
+    },
+    {
+      "path": "official-tool-outputs/18000000-0000-4000-8000-000000000002/metadata.json",
+      "bytes": 230,
+      "sha256": "de4a6be5191533ba094032ad7f8c84f3b531a2ee8fa70de0964c0c179d1d8e0c"
+    },
+    {
+      "path": "tasks.json",
+      "bytes": 25,
+      "sha256": "3904fc76a078b7a0e085d4290346a857362aeb170caa6c850823e3ef580bb5eb"
+    },
+    {
+      "path": "workspace-index.json",
+      "bytes": 76441,
+      "sha256": "5fbec8f0ddfebbaa3c298bc3ba6dfaed7ff14797dec435994b61b449a723e229"
+    }
+  ]
+}

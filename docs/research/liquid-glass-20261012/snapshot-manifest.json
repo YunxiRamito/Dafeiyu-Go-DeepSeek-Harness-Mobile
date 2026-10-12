@@ -1,0 +1,116 @@
+{
+  "audited_at": "2026-10-12T00:21:01.2209369+08:00",
+  "proxy_used": "http://127.0.0.1:7890",
+  "commit": "16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d",
+  "commit_date_utc": "2026-09-29T10:25:08Z",
+  "tree": "708d7ba066714d9399ab10d79ad1f639486255cd",
+  "tree_truncated": false,
+  "head_body_sha256": "05a98b22d07b327f4f7a2e40f5f7ea458162390a9e6f9ebf36de65eeb4e54076",
+  "note": "Retained first-pass HEAD JSON identifies the baseline, not a successfully repeated latest-HEAD check. HEAD headers describe the later HTTP 403 retry; download-manifest records retry failures, not source inventory. Pinned raw sources have their own successful HTTP headers.",
+  "sources": [
+    {
+      "path": "source/LICENSE",
+      "url": "https://raw.githubusercontent.com/QWEA0/Liquid-Glass-Android/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d/LICENSE",
+      "bytes": 1070,
+      "sha256": "b7b41578ce6b8d42fd7ebbb89d7c85d0e7085cdeabf8920d8e1b68b77d60f682",
+      "http_status_lines": [
+        "HTTP/1.1 200 Connection established",
+        "HTTP/1.1 200 OK"
+      ],
+      "response_dates": [
+        "Sun, 11 Oct 2026 16:11:58 GMT"
+      ]
+    },
+    {
+      "path": "source/README.md",
+      "url": "https://raw.githubusercontent.com/QWEA0/Liquid-Glass-Android/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d/README.md",
+      "bytes": 67657,
+      "sha256": "9865e4082a1511abd9953ae87e2e2ee8636984ee1ed264f0bb3be3a6f4c96a63",
+      "http_status_lines": [
+        "HTTP/1.1 200 Connection established",
+        "HTTP/1.1 200 OK"
+      ],
+      "response_dates": [
+        "Sun, 11 Oct 2026 16:11:57 GMT"
+      ]
+    },
+    {
+      "path": "source/liquidglass/build.gradle.kts",
+      "url": "https://raw.githubusercontent.com/QWEA0/Liquid-Glass-Android/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d/liquidglass/build.gradle.kts",
+      "bytes": 2832,
+      "sha256": "882d712c7e0983bdeae032f4ce43ac09866c7adcbd1429b2a7a11fcb675f4434",
+      "http_status_lines": [
+        "HTTP/1.1 200 Connection established",
+        "HTTP/1.1 200 OK"
+      ],
+      "response_dates": [
+        "Sun, 11 Oct 2026 16:11:59 GMT"
+      ]
+    },
+    {
+      "path": "source/liquidglass/src/main/java/com/example/liquidglass/BackdropCapture.kt",
+      "url": "https://raw.githubusercontent.com/QWEA0/Liquid-Glass-Android/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d/liquidglass/src/main/java/com/example/liquidglass/BackdropCapture.kt",
+      "bytes": 6960,
+      "sha256": "7a1fc0d5deb31099114b11af3bfd8ff9e3dfb42b438753d2db316d4c3c257218",
+      "http_status_lines": [
+        "HTTP/1.1 200 Connection established",
+        "HTTP/1.1 200 OK"
+      ],
+      "response_dates": [
+        "Sun, 11 Oct 2026 16:11:59 GMT"
+      ]
+    },
+    {
+      "path": "source/liquidglass/src/main/java/com/example/liquidglass/GlassLensRenderer.kt",
+      "url": "https://raw.githubusercontent.com/QWEA0/Liquid-Glass-Android/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d/liquidglass/src/main/java/com/example/liquidglass/GlassLensRenderer.kt",
+      "bytes": 27022,
+      "sha256": "6c1b7cbb1b03e3c82fae96b44e276e0a1fd8bb41a3af2a3af866fbd8eeb6ee60",
+      "http_status_lines": [
+        "HTTP/1.1 200 Connection established",
+        "HTTP/1.1 200 OK"
+      ],
+      "response_dates": [
+        "Sun, 11 Oct 2026 16:12:01 GMT"
+      ]
+    },
+    {
+      "path": "source/liquidglass/src/main/java/com/example/liquidglass/GlassMaterial.kt",
+      "url": "https://raw.githubusercontent.com/QWEA0/Liquid-Glass-Android/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d/liquidglass/src/main/java/com/example/liquidglass/GlassMaterial.kt",
+      "bytes": 1548,
+      "sha256": "ca03271907ccf0927582b9daa707627ecdeee0ebbc7b2a6bbcaea30a5f0a41c9",
+      "http_status_lines": [
+        "HTTP/1.1 200 Connection established",
+        "HTTP/1.1 200 OK"
+      ],
+      "response_dates": [
+        "Sun, 11 Oct 2026 16:12:02 GMT"
+      ]
+    },
+    {
+      "path": "source/liquidglass/src/main/java/com/example/liquidglass/LiquidGlassButton.kt",
+      "url": "https://raw.githubusercontent.com/QWEA0/Liquid-Glass-Android/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d/liquidglass/src/main/java/com/example/liquidglass/LiquidGlassButton.kt",
+      "bytes": 3655,
+      "sha256": "459e68be5b9f39aabe29821639d4a1639f0dee91381986d8e2d07ba4351a79ed",
+      "http_status_lines": [
+        "HTTP/1.1 200 Connection established",
+        "HTTP/1.1 200 OK"
+      ],
+      "response_dates": [
+        "Sun, 11 Oct 2026 16:12:02 GMT"
+      ]
+    },
+    {
+      "path": "source/liquidglass/src/main/java/com/example/liquidglass/LiquidGlassView.kt",
+      "url": "https://raw.githubusercontent.com/QWEA0/Liquid-Glass-Android/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d/liquidglass/src/main/java/com/example/liquidglass/LiquidGlassView.kt",
+      "bytes": 94302,
+      "sha256": "f66056679b27b3109b1e73da2a835199afb95204b428798302b0e2a0d18f7d52",
+      "http_status_lines": [
+        "HTTP/1.1 200 Connection established",
+        "HTTP/1.1 200 OK"
+      ],
+      "response_dates": [
+        "Sun, 11 Oct 2026 16:12:03 GMT"
+      ]
+    }
+  ]
+}

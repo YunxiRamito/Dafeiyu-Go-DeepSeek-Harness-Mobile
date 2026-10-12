@@ -1,0 +1,268 @@
+{
+  "commit": "9c12b2ea060e397ac6c554338599ae13d8578666",
+  "gitBlob": "f334065489ab590808027d71907b4daea000f0f3",
+  "symbols": [
+    {
+      "symbol": "magnifyingglass",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_search",
+      "weight": "bold"
+    },
+    {
+      "symbol": "pause.fill",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_pause",
+      "weight": "bold"
+    },
+    {
+      "symbol": "chevron.right",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_chevron",
+      "weight": "bold"
+    },
+    {
+      "symbol": "photo",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_photo",
+      "weight": "bold"
+    },
+    {
+      "symbol": "doc.text",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_document",
+      "weight": "bold"
+    },
+    {
+      "symbol": "xmark",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_close",
+      "weight": "bold"
+    },
+    {
+      "symbol": "chevron.down",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_chevrondown",
+      "weight": "bold"
+    },
+    {
+      "symbol": "plus",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_add",
+      "weight": "bold"
+    },
+    {
+      "symbol": "arrow.right",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_arrow",
+      "weight": "bold"
+    },
+    {
+      "symbol": "folder",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_folder",
+      "weight": "bold"
+    },
+    {
+      "symbol": "square.and.pencil",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_edit",
+      "weight": "bold"
+    },
+    {
+      "symbol": "arrow.down.circle",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_download",
+      "weight": "bold"
+    },
+    {
+      "symbol": "qrcode",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_scan",
+      "weight": "bold"
+    },
+    {
+      "symbol": "checkmark",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_check",
+      "weight": "bold"
+    },
+    {
+      "symbol": "moon",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_moon",
+      "weight": "bold"
+    },
+    {
+      "symbol": "gearshape",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_settings",
+      "weight": "bold"
+    },
+    {
+      "symbol": "chevron.left",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_back",
+      "weight": "bold"
+    },
+    {
+      "symbol": "square.grid.2x2",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_grid",
+      "weight": "bold"
+    },
+    {
+      "symbol": "stop.fill",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_stop",
+      "weight": "bold"
+    },
+    {
+      "symbol": "ellipsis",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_more",
+      "weight": "bold"
+    },
+    {
+      "symbol": "paperclip",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_attach",
+      "weight": "bold"
+    },
+    {
+      "symbol": "sun.max",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_sun",
+      "weight": "bold"
+    },
+    {
+      "symbol": "link",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_link",
+      "weight": "bold"
+    },
+    {
+      "symbol": "play.fill",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_play",
+      "weight": "bold"
+    },
+    {
+      "symbol": "bubble.left",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_chat",
+      "weight": "bold"
+    },
+    {
+      "symbol": "sidebar.left",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_menu",
+      "weight": "bold"
+    },
+    {
+      "symbol": "bell",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_bell",
+      "weight": "bold"
+    },
+    {
+      "symbol": "cpu",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_model",
+      "weight": "bold"
+    },
+    {
+      "symbol": "chart.bar",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_usage",
+      "weight": "bold"
+    },
+    {
+      "symbol": "terminal",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_terminal",
+      "weight": "bold"
+    },
+    {
+      "symbol": "camera",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_camera",
+      "weight": "bold"
+    },
+    {
+      "symbol": "arrow.up",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_send",
+      "weight": "bold"
+    },
+    {
+      "symbol": "flashlight.off.fill",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_flashlightoff",
+      "weight": "bold"
+    },
+    {
+      "symbol": "folder.badge.gearshape",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_folderedit",
+      "weight": "bold"
+    },
+    {
+      "symbol": "flashlight.on.fill",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_flashlight",
+      "weight": "bold"
+    },
+    {
+      "symbol": "lock.open",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_unlock",
+      "weight": "bold"
+    },
+    {
+      "symbol": "viewfinder",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_viewfinder",
+      "weight": "bold"
+    },
+    {
+      "symbol": "number.square",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_pair",
+      "weight": "bold"
+    },
+    {
+      "symbol": "lock",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_lock",
+      "weight": "bold"
+    },
+    {
+      "symbol": "trash",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_trash",
+      "weight": "bold"
+    },
+    {
+      "symbol": "archivebox",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_archive",
+      "weight": "bold"
+    },
+    {
+      "symbol": "stopwatch",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_stopwatch",
+      "weight": "bold"
+    },
+    {
+      "symbol": "bubble.left.and.bubble.right",
+      "transformation": "Original SVG path; square viewport and centered group translation only",
+      "resource": "sf_groupchat",
+      "weight": "bold"
+    }
+  ],
+  "sha256": "06320f4811b01150f14f389b340e365574318d0034f8a300ddc7f7a41033ef72",
+  "version": "4.0",
+  "cdn": "https://fastly.jsdelivr.net/gh/UsePreside/sf-symbols@main/src/symbolSet.json",
+  "repository": "https://github.com/UsePreside/sf-symbols"
+}

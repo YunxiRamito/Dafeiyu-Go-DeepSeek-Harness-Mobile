@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "frozen_at": "2026-10-12T02:36:03.7265759+08:00",
+  "status": "PREPARATION_FROZEN_DEVICE_AND_PRODUCTION_JVM_DEFERRED",
+  "intended_version": "0.1.20",
+  "intended_version_code": 21,
+  "final_apk_sha256": null,
+  "qa_inputs": [
+    {
+      "path": "BATCH020.md",
+      "bytes": 5363,
+      "sha256": "6515cc0b9a87837a55fe2d925a074701e0d9d6331fa4024ebf68103b4e72f91d"
+    },
+    {
+      "path": "fixture-manifest.json",
+      "bytes": 2757,
+      "sha256": "b6dfe077c51eceb4c0e5230aae35372c848b3647b0410f81accc75f929a206cf"
+    },
+    {
+      "path": "fixtures/official-tool-outputs/18000000-0000-4000-8000-000000000001/content.txt",
+      "bytes": 54,
+      "sha256": "9157e2b93fba6c8cb856ff5a3aa568d8a7f119bcf57af7937260bd1227cf1590"
+    },
+    {
+      "path": "fixtures/official-tool-outputs/18000000-0000-4000-8000-000000000001/metadata.json",
+      "bytes": 199,
+      "sha256": "277aa2011a47b59b045b6e119c1cad55c1960d455cdcb4925f28af247deb81db"
+    },
+    {
+      "path": "fixtures/official-tool-outputs/18000000-0000-4000-8000-000000000002/content.txt",
+      "bytes": 54,
+      "sha256": "56211de15e25956ca727d2df7f076cc2911099bb0032ce3ca4720289e09c6d56"
+    },
+    {
+      "path": "fixtures/official-tool-outputs/18000000-0000-4000-8000-000000000002/metadata.json",
+      "bytes": 230,
+      "sha256": "de4a6be5191533ba094032ad7f8c84f3b531a2ee8fa70de0964c0c179d1d8e0c"
+    },
+    {
+      "path": "fixtures/tasks.json",
+      "bytes": 25,
+      "sha256": "3904fc76a078b7a0e085d4290346a857362aeb170caa6c850823e3ef580bb5eb"
+    },
+    {
+      "path": "fixtures/workspace-index.json",
+      "bytes": 76441,
+      "sha256": "5fbec8f0ddfebbaa3c298bc3ba6dfaed7ff14797dec435994b61b449a723e229"
+    },
+    {
+      "path": "Invoke-QaBatch020.ps1",
+      "bytes": 1377,
+      "sha256": "ac791c462c6a9008f698c5aadacaac1deca724fca20c471e4e840197d5aa90b9"
+    },
+    {
+      "path": "InvokeProductionWebSmoke.ps1",
+      "bytes": 4106,
+      "sha256": "250a7ebd6df1d779e91c721138316f90846dcfcbe2998dfc12469214abfe3e6c"
+    },
+    {
+      "path": "InvokeSmallHttpsProbe.ps1",
+      "bytes": 6920,
+      "sha256": "800bb012fba62fe45575e1588fa9ac5687c853095c77226d2d71c726180427a2"
+    },
+    {
+      "path": "offline-current-run-info.xml",
+      "bytes": 996,
+      "sha256": "d27374c29c3a3f000f93b264c6ddcde73e9821ca0375e68f69d78e276b39bd6b"
+    },
+    {
+      "path": "PrepareFixture.ps1",
+      "bytes": 3533,
+      "sha256": "52fa70a72c4a65fa9a25fcb40c4ef2acd7151b7ef718378b6b454145264f10c5"
+    },
+    {
+      "path": "ProductionWebSmoke.kt",
+      "bytes": 4524,
+      "sha256": "a0e6f980d9ea2f00e55173c1fffed0ecaa5a37d346f40ed40c5b87180786c970"
+    },
+    {
+      "path": "QaBatch020.ps1",
+      "bytes": 13857,
+      "sha256": "080582f3c6736f6d1f43a4fa74de7b29f2202dbdeb707483a9659a2ce9a325fc"
+    },
+    {
+      "path": "QaCommon.ps1",
+      "bytes": 17140,
+      "sha256": "0ac03647e00946ac1ded3c95270ae73bb82c68b40ea9e802acccc98d174b1c2f"
+    },
+    {
+      "path": "QaLongChat.ps1",
+      "bytes": 8605,
+      "sha256": "7f506df0fe12ecf1d1a9f46da04bb0b49a506296debcd5f2cbc17c56b04918ba"
+    },
+    {
+      "path": "README.md",
+      "bytes": 21830,
+      "sha256": "7b66081eb7440b3332a0f91cae0d8ec22043f0b23f84214c88f765fa9e12ed41"
+    },
+    {
+      "path": "VerifyActivity019.ps1",
+      "bytes": 28875,
+      "sha256": "921043a6cff54c8e32c65112750d743ae7fa7f842adf0852b5b1c9e21c6944f9"
+    },
+    {
+      "path": "VerifyAppUnconfiguredUi.ps1",
+      "bytes": 730,
+      "sha256": "200fc44dc42de44541089d7035802ef7be868c8b19f3d901375ec743434a1d52"
+    },
+    {
+      "path": "VerifyFinalApk.ps1",
+      "bytes": 1526,
+      "sha256": "ffc370c398f777233214c77b6683dc8c2c3dd440d56d3fb1048ab5e8bf97d1d7"
+    },
+    {
+      "path": "VerifyFreeze.ps1",
+      "bytes": 4212,
+      "sha256": "435f0fabea76da94832b7776ef4c259ba22d0ec549781c5fbded03f28c07fade"
+    },
+    {
+      "path": "VerifyOffline.ps1",
+      "bytes": 43316,
+      "sha256": "07938488869eba7d6c2041b904979cd857629ad4dbb4bd3fe20e777d3b2e2ce3"
+    }
+  ],
+  "source_contracts": [
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/ChatRunInfoBar.kt",
+      "sha256": "28cf8fd8540b513ed5fcf71f6677c70a2766cd084fc83b875af7358f0d8465b9"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/BalanceStore.kt",
+      "sha256": "888c706dfb9f5708c3778c2e5b3b4561a413c73de5178da4127fba9d3a41ae32"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/data/OfficialWebClient.kt",
+      "sha256": "89ecc8e3c2a10c889a04115c3176155e6c26eeaf60f467944ec19cd9e8bf59c5"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/ChatScreen.kt",
+      "sha256": "684ef5bc81a2b4723bb1c777e3011014ea11ef83cc645afa3f14e0f5fb4a1031"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/GeneratedFiles.kt",
+      "sha256": "4eeaf2b1cf32766d03491fa28ddf335f1b00a7756d7f6ad523da8f06d220005e"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/AssistantActivityFeed.kt",
+      "sha256": "095f5088a8f4f6403eef32959c1921066d4ce848c3127fb8b61dca6465e1f047"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/AssistantActivitySummary.kt",
+      "sha256": "f64568b0349a8c8dc2b4af0abd3d5b6ccd291f365744858e64c7290aa1cbe8d9"
+    },
+    {
+      "path": "app/src/main/java/com/dafeiyu/mobile/ui/ActivityReceiptDetails.kt",
+      "sha256": "acd1e625cb8ef7763841e17dc04ee7507022025b91aa73e300f620d0140cdc2d"
+    }
+  ],
+  "offline_result": "runs/offline-398f6bec3b2545779f07eccf8432cb11/result.json",
+  "offline_result_sha256": "87a32dda195878b55c5559a964d28000e914ee145d6129c1e6573fb5bf4dc811",
+  "current_device_app_credentials": "UNKNOWN until main-agent runtime gate; no whole-device claim"
+}

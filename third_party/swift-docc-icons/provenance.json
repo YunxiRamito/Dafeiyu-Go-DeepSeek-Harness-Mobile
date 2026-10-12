@@ -1,0 +1,109 @@
+{
+  "commit": "c215689a67cec9742b7253befbd650b0d47973ea",
+  "icons": [
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "download",
+      "source": "src/components/Icons/DownloadIcon.vue",
+      "sha256": "a98e6594768be063c5a87387cf52f4973408732db08602e26f711585ca453093"
+    },
+    {
+      "modification": "SVG path conversion; removed surrounding circular path",
+      "name": "plus",
+      "source": "src/components/Icons/InlinePlusCircleIcon.vue",
+      "sha256": "05e1d7859b0164ed962b37789616b2b6a4a4b38fa185a6d23d2181a59b74446c"
+    },
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "chat",
+      "source": "src/components/Icons/ForumIcon.vue",
+      "sha256": "b2b2ecc07caf44502805ee4c4fe43679d79012597fb71fe855df3e7bf43c6fc4"
+    },
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "search",
+      "source": "src/components/Icons/SearchIcon.vue",
+      "sha256": "89e21ebb8ca5cba1b519cd63cca0ee26c436e1d5675ad64b37978868989d2c06"
+    },
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "technology",
+      "source": "src/components/Icons/TechnologyIcon.vue",
+      "sha256": "9bd3238b495624f3b029718c3faeb5fa219451ba0444c04298bffdac182521af"
+    },
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "pause",
+      "source": "src/components/Icons/PauseIcon.vue",
+      "sha256": "50ab7814cf9e91eca58989d9cc4af6b8cb6d5ba79c489a6d2285f56250c32967"
+    },
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "document",
+      "source": "src/components/Icons/DocumentIcon.vue",
+      "sha256": "38b89157f1e9f7b369d053b167668c63dffaaddc0af7fbde67def61ce14b3d6d"
+    },
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "timer",
+      "source": "src/components/Icons/TimerIcon.vue",
+      "sha256": "e2b0550286004783b2327a125c9fa61fc5686cda85d02355ec12467ba478f80b"
+    },
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "chevron",
+      "source": "src/components/Icons/ChevronRoundedIcon.vue",
+      "sha256": "d50a11b4e4e94b2e3a0872f214a5d230598ee7fc018f1a1e9e7f1d43357a7644"
+    },
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "close",
+      "source": "src/components/Icons/CloseIcon.vue",
+      "sha256": "72e339980c5cc2148140c3ce94283aa118f6fda306c4660775dada4a003007cb"
+    },
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "sidebar",
+      "source": "src/components/Icons/SidenavIcon.vue",
+      "sha256": "7d06fc20454c98f050ccdcc384cf2f44d9f33c00087724bf9ef54ea5e02f71ce"
+    },
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "arrow",
+      "source": "src/components/Icons/DiagonalArrowIcon.vue",
+      "sha256": "048e332fbef601a7d004a264540ee3975a10300d5a0dc1c00d0f45793b77717d"
+    },
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "check",
+      "source": "src/components/Icons/CheckmarkIcon.vue",
+      "sha256": "8c1a399d4d31ac97aa173684c88933cc4d85077820525f6baa44000ec823d5ac"
+    },
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "more",
+      "source": "src/components/Icons/EllipsisIcon.vue",
+      "sha256": "524976a0984144020b7bc90f115e3dd5aad8721e83e52dfc84f1fc7ca715fe6d"
+    },
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "play",
+      "source": "src/components/Icons/PlayIcon.vue",
+      "sha256": "3342797c810e025573e2d1eb3cc37c5730bff04a645db32fb16e8a15fd4dd786"
+    },
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "link",
+      "source": "src/components/Icons/LinkIcon.vue",
+      "sha256": "d0648878fb52c53d6b3ff95c7e322f4ad323bea36357c0e1853308d34446af74"
+    },
+    {
+      "modification": "SVG path conversion to Android VectorDrawable",
+      "name": "collection",
+      "source": "src/components/Icons/CollectionIcon.vue",
+      "sha256": "4bf147bdb743ec02fa5a76b5a1080cb9c39e0deda42e0289d8eeb66d0859fc84"
+    }
+  ],
+  "license": "Apache-2.0 with Runtime Library Exception",
+  "repository": "https://github.com/swiftlang/swift-docc-render"
+}

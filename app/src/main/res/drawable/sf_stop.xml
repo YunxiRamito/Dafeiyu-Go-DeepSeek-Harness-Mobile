@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Source: UsePreside/sf-symbols, SF Symbols 4.0 converted data. Local preview asset; see third_party/sf-symbols/NOTICE.md. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="25.901953" android:viewportHeight="25.901953">
+  <group android:translateX="1.2" android:translateY="1.206836">
+    <path android:fillColor="#FF000000" android:pathData="M0.0037 20.1252C0.0037 22.1852 1.3837 23.4852 3.5637 23.4852H19.9237C22.1237 23.4852 23.5037 22.1852 23.5037 20.1252V3.3752C23.5037 1.2952 22.1237 -0.0048 19.9237 -0.0048H3.5637C1.3837 -0.0048 0.0037 1.2952 0.0037 3.3752Z" />
+  </group>
+</vector>

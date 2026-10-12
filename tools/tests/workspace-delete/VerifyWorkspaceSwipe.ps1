@@ -1,0 +1,45 @@
+param([ValidateRange(192, 512)][int]$MaxHeapMiB = 512)
+$ErrorActionPreference = 'Stop'
+$projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
+$tempRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot '../Temp_Android'))
+$cacheRoot = Join-Path $tempRoot 'caches/gradle/caches'
+$moduleRoot = Join-Path $cacheRoot 'modules-2/files-2.1'
+$javaRoot = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { 'C:/Program Files/Java/JDK21' }
+function Find-CachedJar([string]$RelativeDirectory) {
+    $jar = Get-ChildItem -LiteralPath (Join-Path $moduleRoot $RelativeDirectory) -Recurse -File -Filter '*.jar' |
+        Sort-Object FullName | Select-Object -First 1 -ExpandProperty FullName
+    if (-not $jar) { throw "Missing offline dependency: $RelativeDirectory" }
+    return $jar
+}
+$stdlib = Find-CachedJar 'org.jetbrains.kotlin/kotlin-stdlib/2.1.20'
+$coroutines = Find-CachedJar 'org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/1.9.0'
+$annotations = Find-CachedJar 'org.jetbrains/annotations'
+$compilerClasspath = @(
+    (Find-CachedJar 'org.jetbrains.kotlin/kotlin-compiler-embeddable/2.1.20'),
+    $stdlib, $coroutines, $annotations,
+    (Find-CachedJar 'org.jetbrains.kotlin/kotlin-reflect'),
+    (Find-CachedJar 'org.jetbrains.intellij.deps/trove4j')
+) -join ';'
+$transforms = @(Get-ChildItem -LiteralPath (Join-Path $cacheRoot '8.11.1/transforms') -Recurse -File -Filter 'classes.jar' |
+    Where-Object { $_.FullName -match '[\\/]jars[\\/]classes\.jar$' })
+if (-not $transforms.Count) { throw 'Missing cached Compose implementation jars' }
+$classpath = (@($stdlib, $annotations, (Find-CachedJar 'androidx.collection/collection-jvm')) + $transforms.FullName) -join ';'
+$testRoot = Join-Path $tempRoot ('qa/workspace-delete/swipe-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $testRoot | Out-Null
+$source = [IO.File]::ReadAllText((Join-Path $projectRoot 'app/src/main/java/com/dafeiyu/mobile/ui/WorkspaceSidebar.kt'))
+$start = $source.IndexOf('internal enum class ConversationSwipe', [StringComparison]::Ordinal)
+$end = $source.IndexOf('@Composable', $start, [StringComparison]::Ordinal)
+if ($start -lt 0 -or $end -lt 0) { throw 'Missing production swipe/color helper markers' }
+$generated = Join-Path $testRoot 'WorkspaceSwipeSubject.kt'
+[IO.File]::WriteAllText($generated, "package com.dafeiyu.mobile.ui`nimport androidx.compose.ui.graphics.Color`nimport androidx.compose.ui.graphics.luminance`n" + $source.Substring($start, $end - $start))
+$java = Join-Path $javaRoot 'bin/java.exe'
+$jar = Join-Path $testRoot 'workspace-swipe.jar'
+Write-Output "Workspace swipe QA output: $testRoot"
+& $java "-Xmx${MaxHeapMiB}m" "-Djava.io.tmpdir=$testRoot" -cp $compilerClasspath org.jetbrains.kotlin.cli.jvm.K2JVMCompiler `
+    -no-stdlib -no-reflect -jvm-target 17 -Werror -classpath $classpath -d $jar `
+    $generated (Join-Path $PSScriptRoot 'WorkspaceSwipeChecks.kt') 2>&1 |
+    Tee-Object -FilePath (Join-Path $testRoot 'compile.log')
+if ($LASTEXITCODE -ne 0) { throw 'Production swipe helper compilation failed' }
+& $java "-Xmx${MaxHeapMiB}m" "-Djava.io.tmpdir=$testRoot" -cp "$jar;$classpath" com.dafeiyu.mobile.ui.WorkspaceSwipeChecksKt 2>&1 |
+    Tee-Object -FilePath (Join-Path $testRoot 'results.log')
+if ($LASTEXITCODE -ne 0) { throw 'Production swipe helper checks failed' }

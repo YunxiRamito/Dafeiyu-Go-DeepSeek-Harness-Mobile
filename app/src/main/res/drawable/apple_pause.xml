@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Apple Inc. and Swift authors; Apache-2.0 with Runtime Exception. Converted from PauseIcon.vue. plus omits surrounding circle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="14" android:viewportHeight="14">
+  <path android:fillColor="#FF000000" android:pathData="M5 4h1v6h-1z" />
+  <path android:fillColor="#FF000000" android:pathData="M8 4h1v6h-1z" />
+  <path android:fillColor="#FF000000" android:pathData="M7 0.5c-3.6 0-6.5 2.9-6.5 6.5s2.9 6.5 6.5 6.5 6.5-2.9 6.5-6.5-2.9-6.5-6.5-6.5zM7 12.5c-3 0-5.5-2.5-5.5-5.5s2.5-5.5 5.5-5.5 5.5 2.5 5.5 5.5-2.5 5.5-5.5 5.5z" />
+</vector>
+

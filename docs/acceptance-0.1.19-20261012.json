@@ -1,0 +1,78 @@
+{
+  "date": "2026-10-12",
+  "apkSha256": "c7e3320b4c483c05be842caa62f8f1158b9502ad6870a8ab14a5e5c7cf8a41f3",
+  "scope": "Android 0.1.19/code20 preview for user acceptance, including FishButton file-header scroll fix. Build passed; device acceptance is partial and has an outstanding bounded long-chat failure. This is not whole-app acceptance.",
+  "validation": {
+    "assembleDebug": "PASS; build-0.1.19-scroll-fix.log, BUILD SUCCESSFUL in 3m11s; 46 tasks, 12 executed and 34 up-to-date",
+    "lintDebug": "PASS with warnings",
+    "lintErrors": 0,
+    "lintWarnings": 138,
+    "lintInformation": 5,
+    "offlineQa": {
+      "status": "PASS",
+      "passed": 37,
+      "total": 37,
+      "evidence": "tools/tests/resume-qa-20261011/runs/offline-3706eb4576c94c4c966132b685811dcd/result.json",
+      "scope": "PowerShell selectors, fixture contracts, fail-closed gates and rollback checks; no ADB, JVM or model request"
+    },
+    "emulator": {
+      "serial": "emulator-5558",
+      "avd": "Dafeiyu_QA_API_37",
+      "acceleration": "host GPU and WHPX; isolated QA userdata",
+      "status": "PARTIAL",
+      "evidence": "tools/tests/resume-qa-20261011/runs/activity-019-30b3d08caa2b409c90848385ede716c9/result.txt",
+      "passed": [
+        "Terminal process collapse and expanded grouped activity/image-metadata receipts",
+        "Final reply remains associated with final model round after manual collapse",
+        "Three bounded activity expansion/collapse cycles",
+        "Full workspace/task/output transaction restoration, membership and SHA256, including original absence"
+      ],
+      "failure": "Label not found after bounded chat scrolling: QA_LONG_FIRST_019; exit 1 after original 24 swipes per direction. Long-chat end traversal did not pass.",
+      "failureAnalysis": "docs/research/QA-LONG-CHAT-20261012.md: stored frames show movement from reply 19 to 12 and back to 19. The bounded traversal did not cover reply 0; evidence does not support treating the whole list as immobile or certifying a unique cause.",
+      "notReached": [
+        "Repeated long-chat traversal between both ends",
+        "320dp metrics/composer device check",
+        "Interrupted task labels",
+        "Current PID bounded log and memory checks"
+      ],
+      "fixtureScope": "Synthetic stored conversations only; no model generation, shell-tool execution or actual bitmap decode"
+    },
+    "fileHeaderScroll": {
+      "status": "CENTER_SWIPE_OBSERVED",
+      "evidence": "tools/tests/resume-qa-20261011/runs/activity-019-67829cab2b7744e79e4c4f273eaa5867",
+      "observation": "After rebuilding with consumeDrag=false for the disclosure header, original center-start swipe changed the chat fingerprint and the captured PNG showed moved content. Diagnostic later failed on empty descendant UI bounds; no full diagnostic PASS claimed.",
+      "normalTapRegression": "DEFERRED"
+    },
+    "productionBrowser": {
+      "status": "HOST_JVM_ONLY_PASS",
+      "evidence": "tools/tests/resume-qa-20261011/runs/production-web-50467b2eac23488e9281339c455ea5b8",
+      "scope": "Earlier actual OfficialWebClient host JVM run, 4/4 checks, RFC768 body 6615 bytes; not final APK UID or paid model end-to-end verification"
+    },
+    "deferred": [
+      "Live streaming with user scroll, inertia, IME and conversation switching",
+      "Copy and quote interaction",
+      "Empty workspace deletion and restart persistence",
+      "Two-stage swipe archive/delete on device",
+      "Dark/light glass appearance and accessibility effects",
+      "Shared optical surface fusion for adjacent buttons",
+      "Actual image bitmap memory and peak GPU/CPU memory",
+      "Final APK UID web search/browser and paid model end-to-end tests",
+      "Child agent web tools, script executor and sandbox",
+      "Actual DSH runtime and App-only web adaptation plugin"
+    ],
+    "delivery": {
+      "status": "DELIVERED_FOR_USER_ACCEPTANCE",
+      "verifiedAt": "2026-10-12T00:49:52.3455375+08:00",
+      "desktopApk": "C:/Users/KitamaruRamito/Desktop/Dafeiyu-Go-Mobile-0.1.19.apk",
+      "desktopSha256Verified": true,
+      "phoneSerial": "192.168.5.201:33601",
+      "phoneModel": "PKB110",
+      "install": "adb install -r returned Success; app data retained",
+      "installedVersion": "0.1.19",
+      "installedVersionCode": 20,
+      "phoneLastUpdateTime": "2026-10-12 00:49:48",
+      "installedBaseApkSha256": "c7e3320b4c483c05be842caa62f8f1158b9502ad6870a8ab14a5e5c7cf8a41f3",
+      "scope": "Installation and package metadata/hash verification only; App not launched by delivery step. Physical-device UI acceptance remains pending."
+    }
+  }
+}

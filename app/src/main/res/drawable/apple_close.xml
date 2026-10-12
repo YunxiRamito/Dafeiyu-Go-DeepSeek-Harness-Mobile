@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Apple Inc. and Swift authors; Apache-2.0 with Runtime Exception. Converted from CloseIcon.vue. plus omits surrounding circle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="14" android:viewportHeight="14">
+  <path android:fillColor="#FF000000" android:pathData="M12.73,0l1.27,1.27-5.74,5.73,5.72,5.72-1.27,1.27-5.72-5.72L1.28,13.99,.01,12.72,5.72,7.01,0,1.28,1.27,.01,6.99,5.73,12.73,0Z" />
+</vector>
+

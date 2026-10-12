@@ -1,0 +1,30 @@
+{
+  "note": "Read-only scalar calculations in dp-normalized units. No shader, JVM, GPU, device or production test was run.",
+  "circle_radius_dp": 24.0,
+  "gap_dp": 8.0,
+  "midpoint_union": [
+    {
+      "smoothing_dp": 8,
+      "signed_field_dp": 2.0
+    },
+    {
+      "smoothing_dp": 16,
+      "signed_field_dp": 0.0
+    },
+    {
+      "smoothing_dp": 20,
+      "signed_field_dp": -1.0
+    },
+    {
+      "smoothing_dp": 24,
+      "signed_field_dp": -2.0
+    }
+  ],
+  "current_bridge_at_strength_1": {
+    "end_half_height_dp": 21.12,
+    "waist_half_height_dp": 10.1376,
+    "left_bridge_x_dp": 48,
+    "circle_x_at_bridge_top_dp": 35.399368403556394,
+    "shoulder_missing_span_dp": 12.600631596443606
+  }
+}

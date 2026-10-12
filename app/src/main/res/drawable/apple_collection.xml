@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Apple Inc. and Swift authors; Apache-2.0 with Runtime Exception. Converted from CollectionIcon.vue. plus omits surrounding circle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="14" android:viewportHeight="14">
+  <path android:fillColor="#FF000000" android:pathData="m1 1v12h12v-12zm11 11h-10v-10h10z" />
+  <path android:fillColor="#FF000000" android:pathData="m3 4h8v1h-8zm0 2.5h8v1h-8zm0 2.5h8v1h-8z" />
+  <path android:fillColor="#FF000000" android:pathData="m3 4h8v1h-8z" />
+  <path android:fillColor="#FF000000" android:pathData="m3 6.5h8v1h-8z" />
+  <path android:fillColor="#FF000000" android:pathData="m3 9h8v1h-8z" />
+</vector>
+

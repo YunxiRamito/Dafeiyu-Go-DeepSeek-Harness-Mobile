@@ -1,0 +1,21 @@
+package com.dafeiyu.mobile.data
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+enum class WorkspaceMode { Lite, Dsh }
+data class AttachmentPreview(val id: String, val mimeType: String?, val sizeBytes: Long, val textContent: String? = null)
+
+// Only surrounding state is substituted. Preflight and model gates follow production verbatim.
+class PreflightSubject(val attachmentStore: ConversationAttachmentStore?, val deepSeekClient: DeepSeekChatClient?) {
+    val importedAttachments = mutableMapOf<String, AttachmentPreview>()
+    val conversationMessages = mutableMapOf<String, List<ChatMessage>>()
+    var officialEngineStreaming = true
+    val notices = mutableListOf<String>()
+    var result: List<DeepSeekChatClient.HistoryMessage> = emptyList()
+    fun updateNotice(message: String) { notices += message }
+    fun register(file: ConversationAttachment) {
+        importedAttachments[file.id] = AttachmentPreview(file.id, file.mimeType, file.sizeBytes)
+    }
+    fun acceptsImages(model: ModelChoice) = supportsImages(model)
+

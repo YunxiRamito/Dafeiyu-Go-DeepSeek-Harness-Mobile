@@ -1,0 +1,85 @@
+{
+  "sha": "16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d",
+  "node_id": "C_kwDOQNf-OdoAKDE2YWZlNGQ4YjVkMDhhMzcwZDNmOGM1MGIwOGQ3ZjVjNmViNWRhNGQ",
+  "commit": {
+    "author": {
+      "name": "pandadog",
+      "email": "pandadog@gmail.com",
+      "date": "2026-09-29T10:25:08Z"
+    },
+    "committer": {
+      "name": "pandadog",
+      "email": "pandadog@gmail.com",
+      "date": "2026-09-29T10:25:08Z"
+    },
+    "message": "README / llms.txt 补充玻璃背景含 WebView 时需给 WebView 开硬件层的说明；backdropSource 注释同步",
+    "tree": {
+      "sha": "708d7ba066714d9399ab10d79ad1f639486255cd",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/708d7ba066714d9399ab10d79ad1f639486255cd"
+    },
+    "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/commits/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d",
+    "comment_count": 0,
+    "verification": {
+      "verified": false,
+      "reason": "unsigned",
+      "signature": null,
+      "payload": null,
+      "verified_at": null
+    }
+  },
+  "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/commits/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d",
+  "html_url": "https://github.com/QWEA0/Liquid-Glass-Android/commit/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d",
+  "comments_url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/commits/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d/comments",
+  "author": null,
+  "committer": null,
+  "parents": [
+    {
+      "sha": "42e6bd717f0426d9a8e36a0c435a9bc32168e25c",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/commits/42e6bd717f0426d9a8e36a0c435a9bc32168e25c",
+      "html_url": "https://github.com/QWEA0/Liquid-Glass-Android/commit/42e6bd717f0426d9a8e36a0c435a9bc32168e25c"
+    }
+  ],
+  "stats": {
+    "total": 42,
+    "additions": 42,
+    "deletions": 0
+  },
+  "files": [
+    {
+      "sha": "02ff47deaf41fcac07337cb544f4bdb62665f7e1",
+      "filename": "README.md",
+      "status": "modified",
+      "additions": 32,
+      "deletions": 0,
+      "changes": 32,
+      "blob_url": "https://github.com/QWEA0/Liquid-Glass-Android/blob/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d/README.md",
+      "raw_url": "https://github.com/QWEA0/Liquid-Glass-Android/raw/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d/README.md",
+      "contents_url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/contents/README.md?ref=16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d",
+      "patch": "@@ -376,6 +376,23 @@ anywhere in the tree, the overlap is computed from screen coordinates, and scrol\n repaints the glass automatically. Note that glass inside a `ScrollView` scrolling *with* the\n content sees a fixed backdrop by definition — that's physically correct, not a bug.\n \n+**Glass over a `WebView`: why does the WebView keep redrawing on a static page?**\n+Give the `WebView` a hardware layer whenever a glass's backdrop contains it (the default\n+parent capture, or a `backdropSource` that is the WebView's ancestor):\n+\n+```kotlin\n+webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)\n+```\n+\n+Without it the WebView calls `onDraw` every frame even with no script, animation or\n+scrolling. The glass records a reference to the WebView's display list, so Chromium's draw\n+functor runs twice per frame — once in the window, once in the glass's offscreen layer —\n+with a different viewport and transform each time. WebView invalidates itself whenever the\n+draw constraints change, and the two draws never agree. With a hardware layer the functor\n+draws once into the WebView's own layer and both the window and the glass read that\n+texture; the cost is one WebView-sized texture. `webView.settings.offscreenPreRaster = true`\n+only mitigates it: the loop settles when idle but runs for a few seconds after every scroll.\n+\n **Can I put glass in a `Dialog` / `BottomSheetDialog` / `PopupWindow`?**\n Yes — the demo app's **Overlays** scene is a working `BottomSheetDialog`. Three things differ\n from the in-activity case:\n@@ -838,6 +855,21 @@ glass.blurMethod = BlurMethod.SMART         // 合法枚举名见下方表格\n 任意位置，覆盖区域按屏幕坐标实时算，滚动时自动重绘。另外，玻璃如果是**跟着内容一起滚动**的，\n 它看到的背景本来就不变，这是物理正确的结果，不是 bug。\n \n+**玻璃盖在 `WebView` 上，页面静止时 WebView 为什么还在一直重绘？**\n+只要玻璃的背景里包含 `WebView`（默认捕获父容器，或 `backdropSource` 指向 WebView 的祖先），\n+就给这个 WebView 开硬件层：\n+\n+```kotlin\n+webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)\n+```\n+\n+不开的话，即使没有脚本、动画和滚动，WebView 也会每帧 `onDraw`。玻璃录制的是对 WebView\n+显示列表的引用，于是 Chromium 的绘制 functor 一帧被执行两次——窗口里一次、玻璃的离屏层里\n+一次——两次的视口和变换不同。WebView 每次发现绘制约束变了就会让自己重绘，而这两次永远对不上。\n+开了硬件层之后 functor 只画进 WebView 自己的层一次，窗口和玻璃读的都是这张纹理，代价是多一张\n+WebView 大小的纹理。`webView.settings.offscreenPreRaster = true` 只能缓解：静止后会停下，\n+但每次滚动后还要多转几秒。\n+\n **能在 `Dialog` / `BottomSheetDialog` / `PopupWindow` 里用玻璃吗？**\n 可以，demo app 的**弹层**场景就是一个跑通的 `BottomSheetDialog`。和 Activity 内相比有三点不同：\n "
+    },
+    {
+      "sha": "6feca132a836e554b76da1b0bd8bb7c13373cc1b",
+      "filename": "liquidglass/src/main/java/com/example/liquidglass/LiquidGlassView.kt",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0,
+      "changes": 3,
+      "blob_url": "https://github.com/QWEA0/Liquid-Glass-Android/blob/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d/liquidglass%2Fsrc%2Fmain%2Fjava%2Fcom%2Fexample%2Fliquidglass%2FLiquidGlassView.kt",
+      "raw_url": "https://github.com/QWEA0/Liquid-Glass-Android/raw/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d/liquidglass%2Fsrc%2Fmain%2Fjava%2Fcom%2Fexample%2Fliquidglass%2FLiquidGlassView.kt",
+      "contents_url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/contents/liquidglass%2Fsrc%2Fmain%2Fjava%2Fcom%2Fexample%2Fliquidglass%2FLiquidGlassView.kt?ref=16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d",
+      "patch": "@@ -776,6 +776,9 @@ open class LiquidGlassView @JvmOverloads constructor(\n      * - 玻璃超出 source 边界的部分捕获为透明，需要自行保证覆盖关系\n      * - source 所在的树滚动时会自动触发重绘（见 [backdropScrollListener]）；\n      *   内容以其它方式变化（动画等）需要自行 [invalidate] 或开 [enableDynamicBackground]\n+     * - 背景（含默认的父容器）里有 WebView 时，要给它 `setLayerType(LAYER_TYPE_HARDWARE, null)`：\n+     *   否则它的绘制 functor 一帧被执行两次（窗口里、玻璃离屏层里各一次），视口和变换不同，\n+     *   Chromium 每次都重新请求重绘，静止页面也会每帧 onDraw\n      */\n     var backdropSource: View? = null\n         set(value) {"
+    },
+    {
+      "sha": "51ef47c86b7966c2543febec5dcf6d388b044667",
+      "filename": "llms.txt",
+      "status": "modified",
+      "additions": 7,
+      "deletions": 0,
+      "changes": 7,
+      "blob_url": "https://github.com/QWEA0/Liquid-Glass-Android/blob/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d/llms.txt",
+      "raw_url": "https://github.com/QWEA0/Liquid-Glass-Android/raw/16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d/llms.txt",
+      "contents_url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/contents/llms.txt?ref=16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d",
+      "patch": "@@ -99,6 +99,13 @@ glass.enableDynamicBackground = true   // REQUIRED if the backdrop moves or the\n   the single most common integration mistake.\n - **The glass cannot sample views that are not behind it.** It captures its parent's\n   backdrop. A `LiquidGlassView` with nothing painted behind it renders as an empty tint.\n+- **A `WebView` in the backdrop needs a hardware layer.** When the glass captures a tree that\n+  contains a `WebView` (its parent, or a `backdropSource` that is the WebView's ancestor), call\n+  `webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)`. Otherwise the WebView's draw functor\n+  runs twice per frame (window + the glass's offscreen layer) with different viewport and\n+  transform, Chromium invalidates on every draw-constraint change, and the WebView calls\n+  `onDraw` every frame even on a static page. `WebSettings.offscreenPreRaster = true` only\n+  mitigates it (still loops for seconds after each scroll).\n - **Refraction is invisible over smooth gradients.** The edge compression ring and\n   dispersion fringe only read against high-frequency content (icons, text, photos). When\n   testing or tuning, use a detailed backdrop, not a flat colour or a soft gradient."
+    }
+  ]
+}

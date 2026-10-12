@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Apple Inc. and Swift authors; Apache-2.0 with Runtime Exception. Converted from DiagonalArrowIcon.vue. plus omits surrounding circle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="14" android:viewportHeight="14">
+  <path android:fillColor="#FF000000" android:pathData="M0.010 12.881l10.429-10.477-3.764 0.824-0.339-1.549 7.653-1.679-1.717 7.622-1.546-0.349 0.847-3.759-10.442 10.487z" />
+</vector>
+

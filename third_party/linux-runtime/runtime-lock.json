@@ -1,0 +1,96 @@
+{
+  "sources": [
+    {
+      "sha256": "75f654fe60dea92dabff2bf083ae8bfe4f91baa6a1a374786a6bf391015eebaa",
+      "revision": "a179d3e8a4e045aaa1fb8cc3284f23509d96d353",
+      "url": "https://codeload.github.com/termux/proot/zip/refs/tags/v5.1.107.96",
+      "license": "GPL-2.0-or-later",
+      "name": "proot-v5.1.107.96.zip"
+    },
+    {
+      "sha256": "1e5ff8459bc0a8c229dd8a94b27d119987e09ef3414331c2b5ebfff20b98e867",
+      "revision": "7f0bd7e25dbdd146265aff7c6a890029e374622d",
+      "url": "https://codeload.github.com/termux/libandroid-shmem/tar.gz/refs/tags/v0.7",
+      "license": "BSD-3-Clause",
+      "name": "libandroid-shmem-v0.7.tar.gz"
+    },
+    {
+      "sha256": "912afa237510ae542a7733998eb18a12bcda35ab6729c8e2ddb43e8d0ebab007",
+      "revision": "2.5.0",
+      "url": "https://www.samba.org/ftp/talloc/talloc-2.5.0.tar.gz",
+      "license": "LGPL-3.0-or-later library; mixed source tree licenses retained",
+      "name": "talloc-2.5.0.tar.gz"
+    },
+    {
+      "sha256": "31987ac168b14d636c6cd5ed76edcc598c2d28a01b345d6279f8e11c28190c4f",
+      "revision": "3e13ceaa08e462bb3e0eb6529135ad67f9a3a9c5",
+      "url": "https://codeload.github.com/termux/termux-packages/zip/3e13ceaa08e462bb3e0eb6529135ad67f9a3a9c5",
+      "license": "per-file licenses in build system",
+      "name": "termux-packages-3e13ceaa.zip"
+    }
+  ],
+  "native_files": [
+    {
+      "package": "proot",
+      "packaged": "liblinux_proot.so",
+      "member": "./data/data/com.termux/files/usr/bin/proot",
+      "sha256": "1545b85b312505db6eb6908ff8b2ded0a77a3bd689c50ae85aa7c1d8445dd717"
+    },
+    {
+      "package": "proot",
+      "packaged": "liblinux_prootloader.so",
+      "member": "./data/data/com.termux/files/usr/libexec/proot/loader",
+      "sha256": "cbdef0e652c2b78af25d867e1719fdebbb0915e25aae2dd35b3b5c1835f6b551"
+    },
+    {
+      "package": "proot",
+      "packaged": "liblinux_prootloader32.so",
+      "member": "./data/data/com.termux/files/usr/libexec/proot/loader32",
+      "sha256": "c429996fee730e1a4fe12625b22dab5a5bc2847a4cae274d36fd4a19cd8299a8"
+    },
+    {
+      "package": "libtalloc",
+      "packaged": "liblinux_talloc.so",
+      "member": "./data/data/com.termux/files/usr/lib/libtalloc.so.2.5.0",
+      "sha256": "742b438c4d09e276985a61d44164c9de207b6d8cc268f3018cb3001961bcb309"
+    },
+    {
+      "package": "libandroid-shmem",
+      "packaged": "liblinux_androidshmem.so",
+      "member": "./data/data/com.termux/files/usr/lib/libandroid-shmem.so",
+      "sha256": "84475798e07c8174dbbfaec70a827fdb02f19ffa69a589380c13e7507fd0e731"
+    }
+  ],
+  "dsha": {
+    "commit": "8362bba747fcf84c19e436c3dbb594a0fc388a67",
+    "url": "https://github.com/DSH-APP/DSHA/releases/download/v0.2.0-rc2/dsha-0.2.0-rc2.apk",
+    "sha256": "1fedf883d431af658d89c28b86d85974cc1d11b74e0c5d46ef3d3cf8650b1961",
+    "tag": "v0.2.0-rc2"
+  },
+  "provenance": "Official Termux DEBs, source hashes match fixed recipes; no byte-for-byte rebuild claim.",
+  "native_packages": [
+    {
+      "sha256": "8199dca06dccb693ec09fb1759e3e1ad08b4863f0c11c612f89c20bd9ecdc1a0",
+      "filename": "proot_5.1.107.96_aarch64.deb",
+      "version": "5.1.107.96",
+      "url": "https://packages.termux.dev/apt/termux-main/pool/main/p/proot/proot_5.1.107.96_aarch64.deb",
+      "name": "proot"
+    },
+    {
+      "sha256": "0da3a24d558b93c92bcf8d611e0826a99ff96e396b148e6cdf33b47c47c57ff6",
+      "filename": "libandroid-shmem_0.7_aarch64.deb",
+      "version": "0.7",
+      "url": "https://packages.termux.dev/apt/termux-main/pool/main/liba/libandroid-shmem/libandroid-shmem_0.7_aarch64.deb",
+      "name": "libandroid-shmem"
+    },
+    {
+      "sha256": "556591f43bb773ad8777e1a29522640866a55f95dab71914418b94a8c58ad5a7",
+      "filename": "libtalloc_2.5.0_aarch64.deb",
+      "version": "2.5.0",
+      "url": "https://packages.termux.dev/apt/termux-main/pool/main/libt/libtalloc/libtalloc_2.5.0_aarch64.deb",
+      "name": "libtalloc"
+    }
+  ],
+  "protocol": "dafeiyu-linux-runtime.v1",
+  "architecture": "arm64-v8a"
+}

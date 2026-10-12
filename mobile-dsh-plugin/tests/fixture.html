@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>移动插件离线契约夹具</title>
+<style>
+  html, body { margin: 0; height: 100%; font: 14px system-ui, sans-serif; background: #f3f6f5; }
+  #root { height: 100%; --dsw-alias-bg-base: #f8faf9; --dsw-alias-label-primary: #202724; }
+  .fixture-frame { display: grid; grid-template-columns: 264px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; height: 100%; }
+  .fixture-frame[data-wide="false"] { grid-template-columns: 56px minmax(0, 1fr); }
+  .fixture-sidebar { display: flex; flex-direction: column; min-width: 0; gap: 12px; padding: 12px; background: #d7e5e0; }
+  .fixture-frame[data-wide="false"] .fixture-sidebar { padding: 10px; }
+  .fixture-spacer { flex: 1; }
+  .fixture-main { min-width: 0; overflow: auto; padding: 16px; background: #f8faf9; }
+  .fixture-main h1 { font-size: 17px; font-weight: 500; margin: 0 0 16px; }
+  .fixture-main p { line-height: 1.6; overflow-wrap: anywhere; }
+  .fixture-bottom { grid-column: 1 / -1; min-width: 0; }
+  .fixture-badge { color: #55625d; font-size: 12px; }
+  input { width: 100%; min-height: 44px; box-sizing: border-box; border: 1px solid #a6b7af; border-radius: 8px; background: #ffffff90; padding: 8px; }
+</style>
+<div id="root"></div>
+<script>
+  // Capture the unmodified published platform at its documented loader seam.
+  // Stop before a Cordis tree, remote connection or authenticated runtime exists.
+  window.__offlinePlatformReady = new Promise(resolve => {
+    window.__ModuleLoader__ = {
+      create({staticModules}) {
+        window.__offlinePlatform = staticModules;
+        resolve(staticModules);
+        throw new Error("OFFLINE_FIXTURE_BOOT_STOP");
+      }
+    };
+  });
+</script>
+<script type="module" src="/official/index.js"></script>
+<script type="module" src="/tests/fixture.js"></script>
+</html>

@@ -1,0 +1,26 @@
+[
+  {
+    "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/commits/HEAD",
+    "proxy": "http://127.0.0.1:7890",
+    "started_at": "2026-10-12T00:13:21.5996217+08:00",
+    "completed_at": "2026-10-12T00:13:29.0850988+08:00",
+    "http_status": "000",
+    "curl_exit": 35,
+    "path": "api/head.json",
+    "bytes": 9026,
+    "sha256": "05a98b22d07b327f4f7a2e40f5f7ea458162390a9e6f9ebf36de65eeb4e54076",
+    "headers_sha256": "f55260227c507b4e203ec14ceb78ce8e64d11734111bed9bd18936a3bd4d48f3"
+  },
+  {
+    "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/commits/HEAD",
+    "proxy": "http://127.0.0.1:7890",
+    "started_at": "2026-10-12T00:14:49.6611325+08:00",
+    "completed_at": "2026-10-12T00:14:50.0263521+08:00",
+    "http_status": "403",
+    "curl_exit": 0,
+    "path": "api/head.json",
+    "bytes": 278,
+    "sha256": "6ed2372b3681dbf9e0830d6f655813210ff80a3e776f907b82abfd24daf7a1a1",
+    "headers_sha256": "1a047d8de306e6a3e66a4fad54f0fb1f9f1028c638db46c7d99cc8cbdd785e89"
+  }
+]

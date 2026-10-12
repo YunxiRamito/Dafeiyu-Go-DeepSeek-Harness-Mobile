@@ -1,0 +1,30 @@
+Liquid Glass algorithm attribution
+
+Source: QWEA0/Liquid-Glass-Android
+https://github.com/QWEA0/Liquid-Glass-Android
+Commit: 16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d
+Copyright (c) 2025-2026 pandadog
+License: MIT. The full license is included in the adjacent LICENSE file.
+
+GlassSurface.kt adapts rounded distance fields, numerical normals, inward
+inverse-power refraction, dispersion and directional reflection from
+liquidglass/src/main/java/com/example/liquidglass/GlassLensRenderer.kt.
+GlassPairLensShader.kt and LiquidGlassButtonPair.kt additionally adapt its
+two-shape polynomial smooth-min. Compose capture and integration, transformed
+ellipse correction, opacity, bounded touch and shadow handling are local changes.
+GlassButtonDeformation.kt adapts directional press/stretch behavior from
+LiquidGlassView.kt, with local Compose gesture arbitration and animation.
+ScrollingGlassHeader.kt adapts scroll-edge masking from ScrollEdgeBlurView.kt.
+
+The upstream library and native modules are not included as dependencies.
+
+LiquidGlassFusionSurface.kt reuses the same fixed smooth-min lens for measured
+rounded rectangles. Separation-based connection, per-shape tint and Compose
+fallback ownership are local adaptations; coloured-medium absorption/scattering
+is adapted from the same fixed GlassLensRenderer.kt source.
+
+The 0.1.23 repair gates the toolbar neck by measured transform changes and a
+bounded fade after motion stops. Cached contour shadows and the shared SDF
+shadow use locally normalized user reference parameters. Dark coloured-medium
+scattering is increased without replacing page transmission with an opaque
+white fill. These motion, shadow and tuning changes are local adaptations.

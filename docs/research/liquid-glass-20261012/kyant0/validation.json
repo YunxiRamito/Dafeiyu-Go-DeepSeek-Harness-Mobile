@@ -1,0 +1,87 @@
+{
+  "checked_at": "2026-10-12T00:42:45.7353122+08:00",
+  "offline_only": true,
+  "pinned_commit": "65ab177e90e5c1d8c62e70cf7755841982da65f6",
+  "network_operations": 11,
+  "fallback_requests": 1,
+  "reference_file_attempts": 8,
+  "successful_reference_files": 7,
+  "successful_reference_bytes": 30076.0,
+  "evidence": [
+    {
+      "path": "api/head.json.partial",
+      "success": false,
+      "sha256": "4d702d0c8c6b0a218e6f6d326dfdee0241d61f2a008c67a14443e5cf1dc74ed5",
+      "hash_matches": true
+    },
+    {
+      "path": "api/head-git-fallback.log",
+      "success": true,
+      "sha256": "94bd0a1b210f3d7a1fea3196a30d1158133db96efc832d8b23a72535f150fed4",
+      "hash_matches": true
+    },
+    {
+      "path": "api/tree.json.partial",
+      "success": false,
+      "sha256": "4d702d0c8c6b0a218e6f6d326dfdee0241d61f2a008c67a14443e5cf1dc74ed5",
+      "hash_matches": true
+    },
+    {
+      "path": "source/README.md",
+      "success": true,
+      "sha256": "8aecd8bde9985e31c127ea7b3d76bdb96315ce4f6dd5e9e205be4d486d72673c",
+      "hash_matches": true
+    },
+    {
+      "path": "source/LICENSE",
+      "success": true,
+      "sha256": "4b9f7e7c2821a5a1822a6cf1e4a34e877bba48a99b9bba1f03e5e2eccf6dec56",
+      "hash_matches": true
+    },
+    {
+      "path": "source/gradle/libs.versions.toml",
+      "success": true,
+      "sha256": "eaabed5ad27f76ed44afb5222cd3b6c2312793c3819ca7263c44cc898a08b94d",
+      "hash_matches": true
+    },
+    {
+      "path": "source/backdrop/build.gradle.kts",
+      "success": true,
+      "sha256": "3e5e6d67bf55b94238219a5f807f4395112299eec04786360621d5ad66208053",
+      "hash_matches": true
+    },
+    {
+      "path": "source/app/src/commonMain/kotlin/com/kyant/backdrop/catalog/components/LiquidButton.kt",
+      "success": true,
+      "sha256": "7b95a0c1b33ff984f59b1e7c7a910b7038a0a8ad4377a2fdbe77400711a8244b",
+      "hash_matches": true
+    },
+    {
+      "path": "source/app/src/commonMain/kotlin/com/kyant/backdrop/catalog/utils/InteractiveHighlight.kt",
+      "success": true,
+      "sha256": "d0af46b531eba19bd0fed886892f02193f05d5a61db0925da016ff6059984f83",
+      "hash_matches": true
+    },
+    {
+      "path": "source/backdrop/src/commonMain/kotlin/com/kyant/backdrop/DrawBackdrop.kt.partial",
+      "success": false,
+      "sha256": "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed",
+      "hash_matches": true
+    },
+    {
+      "path": "source/backdrop/src/commonMain/kotlin/com/kyant/backdrop/effects/Lens.kt",
+      "success": true,
+      "sha256": "28e2a61c6f994d6ef793e4bea5e97b95d712a6d8536e35bd98634ad9999027dd",
+      "hash_matches": true
+    }
+  ],
+  "frozen_comparison_baseline": {
+    "REPORT.md": "52cdd6785987d7c11a4f11a401bede2323de99bb1e3a75bfa301317db4cead05",
+    "snapshot-manifest.json": "9dc89c037fee3ea760a8875d560e9f9d6e44e5d8464386e2803a43f154ae4f99",
+    "download-manifest.json": "da0033d08200f6296f9a6fdf0ae5b6a79ef651846bfdf799c2e507a191bdbffd"
+  },
+  "frozen_hashes_match_baseline": true,
+  "external_code_executed": false,
+  "production_edited": false,
+  "build_or_device_validation": "Not run; source/document evidence only."
+}

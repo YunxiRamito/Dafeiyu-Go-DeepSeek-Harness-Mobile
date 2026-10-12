@@ -1,0 +1,147 @@
+{
+  "repository": "https://github.com/Kyant0/AndroidLiquidGlass",
+  "proxy": "http://127.0.0.1:7890",
+  "policy": "One attempt per resource; at most one fallback request overall; at most eight reference files. No downloaded code is executed.",
+  "fallback_used": true,
+  "requests": [
+    {
+      "url": "https://api.github.com/repos/Kyant0/AndroidLiquidGlass/commits/HEAD",
+      "started_at": "2026-10-12T00:37:34.1919273+08:00",
+      "completed_at": "2026-10-12T00:37:34.502886+08:00",
+      "http_status": "403",
+      "curl_exit": 0,
+      "success": false,
+      "path": "api/head.json.partial",
+      "bytes": 279,
+      "sha256": "4d702d0c8c6b0a218e6f6d326dfdee0241d61f2a008c67a14443e5cf1dc74ed5",
+      "headers_sha256": "8eb0989cb05a321dca3df8642602d82bd08e6c8e6bfa3f9240861a98241f49d8"
+    },
+    {
+      "command": "-c http.proxy=http://127.0.0.1:7890 ls-remote https://github.com/Kyant0/AndroidLiquidGlass.git HEAD",
+      "exit": 0,
+      "timed_out": false,
+      "path": "api/head-git-fallback.log",
+      "success": true,
+      "sha256": "94bd0a1b210f3d7a1fea3196a30d1158133db96efc832d8b23a72535f150fed4",
+      "bytes": 123
+    },
+    {
+      "url": "https://api.github.com/repos/Kyant0/AndroidLiquidGlass/git/trees/65ab177e90e5c1d8c62e70cf7755841982da65f6?recursive=1",
+      "started_at": "2026-10-12T00:37:42.2288787+08:00",
+      "completed_at": "2026-10-12T00:37:42.5208937+08:00",
+      "http_status": "403",
+      "curl_exit": 0,
+      "success": false,
+      "path": "api/tree.json.partial",
+      "bytes": 279,
+      "sha256": "4d702d0c8c6b0a218e6f6d326dfdee0241d61f2a008c67a14443e5cf1dc74ed5",
+      "headers_sha256": "fe9a2d70a5cfe1fb8f8620d590ebfea7da19744773d525e8da27b94815ea8cd8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/Kyant0/AndroidLiquidGlass/65ab177e90e5c1d8c62e70cf7755841982da65f6/README.md",
+      "started_at": "2026-10-12T00:38:03.4655656+08:00",
+      "completed_at": "2026-10-12T00:38:04.0111302+08:00",
+      "http_status": "200",
+      "curl_exit": 0,
+      "success": true,
+      "path": "source/README.md",
+      "bytes": 1029,
+      "sha256": "8aecd8bde9985e31c127ea7b3d76bdb96315ce4f6dd5e9e205be4d486d72673c",
+      "headers_sha256": "4341ac2857ce44f4ea11abcfd2275d7b58421f69f0c65eb48234c70db522ffd8"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/Kyant0/AndroidLiquidGlass/65ab177e90e5c1d8c62e70cf7755841982da65f6/LICENSE",
+      "started_at": "2026-10-12T00:38:04.0616475+08:00",
+      "completed_at": "2026-10-12T00:38:04.4903274+08:00",
+      "http_status": "200",
+      "curl_exit": 0,
+      "success": true,
+      "path": "source/LICENSE",
+      "bytes": 10750,
+      "sha256": "4b9f7e7c2821a5a1822a6cf1e4a34e877bba48a99b9bba1f03e5e2eccf6dec56",
+      "headers_sha256": "97c92b65512f8514b0552a57811c686267e439067498e3ad71fae326c6a209b0"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/Kyant0/AndroidLiquidGlass/65ab177e90e5c1d8c62e70cf7755841982da65f6/gradle/libs.versions.toml",
+      "started_at": "2026-10-12T00:38:04.5024554+08:00",
+      "completed_at": "2026-10-12T00:38:04.9450286+08:00",
+      "http_status": "200",
+      "curl_exit": 0,
+      "success": true,
+      "path": "source/gradle/libs.versions.toml",
+      "bytes": 1429,
+      "sha256": "eaabed5ad27f76ed44afb5222cd3b6c2312793c3819ca7263c44cc898a08b94d",
+      "headers_sha256": "bd0221ce5f100178624538140c182bb9af6aba56b5206b4a5b9cae0852f57a1b"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/Kyant0/AndroidLiquidGlass/65ab177e90e5c1d8c62e70cf7755841982da65f6/backdrop/build.gradle.kts",
+      "started_at": "2026-10-12T00:38:24.5035684+08:00",
+      "completed_at": "2026-10-12T00:38:24.9788602+08:00",
+      "http_status": "200",
+      "curl_exit": 0,
+      "success": true,
+      "path": "source/backdrop/build.gradle.kts",
+      "bytes": 2893,
+      "sha256": "3e5e6d67bf55b94238219a5f807f4395112299eec04786360621d5ad66208053",
+      "headers_sha256": "0cbfb45afcb92a9767a814321997e4776ab7ff5b2b57013c54c2b06a498f2ac3"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/Kyant0/AndroidLiquidGlass/65ab177e90e5c1d8c62e70cf7755841982da65f6/app/src/commonMain/kotlin/com/kyant/backdrop/catalog/components/LiquidButton.kt",
+      "started_at": "2026-10-12T00:38:25.0338225+08:00",
+      "completed_at": "2026-10-12T00:38:25.4730066+08:00",
+      "http_status": "200",
+      "curl_exit": 0,
+      "success": true,
+      "path": "source/app/src/commonMain/kotlin/com/kyant/backdrop/catalog/components/LiquidButton.kt",
+      "bytes": 4688,
+      "sha256": "7b95a0c1b33ff984f59b1e7c7a910b7038a0a8ad4377a2fdbe77400711a8244b",
+      "headers_sha256": "9ad9f4dc5d1f6ff24e6e20e4b4cb429ff8357153b56e38ad42c87df57243636e"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/Kyant0/AndroidLiquidGlass/65ab177e90e5c1d8c62e70cf7755841982da65f6/app/src/commonMain/kotlin/com/kyant/backdrop/catalog/utils/InteractiveHighlight.kt",
+      "started_at": "2026-10-12T00:39:00.5860448+08:00",
+      "completed_at": "2026-10-12T00:39:01.1056656+08:00",
+      "http_status": "200",
+      "curl_exit": 0,
+      "success": true,
+      "path": "source/app/src/commonMain/kotlin/com/kyant/backdrop/catalog/utils/InteractiveHighlight.kt",
+      "bytes": 4648,
+      "sha256": "d0af46b531eba19bd0fed886892f02193f05d5a61db0925da016ff6059984f83",
+      "headers_sha256": "227fbb3c14b9052b43d9d4518c378e5d99dc5f3e2e9d0bff91a912377b9ff735"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/Kyant0/AndroidLiquidGlass/65ab177e90e5c1d8c62e70cf7755841982da65f6/backdrop/src/commonMain/kotlin/com/kyant/backdrop/DrawBackdrop.kt",
+      "started_at": "2026-10-12T00:39:01.1621022+08:00",
+      "completed_at": "2026-10-12T00:39:01.7847687+08:00",
+      "http_status": "404",
+      "curl_exit": 0,
+      "success": false,
+      "path": "source/backdrop/src/commonMain/kotlin/com/kyant/backdrop/DrawBackdrop.kt.partial",
+      "bytes": 14,
+      "sha256": "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed",
+      "headers_sha256": "90982159e3db9f8698ba7bf973bd8963ba0e1c81b3e693135c7c970ad3a206ec"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/Kyant0/AndroidLiquidGlass/65ab177e90e5c1d8c62e70cf7755841982da65f6/backdrop/src/commonMain/kotlin/com/kyant/backdrop/effects/Lens.kt",
+      "started_at": "2026-10-12T00:39:01.812659+08:00",
+      "completed_at": "2026-10-12T00:39:02.2656726+08:00",
+      "http_status": "200",
+      "curl_exit": 0,
+      "success": true,
+      "path": "source/backdrop/src/commonMain/kotlin/com/kyant/backdrop/effects/Lens.kt",
+      "bytes": 4639,
+      "sha256": "28e2a61c6f994d6ef793e4bea5e97b95d712a6d8536e35bd98634ad9999027dd",
+      "headers_sha256": "1e8b2484a813dc9476df23b56140107c62bd8a94682c19b23ff365bb9fdc110f"
+    }
+  ],
+  "pinned_commit": "65ab177e90e5c1d8c62e70cf7755841982da65f6",
+  "head_confirmation": "Successful proxied git ls-remote HEAD; completed 2026-10-12T00:37:36.0596661+08:00. Commit author/committer date unavailable.",
+  "blocked": [
+    "HEAD and recursive-tree API responses are 403 rate limit; no successful API metadata.",
+    "DrawBackdrop.kt was an inferred path and returned 404. Actual rendering entry and internal shader strings were not read.",
+    "No remaining reference-file attempts or fallback requests; no further network requests authorized by this bounded run.",
+    "Published artifact availability, transitive dependencies, AAR metadata and platform shader-support implementation were not verified."
+  ],
+  "reference_file_attempts": 8,
+  "reference_files_successful": 7
+}

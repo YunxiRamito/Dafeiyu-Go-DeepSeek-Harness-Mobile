@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Apple Inc. and Swift authors; Apache-2.0 with Runtime Exception. Converted from DocumentIcon.vue. plus omits surrounding circle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="14" android:viewportHeight="14">
+  <path android:fillColor="#FF000000" android:pathData="M11.2,5.3,8,2l-.1-.1H2.8V12.1h8.5V6.3l-.1-1ZM8,3.2l2,2.1H8Zm2.4,8H3.6V2.8H7V6.3h3.4Z" />
+</vector>
+

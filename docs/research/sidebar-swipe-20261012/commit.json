@@ -1,0 +1,84 @@
+[
+  {
+    "sha": "7ac433e44e797de53af85226797862687f37735f",
+    "node_id": "C_kwDOD0s_1doAKDdhYzQzM2U0NGU3OTdkZTUzYWY4NTIyNjc5Nzg2MjY4N2YzNzczNWY",
+    "commit": {
+      "author": {
+        "name": "Aurimas Liutikas",
+        "email": "aurimas@google.com",
+        "date": "2026-09-02T21:50:04Z"
+      },
+      "committer": {
+        "name": "Aurimas Liutikas",
+        "email": "aurimas@google.com",
+        "date": "2026-09-02T21:50:04Z"
+      },
+      "message": "Format all code with ktfmt 0.64\n\nTest: ./gradlew ktFormat\nChange-Id: I00073f3dcfac94057358929f9942d812459158a7",
+      "tree": {
+        "sha": "63ab46faf2a6bd7446c279e7f5616939a89c2080",
+        "url": "https://api.github.com/repos/androidx/androidx/git/trees/63ab46faf2a6bd7446c279e7f5616939a89c2080"
+      },
+      "url": "https://api.github.com/repos/androidx/androidx/git/commits/7ac433e44e797de53af85226797862687f37735f",
+      "comment_count": 0,
+      "verification": {
+        "verified": false,
+        "reason": "unsigned",
+        "signature": null,
+        "payload": null,
+        "verified_at": null
+      }
+    },
+    "url": "https://api.github.com/repos/androidx/androidx/commits/7ac433e44e797de53af85226797862687f37735f",
+    "html_url": "https://github.com/androidx/androidx/commit/7ac433e44e797de53af85226797862687f37735f",
+    "comments_url": "https://api.github.com/repos/androidx/androidx/commits/7ac433e44e797de53af85226797862687f37735f/comments",
+    "author": {
+      "login": "liutikas",
+      "id": 1418185,
+      "node_id": "MDQ6VXNlcjE0MTgxODU=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1418185?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/liutikas",
+      "html_url": "https://github.com/liutikas",
+      "followers_url": "https://api.github.com/users/liutikas/followers",
+      "following_url": "https://api.github.com/users/liutikas/following{/other_user}",
+      "gists_url": "https://api.github.com/users/liutikas/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/liutikas/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/liutikas/subscriptions",
+      "organizations_url": "https://api.github.com/users/liutikas/orgs",
+      "repos_url": "https://api.github.com/users/liutikas/repos",
+      "events_url": "https://api.github.com/users/liutikas/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/liutikas/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "committer": {
+      "login": "liutikas",
+      "id": 1418185,
+      "node_id": "MDQ6VXNlcjE0MTgxODU=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1418185?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/liutikas",
+      "html_url": "https://github.com/liutikas",
+      "followers_url": "https://api.github.com/users/liutikas/followers",
+      "following_url": "https://api.github.com/users/liutikas/following{/other_user}",
+      "gists_url": "https://api.github.com/users/liutikas/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/liutikas/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/liutikas/subscriptions",
+      "organizations_url": "https://api.github.com/users/liutikas/orgs",
+      "repos_url": "https://api.github.com/users/liutikas/repos",
+      "events_url": "https://api.github.com/users/liutikas/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/liutikas/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "parents": [
+      {
+        "sha": "a16ba8aaec93727179f641a81f8ca3bfc97216d3",
+        "url": "https://api.github.com/repos/androidx/androidx/commits/a16ba8aaec93727179f641a81f8ca3bfc97216d3",
+        "html_url": "https://github.com/androidx/androidx/commit/a16ba8aaec93727179f641a81f8ca3bfc97216d3"
+      }
+    ]
+  }
+]

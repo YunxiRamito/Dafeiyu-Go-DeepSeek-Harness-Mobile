@@ -1,0 +1,1628 @@
+{
+  "sha": "708d7ba066714d9399ab10d79ad1f639486255cd",
+  "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/708d7ba066714d9399ab10d79ad1f639486255cd",
+  "tree": [
+    {
+      "path": ".gitattributes",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e7b402c4d7ecb48e7d33092d1257febc587a4b38",
+      "size": 296,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/e7b402c4d7ecb48e7d33092d1257febc587a4b38"
+    },
+    {
+      "path": ".github",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "eb0f1a766c92bf9a8f3eb1766a55c06f5cf0df1a",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/eb0f1a766c92bf9a8f3eb1766a55c06f5cf0df1a"
+    },
+    {
+      "path": ".github/workflows",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "1a32ef9909012a214086ccca71443b8fa1fc9712",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/1a32ef9909012a214086ccca71443b8fa1fc9712"
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c5e125ef611e4a320712e1c7e8c3a58e7eccc3b8",
+      "size": 3961,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/c5e125ef611e4a320712e1c7e8c3a58e7eccc3b8"
+    },
+    {
+      "path": ".gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1f48554e78acaffb51167d6d784895a2666221fb",
+      "size": 1292,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/1f48554e78acaffb51167d6d784895a2666221fb"
+    },
+    {
+      "path": "LICENSE",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fcecb0854bc0dfbd6ac25877ebf3a8652970401c",
+      "size": 1070,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/fcecb0854bc0dfbd6ac25877ebf3a8652970401c"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "02ff47deaf41fcac07337cb544f4bdb62665f7e1",
+      "size": 67657,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/02ff47deaf41fcac07337cb544f4bdb62665f7e1"
+    },
+    {
+      "path": "app",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "29ba85193d6429f3283fb11384c25bbfd38d3125",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/29ba85193d6429f3283fb11384c25bbfd38d3125"
+    },
+    {
+      "path": "app/.gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "42afabfd2abebf31384ca7797186a27a4b7dbee8",
+      "size": 6,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/42afabfd2abebf31384ca7797186a27a4b7dbee8"
+    },
+    {
+      "path": "app/build.gradle.kts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "deb5c2d9a1b8d35018425f34f65bc99b80a9e5c2",
+      "size": 2839,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/deb5c2d9a1b8d35018425f34f65bc99b80a9e5c2"
+    },
+    {
+      "path": "app/proguard-rules.pro",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "62253830f008bfc8119d5e70e665755b7092495c",
+      "size": 1387,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/62253830f008bfc8119d5e70e665755b7092495c"
+    },
+    {
+      "path": "app/src",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "d424a650aaa28e0f967e973a273283c870b7c4ae",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/d424a650aaa28e0f967e973a273283c870b7c4ae"
+    },
+    {
+      "path": "app/src/androidTest",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "e677d3233b28afeb77625f7caad6ceecfe6b02a9",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/e677d3233b28afeb77625f7caad6ceecfe6b02a9"
+    },
+    {
+      "path": "app/src/androidTest/java",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "286ad793d7e82373b0e31550fa5b2d5771537eac",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/286ad793d7e82373b0e31550fa5b2d5771537eac"
+    },
+    {
+      "path": "app/src/androidTest/java/com",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "63a66b71f670fabbc389fe76e4f8fabcbee318c5",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/63a66b71f670fabbc389fe76e4f8fabcbee318c5"
+    },
+    {
+      "path": "app/src/androidTest/java/com/example",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "b4ac975489ba6dc08cc927d590c4e256c9cfdc9b",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/b4ac975489ba6dc08cc927d590c4e256c9cfdc9b"
+    },
+    {
+      "path": "app/src/androidTest/java/com/example/blur",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "17098543e26b1d603be47c12466dffb506b1f0e1",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/17098543e26b1d603be47c12466dffb506b1f0e1"
+    },
+    {
+      "path": "app/src/androidTest/java/com/example/blur/NativeGaussTest.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "02776f3a1a54629b9664cdf40e192d7f1c96c902",
+      "size": 9428,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/02776f3a1a54629b9664cdf40e192d7f1c96c902"
+    },
+    {
+      "path": "app/src/androidTest/java/com/example/liquidglass",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "f06e63a5e6ee203d3d606d9ca8ec0e12ecd29150",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/f06e63a5e6ee203d3d606d9ca8ec0e12ecd29150"
+    },
+    {
+      "path": "app/src/androidTest/java/com/example/liquidglass/ExampleInstrumentedTest.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d67e1e37c08eba0ad0a7857b6f8ef6552a551d58",
+      "size": 673,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/d67e1e37c08eba0ad0a7857b6f8ef6552a551d58"
+    },
+    {
+      "path": "app/src/main",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "be9260f0425bc72c0e90ad98dd53649305631247",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/be9260f0425bc72c0e90ad98dd53649305631247"
+    },
+    {
+      "path": "app/src/main/AndroidManifest.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9ebf5c5eca30dea318a68c9a2badbe1477277665",
+      "size": 1905,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/9ebf5c5eca30dea318a68c9a2badbe1477277665"
+    },
+    {
+      "path": "app/src/main/java",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a6caa731e47e43a133c9032bf5a580cca056fbc2",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/a6caa731e47e43a133c9032bf5a580cca056fbc2"
+    },
+    {
+      "path": "app/src/main/java/com",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "da7a777911afc0664a5afa20c5e4017a1f758b73",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/da7a777911afc0664a5afa20c5e4017a1f758b73"
+    },
+    {
+      "path": "app/src/main/java/com/example",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "9a0e38b0028b2157c12873d8807c76448499091f",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/9a0e38b0028b2157c12873d8807c76448499091f"
+    },
+    {
+      "path": "app/src/main/java/com/example/liquidglass",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "5c15679e96064c0ea12b3ee05e4c064ec5fdbd5d",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/5c15679e96064c0ea12b3ee05e4c064ec5fdbd5d"
+    },
+    {
+      "path": "app/src/main/java/com/example/liquidglass/GlassTextPrototypeView.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e53cad55da2ab116451fa54a8d2002b21abd979a",
+      "size": 17393,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/e53cad55da2ab116451fa54a8d2002b21abd979a"
+    },
+    {
+      "path": "app/src/main/java/com/example/liquidglass/HeroShowcaseActivity.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6946e63b97df12a519a4830b2fd13f09a6f63664",
+      "size": 5745,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/6946e63b97df12a519a4830b2fd13f09a6f63664"
+    },
+    {
+      "path": "app/src/main/java/com/example/liquidglass/HomeScreenGridView.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8ae4eacaf00196ec817923ea72838e1a801d0a68",
+      "size": 7373,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/8ae4eacaf00196ec817923ea72838e1a801d0a68"
+    },
+    {
+      "path": "app/src/main/java/com/example/liquidglass/ProfessionalDemoActivity.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "24f699ac465d79ed44ca5cbd001ef11679fcd94e",
+      "size": 160188,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/24f699ac465d79ed44ca5cbd001ef11679fcd94e"
+    },
+    {
+      "path": "app/src/main/java/com/example/liquidglass/TextSdf.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7410988cc9321ac089bd6ffae58eca8b6e6bf30d",
+      "size": 10186,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/7410988cc9321ac089bd6ffae58eca8b6e6bf30d"
+    },
+    {
+      "path": "app/src/main/res",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "beb2282f07040b384cbd4ff6fc0cc016b064da46",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/beb2282f07040b384cbd4ff6fc0cc016b064da46"
+    },
+    {
+      "path": "app/src/main/res/drawable-nodpi",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "55b31129ec039ea875bb1cd02aa180477c481524",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/55b31129ec039ea875bb1cd02aa180477c481524"
+    },
+    {
+      "path": "app/src/main/res/drawable-nodpi/ios_control_center_bg.webp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c89954f9c3f0e8dbd619cdf84e4bc9ea421432fa",
+      "size": 156134,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/c89954f9c3f0e8dbd619cdf84e4bc9ea421432fa"
+    },
+    {
+      "path": "app/src/main/res/drawable-nodpi/ios_wallpaper.jpg",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "354f2c522dc5618d0dabf7e2955302040df8bd59",
+      "size": 128148,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/354f2c522dc5618d0dabf7e2955302040df8bd59"
+    },
+    {
+      "path": "app/src/main/res/drawable-nodpi/text_backdrop.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ac3f5779793ced7a8cda8c4bf5f732dd9852c8a8",
+      "size": 1261582,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/ac3f5779793ced7a8cda8c4bf5f732dd9852c8a8"
+    },
+    {
+      "path": "app/src/main/res/drawable",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "62e2bb9e69d928cc90d8bf6626fe59f97fa49a24",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/62e2bb9e69d928cc90d8bf6626fe59f97fa49a24"
+    },
+    {
+      "path": "app/src/main/res/drawable/demo_background.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "df871349be4274f3e84dd285bdce87c9e33497db",
+      "size": 382,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/df871349be4274f3e84dd285bdce87c9e33497db"
+    },
+    {
+      "path": "app/src/main/res/drawable/gradient_background_1.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c6992f9a07493bea678859a58fbd3cb6d222b26a",
+      "size": 347,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/c6992f9a07493bea678859a58fbd3cb6d222b26a"
+    },
+    {
+      "path": "app/src/main/res/drawable/gradient_background_2.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "32e324f40e3e1653c5b20ac968bef8a4f1411ce4",
+      "size": 308,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/32e324f40e3e1653c5b20ac968bef8a4f1411ce4"
+    },
+    {
+      "path": "app/src/main/res/drawable/gradient_background_3.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b7a84259fe4e8e2d41889bb44773a866302d5bdb",
+      "size": 308,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/b7a84259fe4e8e2d41889bb44773a866302d5bdb"
+    },
+    {
+      "path": "app/src/main/res/drawable/gradient_background_4.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fbc5af573be1e47b653a5355aa67a93dd3c1ca1a",
+      "size": 309,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/fbc5af573be1e47b653a5355aa67a93dd3c1ca1a"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_airdrop.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "52fc51aff9e7f60db50106d6f1bd87323925f71c",
+      "size": 779,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/52fc51aff9e7f60db50106d6f1bd87323925f71c"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_airplane.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "18358fcb4c68ea942f5de2f356d6b1e0be2eebed",
+      "size": 778,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/18358fcb4c68ea942f5de2f356d6b1e0be2eebed"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_airplay.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e4f24d74dacf8c7dff9f97510ff13502ed49e92c",
+      "size": 733,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/e4f24d74dacf8c7dff9f97510ff13502ed49e92c"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_antenna.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3c77676783e54f66e4f5a15d52174d68b056f823",
+      "size": 711,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/3c77676783e54f66e4f5a15d52174d68b056f823"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_backward.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4a41cdff6900bc156558c9de249537f4f04096c9",
+      "size": 569,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/4a41cdff6900bc156558c9de249537f4f04096c9"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_battery.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5739d48bc7cce50cbe29dbe20e61be81f437fe08",
+      "size": 1153,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/5739d48bc7cce50cbe29dbe20e61be81f437fe08"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_bluetooth.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1fd22e49d154a35147895b46edd7a0603ce818bc",
+      "size": 456,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/1fd22e49d154a35147895b46edd7a0603ce818bc"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_calculator.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d8b6af02dc6d4327eb0c2ef1fd2c823279aa818d",
+      "size": 1186,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/d8b6af02dc6d4327eb0c2ef1fd2c823279aa818d"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_camera.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2f1901c8a2bbceb45ed9e0ae386aab6b86b8b969",
+      "size": 764,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/2f1901c8a2bbceb45ed9e0ae386aab6b86b8b969"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_cellular.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f35961cbf25c2835484b968511fca3731b5efb92",
+      "size": 1209,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/f35961cbf25c2835484b968511fca3731b5efb92"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_chevron_updown.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "caaf0290ad516fffd4be2759dba10730c92a04f4",
+      "size": 494,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/caaf0290ad516fffd4be2759dba10730c92a04f4"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_flashlight.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eb3d9956f9cc255cc18a946ecf6c7698087d59c0",
+      "size": 657,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/eb3d9956f9cc255cc18a946ecf6c7698087d59c0"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_forward.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e3c089ff35ecc13920b2d105947982408c82e691",
+      "size": 566,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/e3c089ff35ecc13920b2d105947982408c82e691"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_heart.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aac5ffd4fd88ef9f99185f45de563e45f489f7dc",
+      "size": 491,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/aac5ffd4fd88ef9f99185f45de563e45f489f7dc"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_hotspot.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2ec669980504fe2d70eb5818e602f257c67f3966",
+      "size": 750,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/2ec669980504fe2d70eb5818e602f257c67f3966"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_lock_rotation.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5ea6ab1982892af72489c5ff49923a2d0c7f7a14",
+      "size": 1080,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/5ea6ab1982892af72489c5ff49923a2d0c7f7a14"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_mirror.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ae2ba9af64e34c240e5b53363464008e8e664acf",
+      "size": 805,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/ae2ba9af64e34c240e5b53363464008e8e664acf"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_moon.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8a2fcfc4be32466bd7ec566d2f6b805a22de9910",
+      "size": 423,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/8a2fcfc4be32466bd7ec566d2f6b805a22de9910"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_music_note.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "60a420a8938786905ad3762032f2fe8a7d7e4a7c",
+      "size": 544,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/60a420a8938786905ad3762032f2fe8a7d7e4a7c"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_play.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "98c6af0dc3a962687b9513afe5266d86b9e27818",
+      "size": 452,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/98c6af0dc3a962687b9513afe5266d86b9e27818"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_plus.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d3369e6d4ecbaf11c04a92886fd8f12633a6418f",
+      "size": 394,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/d3369e6d4ecbaf11c04a92886fd8f12633a6418f"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_power.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5cc312093194256449dab51b5e7ab2b2db0779b4",
+      "size": 451,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/5cc312093194256449dab51b5e7ab2b2db0779b4"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_qr.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bf8b151a7e00c47bab3f271b6608e3a9958a0a56",
+      "size": 1027,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/bf8b151a7e00c47bab3f271b6608e3a9958a0a56"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_record.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "042f169d43e3a09103aa72b969ba9e304c89a504",
+      "size": 617,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/042f169d43e3a09103aa72b969ba9e304c89a504"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_signal_dots.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "da0d3c6eab3ff626c7b411ec077b7d5c78e4c4cf",
+      "size": 746,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/da0d3c6eab3ff626c7b411ec077b7d5c78e4c4cf"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_speaker_slash.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a41336835cd5b061f72f57dcee8516211e5c4dea",
+      "size": 625,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/a41336835cd5b061f72f57dcee8516211e5c4dea"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_sun.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3f379225cc6b2b860d279e0f0e65e609a95e3011",
+      "size": 706,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/3f379225cc6b2b860d279e0f0e65e609a95e3011"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_timer.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4b4255bd2572b3445660b13cdfffdffd69df7ebe",
+      "size": 709,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/4b4255bd2572b3445660b13cdfffdffd69df7ebe"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_vpn.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "679eee77e7462165606a8f548efef65e2d9b8412",
+      "size": 918,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/679eee77e7462165606a8f548efef65e2d9b8412"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_cc_wifi.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "669c5d607d5d7d9fb87d61cf12db2d77fca4dab9",
+      "size": 808,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/669c5d607d5d7d9fb87d61cf12db2d77fca4dab9"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_expand_more.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "724209c89207176bc7f6ddb1ae1f815f437bb5f5",
+      "size": 410,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/724209c89207176bc7f6ddb1ae1f815f437bb5f5"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_launcher_background.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "07d5da9cbf141911847041df5d7b87f0dd5ef9d4",
+      "size": 5606,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/07d5da9cbf141911847041df5d7b87f0dd5ef9d4"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_launcher_foreground.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2b068d11462a4b96669193de13a711a3a36220a0",
+      "size": 1702,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/2b068d11462a4b96669193de13a711a3a36220a0"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_tab_explore.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "60aa8f478e5c12e79c3d9fcb95e36b28c05a07c1",
+      "size": 583,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/60aa8f478e5c12e79c3d9fcb95e36b28c05a07c1"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_tab_home.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1cf238be0c54a5e7c9d8dc85e5ef52f2453bb7cb",
+      "size": 711,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/1cf238be0c54a5e7c9d8dc85e5ef52f2453bb7cb"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_tab_library.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3d401867feda779cd5f46a189289651b8ad89d4e",
+      "size": 854,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/3d401867feda779cd5f46a189289651b8ad89d4e"
+    },
+    {
+      "path": "app/src/main/res/drawable/image_placeholder.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "845ad4790d89e728577803dd29ef2afeb1f8d2aa",
+      "size": 394,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/845ad4790d89e728577803dd29ef2afeb1f8d2aa"
+    },
+    {
+      "path": "app/src/main/res/mipmap-anydpi-v26",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "46123c8a05f7c8ae0d069692786b4f3b1a0648d7",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/46123c8a05f7c8ae0d069692786b4f3b1a0648d7"
+    },
+    {
+      "path": "app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6f3b755bf50c6b03d8714a9c6184705e6a08389f",
+      "size": 343,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/6f3b755bf50c6b03d8714a9c6184705e6a08389f"
+    },
+    {
+      "path": "app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6f3b755bf50c6b03d8714a9c6184705e6a08389f",
+      "size": 343,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/6f3b755bf50c6b03d8714a9c6184705e6a08389f"
+    },
+    {
+      "path": "app/src/main/res/mipmap-hdpi",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "42022c214b8c47a5d5f9774197529f763d5716a0",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/42022c214b8c47a5d5f9774197529f763d5716a0"
+    },
+    {
+      "path": "app/src/main/res/mipmap-hdpi/ic_launcher.webp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c209e78ecd372343283f4157dcfd918ec5165bb3",
+      "size": 1404,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/c209e78ecd372343283f4157dcfd918ec5165bb3"
+    },
+    {
+      "path": "app/src/main/res/mipmap-hdpi/ic_launcher_round.webp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b2dfe3d1ba5cf3ee31b3ecc1ced89044a1f3b7a9",
+      "size": 2898,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/b2dfe3d1ba5cf3ee31b3ecc1ced89044a1f3b7a9"
+    },
+    {
+      "path": "app/src/main/res/mipmap-mdpi",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c033b6b2e70a2d6993c415f583601bc6745f63fb",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/c033b6b2e70a2d6993c415f583601bc6745f63fb"
+    },
+    {
+      "path": "app/src/main/res/mipmap-mdpi/ic_launcher.webp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4f0f1d64e58ba64d180ce43ee13bf9a17835fbca",
+      "size": 982,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/4f0f1d64e58ba64d180ce43ee13bf9a17835fbca"
+    },
+    {
+      "path": "app/src/main/res/mipmap-mdpi/ic_launcher_round.webp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "62b611da081676d42f6c3f78a2c91e7bcedddedb",
+      "size": 1772,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/62b611da081676d42f6c3f78a2c91e7bcedddedb"
+    },
+    {
+      "path": "app/src/main/res/mipmap-xhdpi",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "07615786dd22a6c2df1ebd0b3a53fcd204d49d6c",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/07615786dd22a6c2df1ebd0b3a53fcd204d49d6c"
+    },
+    {
+      "path": "app/src/main/res/mipmap-xhdpi/ic_launcher.webp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "948a3070fe34c611c42c0d3ad3013a0dce358be0",
+      "size": 1900,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/948a3070fe34c611c42c0d3ad3013a0dce358be0"
+    },
+    {
+      "path": "app/src/main/res/mipmap-xhdpi/ic_launcher_round.webp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1b9a6956b3acdc11f40ce2bb3f6efbd845cc243f",
+      "size": 3918,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/1b9a6956b3acdc11f40ce2bb3f6efbd845cc243f"
+    },
+    {
+      "path": "app/src/main/res/mipmap-xxhdpi",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "1217e928894cecf247fd980964e5e9f7fad16e4e",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/1217e928894cecf247fd980964e5e9f7fad16e4e"
+    },
+    {
+      "path": "app/src/main/res/mipmap-xxhdpi/ic_launcher.webp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "28d4b77f9f036a47549d47db79c16788749dca10",
+      "size": 2884,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/28d4b77f9f036a47549d47db79c16788749dca10"
+    },
+    {
+      "path": "app/src/main/res/mipmap-xxhdpi/ic_launcher_round.webp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9287f5083623b375139afb391af71cc533a7dd37",
+      "size": 5914,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/9287f5083623b375139afb391af71cc533a7dd37"
+    },
+    {
+      "path": "app/src/main/res/mipmap-xxxhdpi",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a3de34961096076e3ad578310142d8e33859d1bb",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/a3de34961096076e3ad578310142d8e33859d1bb"
+    },
+    {
+      "path": "app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aa7d6427e6fa1074b79ccd52ef67ac15c5637e85",
+      "size": 3844,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/aa7d6427e6fa1074b79ccd52ef67ac15c5637e85"
+    },
+    {
+      "path": "app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9126ae37cbc3587421d6889eadd1d91fbf1994d4",
+      "size": 7778,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/9126ae37cbc3587421d6889eadd1d91fbf1994d4"
+    },
+    {
+      "path": "app/src/main/res/values-night",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "0ce0ff60c5eceafc83f818033ee2d9651a2d6edc",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/0ce0ff60c5eceafc83f818033ee2d9651a2d6edc"
+    },
+    {
+      "path": "app/src/main/res/values-night/themes.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "db5634daea6853ce363563825e8d976e5e424f88",
+      "size": 813,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/db5634daea6853ce363563825e8d976e5e424f88"
+    },
+    {
+      "path": "app/src/main/res/values-zh",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "b34fbfa0d314770f4a2eec84dc80d5c988ca9b2c",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/b34fbfa0d314770f4a2eec84dc80d5c988ca9b2c"
+    },
+    {
+      "path": "app/src/main/res/values-zh/strings.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e590ebfb8d9eb52da21c5728c20404ec250fd91a",
+      "size": 17780,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/e590ebfb8d9eb52da21c5728c20404ec250fd91a"
+    },
+    {
+      "path": "app/src/main/res/values",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c8e02dd3990a77725f5aa4b5d801995ba8febd8d",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/c8e02dd3990a77725f5aa4b5d801995ba8febd8d"
+    },
+    {
+      "path": "app/src/main/res/values/colors.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f8c6127d327620c93d2b2d00342a68e97b98a48d",
+      "size": 378,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/f8c6127d327620c93d2b2d00342a68e97b98a48d"
+    },
+    {
+      "path": "app/src/main/res/values/strings.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "12ce21636143684f7df2ef07de11066b9244c029",
+      "size": 18107,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/12ce21636143684f7df2ef07de11066b9244c029"
+    },
+    {
+      "path": "app/src/main/res/values/themes.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8f7ec91aa7cc6183f18c14f9e457931d3d42b996",
+      "size": 2773,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/8f7ec91aa7cc6183f18c14f9e457931d3d42b996"
+    },
+    {
+      "path": "app/src/main/res/xml",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "516abe05699b4a4d708524ba0d8a6ebbd734ec1a",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/516abe05699b4a4d708524ba0d8a6ebbd734ec1a"
+    },
+    {
+      "path": "app/src/main/res/xml/backup_rules.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4df925582478cf0d469c4cff9a4bb50859f3230a",
+      "size": 478,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/4df925582478cf0d469c4cff9a4bb50859f3230a"
+    },
+    {
+      "path": "app/src/main/res/xml/data_extraction_rules.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9ee9997b0b4726e57c27b2f7b21462b604ff8a88",
+      "size": 551,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/9ee9997b0b4726e57c27b2f7b21462b604ff8a88"
+    },
+    {
+      "path": "app/src/test",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "558e0483e6bd87c836dc0cd5d80cdacfb0265db4",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/558e0483e6bd87c836dc0cd5d80cdacfb0265db4"
+    },
+    {
+      "path": "app/src/test/java",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c614f3f8b306ba3f365bf15c74130d37824e2931",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/c614f3f8b306ba3f365bf15c74130d37824e2931"
+    },
+    {
+      "path": "app/src/test/java/com",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "63c2f2dd43ef2a3f98f5aec22875df22714acef3",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/63c2f2dd43ef2a3f98f5aec22875df22714acef3"
+    },
+    {
+      "path": "app/src/test/java/com/example",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "f0321be392d74ea91b609b8a072d363996403ef7",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/f0321be392d74ea91b609b8a072d363996403ef7"
+    },
+    {
+      "path": "app/src/test/java/com/example/liquidglass",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "b52e01543ced5f615ee7a228762e6523f368eccd",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/b52e01543ced5f615ee7a228762e6523f368eccd"
+    },
+    {
+      "path": "app/src/test/java/com/example/liquidglass/ExampleUnitTest.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b2b63b4740467adf585456181be6a3cd6ea5d7db",
+      "size": 347,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/b2b63b4740467adf585456181be6a3cd6ea5d7db"
+    },
+    {
+      "path": "assets",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "fd45445941f41adb57b5c0f4f7ba77b32513e31e",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/fd45445941f41adb57b5c0f4f7ba77b32513e31e"
+    },
+    {
+      "path": "assets/banner.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b0ee9570611831a3b473a21990b1604fc34d17d7",
+      "size": 1331952,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/b0ee9570611831a3b473a21990b1604fc34d17d7"
+    },
+    {
+      "path": "assets/demo-glass-drag.gif",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cc309e47f1a97fd0aa3d0e1e7ac6597c2860cf0f",
+      "size": 2546966,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/cc309e47f1a97fd0aa3d0e1e7ac6597c2860cf0f"
+    },
+    {
+      "path": "assets/demo-glass-params.gif",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "636c659acf935c9fa658185abeea1ae18b2ea2aa",
+      "size": 2191647,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/636c659acf935c9fa658185abeea1ae18b2ea2aa"
+    },
+    {
+      "path": "assets/glass-clear-material.jpg",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c57796cf79576609605e2623e8f0a68905bff04f",
+      "size": 384501,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/c57796cf79576609605e2623e8f0a68905bff04f"
+    },
+    {
+      "path": "assets/glass-regular-material.jpg",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e9cbeb790b34b75d6ed7b91ea5a8f197b0fc025e",
+      "size": 413864,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/e9cbeb790b34b75d6ed7b91ea5a8f197b0fc025e"
+    },
+    {
+      "path": "assets/hero-home-screen.jpg",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ede1a86f10ecddf17702becb7c39c1bcc4641782",
+      "size": 320716,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/ede1a86f10ecddf17702becb7c39c1bcc4641782"
+    },
+    {
+      "path": "assets/hero-lens-detail.jpg",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e77014ea8e80462df9d00f7786e58c26876b4e26",
+      "size": 104909,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/e77014ea8e80462df9d00f7786e58c26876b4e26"
+    },
+    {
+      "path": "assets/hero-refraction.gif",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "54dbd99599008701596b151f2d46c5a3e4bf7bac",
+      "size": 1243834,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/54dbd99599008701596b151f2d46c5a3e4bf7bac"
+    },
+    {
+      "path": "assets/social-preview.png",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b8ccd58a22a3524f7c110f0bb96321d4118629f3",
+      "size": 363642,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/b8ccd58a22a3524f7c110f0bb96321d4118629f3"
+    },
+    {
+      "path": "build.gradle.kts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f55768e8e66bec0bfdff71c76876f28b6df1d5f4",
+      "size": 270,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/f55768e8e66bec0bfdff71c76876f28b6df1d5f4"
+    },
+    {
+      "path": "docs",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "574092aefc2ee121f3e3e8ab492d7606db441e31",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/574092aefc2ee121f3e3e8ab492d7606db441e31"
+    },
+    {
+      "path": "docs/LIQUID_GLASS_V2.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "deab2b6cd3a4920bd39d161765d3350de183cb55",
+      "size": 12305,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/deab2b6cd3a4920bd39d161765d3350de183cb55"
+    },
+    {
+      "path": "gradle.properties",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "20e2a01520742aff4ec9ce578ed4fe5f3a76fe77",
+      "size": 1346,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/20e2a01520742aff4ec9ce578ed4fe5f3a76fe77"
+    },
+    {
+      "path": "gradle",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "5f6acaa8371588a2cfb06267da412289f2776329",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/5f6acaa8371588a2cfb06267da412289f2776329"
+    },
+    {
+      "path": "gradle/libs.versions.toml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "da970f791a59ade8e33318154338879d7dd4df01",
+      "size": 1123,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/da970f791a59ade8e33318154338879d7dd4df01"
+    },
+    {
+      "path": "gradle/wrapper",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "61967a217828b6d5e4031f172d0699da78e48688",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/61967a217828b6d5e4031f172d0699da78e48688"
+    },
+    {
+      "path": "gradle/wrapper/gradle-wrapper.jar",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e708b1c023ec8b20f512888fe07c5bd3ff77bb8f",
+      "size": 59203,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/e708b1c023ec8b20f512888fe07c5bd3ff77bb8f"
+    },
+    {
+      "path": "gradle/wrapper/gradle-wrapper.properties",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "80c6a61769e1c39b78bd139a862a7449dd6172c9",
+      "size": 233,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/80c6a61769e1c39b78bd139a862a7449dd6172c9"
+    },
+    {
+      "path": "gradlew",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "4f906e0c811fc9e230eb44819f509cd0627f2600",
+      "size": 5766,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/4f906e0c811fc9e230eb44819f509cd0627f2600"
+    },
+    {
+      "path": "gradlew.bat",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "107acd32c4e687021ef32db511e8a206129b88ec",
+      "size": 2674,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/107acd32c4e687021ef32db511e8a206129b88ec"
+    },
+    {
+      "path": "jitpack.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "efde7bf2580f4bd76245bb4bb5e839f83236a99f",
+      "size": 19,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/efde7bf2580f4bd76245bb4bb5e839f83236a99f"
+    },
+    {
+      "path": "keystore.properties.example",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f3bfc4249cf5b530b0469772f736b51d86c2ad5b",
+      "size": 396,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/f3bfc4249cf5b530b0469772f736b51d86c2ad5b"
+    },
+    {
+      "path": "liquidglass",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c6d421c46c0dc16a92a9440e8bbac5c4f111eb26",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/c6d421c46c0dc16a92a9440e8bbac5c4f111eb26"
+    },
+    {
+      "path": "liquidglass/build.gradle.kts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "afe5572ac783ec32090f150ac282aaf53aba493c",
+      "size": 2832,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/afe5572ac783ec32090f150ac282aaf53aba493c"
+    },
+    {
+      "path": "liquidglass/consumer-rules.pro",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5b62483e62a5921af39fac632ea0595092e49ba2",
+      "size": 444,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/5b62483e62a5921af39fac632ea0595092e49ba2"
+    },
+    {
+      "path": "liquidglass/src",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "b4fb1cbb544676a2f336b764ff4201ca126d98a2",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/b4fb1cbb544676a2f336b764ff4201ca126d98a2"
+    },
+    {
+      "path": "liquidglass/src/main",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "99b15bc7375466a0db199f9a6e1e56f726197a46",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/99b15bc7375466a0db199f9a6e1e56f726197a46"
+    },
+    {
+      "path": "liquidglass/src/main/AndroidManifest.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8072ee00dbf16d9161b7464ef3d2194a7d659bcc",
+      "size": 52,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/8072ee00dbf16d9161b7464ef3d2194a7d659bcc"
+    },
+    {
+      "path": "liquidglass/src/main/cpp",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2705e1e9cb6d2539ddebe49c6f497936ea79db83",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/2705e1e9cb6d2539ddebe49c6f497936ea79db83"
+    },
+    {
+      "path": "liquidglass/src/main/cpp/CMakeLists.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1712c4b2d86a07e9dc1a0233a3414c8be5f54e70",
+      "size": 2914,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/1712c4b2d86a07e9dc1a0233a3414c8be5f54e70"
+    },
+    {
+      "path": "liquidglass/src/main/cpp/boxblur.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c9a52b7bac1c90f22c83f642039ab451479a3ba6",
+      "size": 14640,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/c9a52b7bac1c90f22c83f642039ab451479a3ba6"
+    },
+    {
+      "path": "liquidglass/src/main/cpp/boxblur.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dac5295664caf7bff9d5410b93532496cf6f7983",
+      "size": 4456,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/dac5295664caf7bff9d5410b93532496cf6f7983"
+    },
+    {
+      "path": "liquidglass/src/main/cpp/chromatic_aberration.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c94051e06cc474b507d9631c0bb731f8e3fa891b",
+      "size": 18883,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/c94051e06cc474b507d9631c0bb731f8e3fa891b"
+    },
+    {
+      "path": "liquidglass/src/main/cpp/chromatic_aberration.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "78bafca0faeca25121dee69562c0a31f01df289d",
+      "size": 6967,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/78bafca0faeca25121dee69562c0a31f01df289d"
+    },
+    {
+      "path": "liquidglass/src/main/cpp/gauss_iir.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "750ce8701b3449fac9e24713b8d6f2d5b6b3d45a",
+      "size": 10965,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/750ce8701b3449fac9e24713b8d6f2d5b6b3d45a"
+    },
+    {
+      "path": "liquidglass/src/main/cpp/gauss_iir.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bc801d0487ac9deb7813fb02c1d60046a172b410",
+      "size": 2790,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/bc801d0487ac9deb7813fb02c1d60046a172b410"
+    },
+    {
+      "path": "liquidglass/src/main/cpp/gauss_iir_neon.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "498b0b662e612137ab34d276ac58305fc021d78f",
+      "size": 11681,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/498b0b662e612137ab34d276ac58305fc021d78f"
+    },
+    {
+      "path": "liquidglass/src/main/cpp/gauss_iir_neon.h",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3339f33fc4b253be628c1ddb53ccb7ed197cfc51",
+      "size": 2216,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/3339f33fc4b253be628c1ddb53ccb7ed197cfc51"
+    },
+    {
+      "path": "liquidglass/src/main/cpp/native-lib.cpp",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "42a01ff2a81f98fac49d5b5d0c63635572ff9f68",
+      "size": 17131,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/42a01ff2a81f98fac49d5b5d0c63635572ff9f68"
+    },
+    {
+      "path": "liquidglass/src/main/java",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "74dab4ccb67cb03fdd566140a36aa57b6106e6fc",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/74dab4ccb67cb03fdd566140a36aa57b6106e6fc"
+    },
+    {
+      "path": "liquidglass/src/main/java/com",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a09b3f31215eed18cc0e77b240a7b3c6725fb92d",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/a09b3f31215eed18cc0e77b240a7b3c6725fb92d"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "7b68e5355870d820b4ee5d7ef26c342814e45157",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/7b68e5355870d820b4ee5d7ef26c342814e45157"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/blur",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "eaa2a6378083e0c021fefa9de226670bc0e8bcd4",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/eaa2a6378083e0c021fefa9de226670bc0e8bcd4"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/blur/NativeGauss.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b88876d02023e1cb1651a6c0cabc0bda820cd61d",
+      "size": 9064,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/b88876d02023e1cb1651a6c0cabc0bda820cd61d"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "e623678eb848fa5aee648bf954467e11c909a43b",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/e623678eb848fa5aee648bf954467e11c909a43b"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/AdvancedFastBlur.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "51043af975425839be613bf798f486f11cc150e8",
+      "size": 8659,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/51043af975425839be613bf798f486f11cc150e8"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/AsyncRenderer.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8edee5ce841168d18374fcf37d559b649a5d1d41",
+      "size": 4575,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/8edee5ce841168d18374fcf37d559b649a5d1d41"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/BackdropCapture.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7a22331fa800fdb3467ef59dc27a6eef8aeb0a53",
+      "size": 6960,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/7a22331fa800fdb3467ef59dc27a6eef8aeb0a53"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/BackdropLuminanceMeter.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f3e6f8d9d2eaaae796310633947dc90d89c03197",
+      "size": 5335,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/f3e6f8d9d2eaaae796310633947dc90d89c03197"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/BitmapPool.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "366f18174a07f0b1c1a5ebcaf838dc952145635b",
+      "size": 4345,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/366f18174a07f0b1c1a5ebcaf838dc952145635b"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/BlurMethod.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "23bb3b9d18721f945139338fe576ffcf837be146",
+      "size": 1598,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/23bb3b9d18721f945139338fe576ffcf837be146"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/ChromaticAberrationEffect.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ebcacef6b536cd0ba39cbfb6d23ab2299573313a",
+      "size": 24208,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/ebcacef6b536cd0ba39cbfb6d23ab2299573313a"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/ChromaticDispersionEffect.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7bfe8ff590300e26bbc63205bd3eb4bdd88db7ef",
+      "size": 10556,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/7bfe8ff590300e26bbc63205bd3eb4bdd88db7ef"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/DispersionMapGenerator.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a2ae0ab13d235fdd4e2aa8fa127e47cd0a5404ff",
+      "size": 14639,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/a2ae0ab13d235fdd4e2aa8fa127e47cd0a5404ff"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/DisplacementMapGenerator.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5342721ba22bd7ab6ff3ff7f88305403abe6aa8d",
+      "size": 6886,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/5342721ba22bd7ab6ff3ff7f88305403abe6aa8d"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/EdgeHighlightEffect.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2978552f36cd57a17fab233e4518efc15292334d",
+      "size": 9884,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/2978552f36cd57a17fab233e4518efc15292334d"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/EnhancedBlurEffect.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "06e9717a3b110ac7ed9486b4781506ff1766ef9d",
+      "size": 13009,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/06e9717a3b110ac7ed9486b4781506ff1766ef9d"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/GlassAccessibility.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3973fa2ee702586285daec560100358cca971bc5",
+      "size": 2522,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/3973fa2ee702586285daec560100358cca971bc5"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/GlassLensRenderer.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c5ac3e68d87845ab6bb62be5b48954027da2ca2f",
+      "size": 27022,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/c5ac3e68d87845ab6bb62be5b48954027da2ca2f"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/GlassMaterial.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2e0a2034d553abd34e07d5596d96bbd97bf74393",
+      "size": 1548,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/2e0a2034d553abd34e07d5596d96bbd97bf74393"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/GlassRuntimeEffects.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d2fc5ad447a7c64c727f37666e33c0d66925bfe6",
+      "size": 7607,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/d2fc5ad447a7c64c727f37666e33c0d66925bfe6"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/HardwareBackdropBlur.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "84a290eaaf492978ec213a91b5b4e29c1ec50c04",
+      "size": 10982,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/84a290eaaf492978ec213a91b5b4e29c1ec50c04"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/LightSourceController.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4713f89171596cf4f402984b999381a352588195",
+      "size": 5527,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/4713f89171596cf4f402984b999381a352588195"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/LiquidGlassButton.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "52d8e38df16863a3228dbcbf965e773ce11f7f02",
+      "size": 3655,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/52d8e38df16863a3228dbcbf965e773ce11f7f02"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/LiquidGlassChip.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4a99bf62b81a8e87dc591c3743fc1e87263fbba7",
+      "size": 15501,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/4a99bf62b81a8e87dc591c3743fc1e87263fbba7"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/LiquidGlassChipGroup.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2bdd0db82de24116b77526180aa2dc850c4930e4",
+      "size": 11849,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/2bdd0db82de24116b77526180aa2dc850c4930e4"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/LiquidGlassDialogBuilder.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bc996462498a9db8447f1d17d68fc3b9f99e0799",
+      "size": 11371,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/bc996462498a9db8447f1d17d68fc3b9f99e0799"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/LiquidGlassFab.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6430e5367d6870a1411b1e3169a7a09d8f9f2af6",
+      "size": 3161,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/6430e5367d6870a1411b1e3169a7a09d8f9f2af6"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/LiquidGlassListGroup.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2d5beb8257ed6c77ed17811b030fd9abdb102a6f",
+      "size": 7065,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/2d5beb8257ed6c77ed17811b030fd9abdb102a6f"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/LiquidGlassListItem.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e91983ea70b3c069584092392d2ad52ed1c3f363",
+      "size": 22993,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/e91983ea70b3c069584092392d2ad52ed1c3f363"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/LiquidGlassTabBar.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dbcc489d15f3e07f16593b72a1b94f74c7e2075f",
+      "size": 15733,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/dbcc489d15f3e07f16593b72a1b94f74c7e2075f"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/LiquidGlassTabLayout.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fad46a2ad6f76460801da6b83543a10d9ce941c8",
+      "size": 22951,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/fad46a2ad6f76460801da6b83543a10d9ce941c8"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/LiquidGlassTabLayoutMediator.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a517a213bde912f2d8ae5c82eb1d508509c99150",
+      "size": 5503,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/a517a213bde912f2d8ae5c82eb1d508509c99150"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/LiquidGlassToast.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3a2af4101de57aef786af82595eb15174e679383",
+      "size": 21620,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/3a2af4101de57aef786af82595eb15174e679383"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/LiquidGlassView.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6feca132a836e554b76da1b0bd8bb7c13373cc1b",
+      "size": 94302,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/6feca132a836e554b76da1b0bd8bb7c13373cc1b"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/NativeChromaticAberration.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "654b3e0e788dbded24dc3015fcd2422082da54d3",
+      "size": 8977,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/654b3e0e788dbded24dc3015fcd2422082da54d3"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/NativeChromaticDispersion.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9e0665a548a49607662d6169c75f0a4ce17e4b58",
+      "size": 2247,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/9e0665a548a49607662d6169c75f0a4ce17e4b58"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/ScrollEdgeBlurView.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "066d7b8e854a479f8ef0ae23e3285711d37423dc",
+      "size": 9785,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/066d7b8e854a479f8ef0ae23e3285711d37423dc"
+    },
+    {
+      "path": "liquidglass/src/main/java/com/example/liquidglass/WindowStackBackdrop.kt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5336657e6bb508ba293de1406c00a54fc1a4acbb",
+      "size": 8712,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/5336657e6bb508ba293de1406c00a54fc1a4acbb"
+    },
+    {
+      "path": "liquidglass/src/main/res",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "7114e50e5fc364ff134d51657e41249a394dfcd8",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/7114e50e5fc364ff134d51657e41249a394dfcd8"
+    },
+    {
+      "path": "liquidglass/src/main/res/anim",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2cfc8a34cac8bee3b1fbba24c4ce7adcbc2e5283",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/2cfc8a34cac8bee3b1fbba24c4ce7adcbc2e5283"
+    },
+    {
+      "path": "liquidglass/src/main/res/anim/liquid_glass_dialog_exit.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0206a6698c5162dbeb5d1591b40d4f702cfbf2f1",
+      "size": 360,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/0206a6698c5162dbeb5d1591b40d4f702cfbf2f1"
+    },
+    {
+      "path": "liquidglass/src/main/res/anim/liquid_glass_dialog_none.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2fe91657a182c4a9303ed442281e840f14092d5e",
+      "size": 292,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/2fe91657a182c4a9303ed442281e840f14092d5e"
+    },
+    {
+      "path": "liquidglass/src/main/res/drawable",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "f6ff009c05f6656b4bfb8c6b73fae5eeadd7db7d",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/f6ff009c05f6656b4bfb8c6b73fae5eeadd7db7d"
+    },
+    {
+      "path": "liquidglass/src/main/res/drawable/liquid_glass_ic_check.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "54f2ee673d3089c24ff183f39b616164fc65a4c1",
+      "size": 443,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/54f2ee673d3089c24ff183f39b616164fc65a4c1"
+    },
+    {
+      "path": "liquidglass/src/main/res/drawable/liquid_glass_ic_close.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c6a3b895a74841f993549ce3767f5dd837ae692d",
+      "size": 497,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/c6a3b895a74841f993549ce3767f5dd837ae692d"
+    },
+    {
+      "path": "liquidglass/src/main/res/values-zh",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "dc1f8197b2a8615439dce207b113f37be35473fb",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/dc1f8197b2a8615439dce207b113f37be35473fb"
+    },
+    {
+      "path": "liquidglass/src/main/res/values-zh/strings.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "060ab1a60ff94e870fe6da310882da30d19cafba",
+      "size": 139,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/060ab1a60ff94e870fe6da310882da30d19cafba"
+    },
+    {
+      "path": "liquidglass/src/main/res/values",
+      "mode": "040000",
+      "type": "tree",
+      "sha": "e26ca5250dc1c680a6af0df93152cb626e882c23",
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/trees/e26ca5250dc1c680a6af0df93152cb626e882c23"
+    },
+    {
+      "path": "liquidglass/src/main/res/values/attrs.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "05546e7ac95a09174bfce7baed2e97169585a7a2",
+      "size": 8218,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/05546e7ac95a09174bfce7baed2e97169585a7a2"
+    },
+    {
+      "path": "liquidglass/src/main/res/values/strings.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1a7d4bacde3d15d8232de9c28468171aca1ff0a2",
+      "size": 223,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/1a7d4bacde3d15d8232de9c28468171aca1ff0a2"
+    },
+    {
+      "path": "liquidglass/src/main/res/values/styles.xml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "86dea5825cee31ea07c7b4068da4e5b052a4e317",
+      "size": 614,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/86dea5825cee31ea07c7b4068da4e5b052a4e317"
+    },
+    {
+      "path": "llms.txt",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "51ef47c86b7966c2543febec5dcf6d388b044667",
+      "size": 21742,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/51ef47c86b7966c2543febec5dcf6d388b044667"
+    },
+    {
+      "path": "settings.gradle.kts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a99a0bf1b78a6c96470757dfb009c9b52cc86695",
+      "size": 560,
+      "url": "https://api.github.com/repos/QWEA0/Liquid-Glass-Android/git/blobs/a99a0bf1b78a6c96470757dfb009c9b52cc86695"
+    }
+  ],
+  "truncated": false
+}

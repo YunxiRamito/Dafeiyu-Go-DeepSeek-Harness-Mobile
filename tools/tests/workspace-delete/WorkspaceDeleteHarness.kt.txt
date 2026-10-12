@@ -1,0 +1,65 @@
+package com.dafeiyu.mobile.data
+
+import java.util.UUID
+import java.util.concurrent.Executors
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+internal val fixtureMain = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+internal fun <T> mutableStateListOf(): MutableList<T> = mutableListOf()
+internal data class FixtureTask(val parentConversationId: String?)
+internal class FixtureTaskEngine {
+    val tasks = MutableStateFlow<List<FixtureTask>>(emptyList())
+    val storageIssue = MutableStateFlow<String?>(null)
+}
+internal data class FixtureOutput(val conversationId: String)
+internal class WorkspaceDeleteSubject(val workspaceStore: WorkspaceStore?) {
+    val viewModelScope = CoroutineScope(SupervisorJob() + fixtureMain)
+    val workspaces = mutableListOf(Workspace("default", "Default"), Workspace("other", "Other"))
+    val conversations = mutableListOf(Conversation("initial", "\u65b0\u5bf9\u8bdd", "default"))
+    val conversationMessages = mutableMapOf("initial" to mutableListOf<ChatMessage>())
+    var selectedWorkspaceId = "default"
+    var selectedConversationId = "initial"
+    var workspaceInitialized = true
+    var workspaceDeletionBusy = false
+    var composerDraftText: String? = null
+    var deletionProtectionLoadError: String? = null
+    var backgroundTasks: FixtureTaskEngine? = FixtureTaskEngine()
+    val officialOutputs = mutableMapOf<String, FixtureOutput>()
+    val liteAttachments = mutableListOf<String>()
+    val dshAttachments = mutableListOf<String>()
+    val pendingAttachmentSelections = mutableMapOf<String, Any>()
+    var attachmentImportCount = 0
+    var composerGeneration = 0
+    var activeResponseConversationId: String? = null
+    var saveJob: Job? = null
+    val persistenceMutex = Mutex()
+    var persistenceRevision = 0L
+    var sendPending = false
+    var isResponding = false
+    var workspaceSaveError: String? = null
+    var cancelledResponses = 0
+    var clearedAttachments = 0
+    var notice = ""
+    fun updateNotice(text: String) { notice = text }
+    fun clearAttachments() {
+        clearedAttachments++
+        liteAttachments.clear()
+        dshAttachments.clear()
+        pendingAttachmentSelections.clear()
+    }
+    fun cancelResponse() {
+        cancelledResponses++
+        activeResponseConversationId = null
+        isResponding = false
+        persistWorkspaces()
+    }
+    suspend fun settle() {
+        withTimeout(15_000) {
+            while (workspaceDeletionBusy || saveJob?.isCompleted == false) delay(10)
+        }
+    }
+    suspend fun shutdown() { viewModelScope.coroutineContext[Job]?.cancelAndJoin() }
+

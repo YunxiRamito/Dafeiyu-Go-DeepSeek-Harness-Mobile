@@ -1,0 +1,144 @@
+@file:Suppress("UNUSED_PARAMETER")
+
+package com.dafeiyu.mobile.data
+
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.concurrent.Executors
+
+internal val fixtureMain = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+
+enum class WorkspaceMode { Lite, Dsh }
+enum class RuntimeStatus { Running }
+data class ReasoningOption(val id: String)
+data class ModelChoice(val id: String, val isExample: Boolean = false)
+data class AttachmentPreview(
+    val id: String,
+    val label: String,
+    val textContent: String?,
+    val mimeType: String? = null,
+    val sizeBytes: Long = 0L,
+)
+
+internal class FixtureAttachmentStore {
+    suspend fun readImageDataUrls(ids: List<String>): Map<String, String> = ids.associateWith {
+        "data:image/png;base64,AA=="
+    }
+}
+
+internal class FixtureDeepSeekClient {
+    var onValidate: (() -> Unit)? = null
+    fun validateRequest(request: DeepSeekChatClient.Request): Int {
+        onValidate?.invoke()
+        return request.history.size
+    }
+}
+
+internal object DeepSeekChatClient {
+    data class FunctionTool(val name: String, val description: String, val parameters: JSONObject)
+    data class HistoryMessage(
+        val role: String,
+        val content: String,
+        val reasoningContent: String? = null,
+        val toolCalls: List<Any> = emptyList(),
+        val toolCallId: String? = null,
+        val images: List<String> = emptyList(),
+    )
+    data class Request(
+        val model: String,
+        val history: List<HistoryMessage>,
+        val thinking: Boolean? = true,
+        val streaming: Boolean = true,
+        val tools: List<FunctionTool> = emptyList(),
+    )
+}
+
+internal object OfficialToolSession {
+    fun systemMessage() = DeepSeekChatClient.HistoryMessage("system", "fixture")
+}
+
+internal object OfficialChatHistory {
+    fun build(
+        messages: List<ChatMessage>,
+        includeToolTurns: Boolean,
+        imageData: Map<String, String>,
+        attachmentCatalog: Map<String, Boolean>? = null,
+    ): List<DeepSeekChatClient.HistoryMessage> =
+        messages.filter { it.role == "user" }.map { message ->
+            DeepSeekChatClient.HistoryMessage(
+                "user", message.modelInput ?: message.text,
+                images = message.attachmentIds.mapNotNull { imageData[it] },
+            )
+        }
+}
+
+internal object OfficialToolContract {
+    fun schemas(includeWeather: Boolean, includeWeatherSelection: Boolean = false): JSONArray =
+        JSONArray()
+}
+
+/** History, images, schemas and request validation are fixtures; only persistence/precommit are tested. */
+internal class SendPersistenceSubject(private val workspaceStore: WorkspaceStore?) {
+    val viewModelScope = CoroutineScope(SupervisorJob() + fixtureMain)
+    val workspaces = mutableListOf(Workspace("default", "Default"))
+    val conversations = mutableListOf(Conversation("c1", "Title", "default"))
+    val conversationMessages = mutableMapOf("c1" to mutableListOf<ChatMessage>())
+    var selectedWorkspaceId = "default"
+    var selectedConversationId = "c1"
+    var workspaceInitialized = true
+    var initializationStarted = true
+    var saveJob: Job? = null
+    val persistenceMutex = Mutex()
+    var persistenceRevision = 0L
+    var sendPending = false
+    var workspaceSaveError: String? = null
+    var isResponding = false
+    var workspaceMode = WorkspaceMode.Lite
+    var runtimeStatus = RuntimeStatus.Running
+    var engineMode = "official"
+    var selectedModel = ModelChoice("configured")
+    var selectedReasoningOption: ReasoningOption? = null
+    var deepSeekConfigured = true
+    var deepSeekConfigurationBusy = false
+    var composerGeneration = 0
+    var credentialGeneration = 0L
+    var attachmentImportCount = 0
+    var attachmentPreviews = emptyList<AttachmentPreview>()
+    val activeAttachments get() = attachmentPreviews
+    val importedAttachments = mutableMapOf<String, AttachmentPreview>()
+    val attachmentStore = FixtureAttachmentStore()
+    val deepSeekClient = FixtureDeepSeekClient()
+    val officialEngineStreaming = true
+    var nextMessageId = 1L
+    var paidCalls = 0
+    var clearedAttachments = 0
+    var notice = ""
+    var onPaid: (() -> Unit)? = null
+    fun isModelProviderEnabled(id: String): Boolean = id == "deepseek"
+    fun updateNotice(text: String) { notice = text }
+    fun clearAttachments() { clearedAttachments++; attachmentPreviews = emptyList() }
+    fun supportsImages(model: ModelChoice): Boolean = !model.isExample
+    fun isImageAttachment(attachment: AttachmentPreview): Boolean =
+        attachment.mimeType in setOf("image/jpeg", "image/png", "image/gif", "image/webp") &&
+            attachment.textContent == null && attachment.id in importedAttachments
+    fun sendDeepSeekMessage(
+        conversationId: String,
+        input: String,
+        modelId: String,
+        thinking: Boolean?,
+        history: List<DeepSeekChatClient.HistoryMessage>,
+    ) {
+        check(conversationId == "c1" && input.isNotBlank() && modelId.isNotBlank())
+        onPaid?.invoke()
+        paidCalls++
+        isResponding = true
+    }
+    fun mutate(text: String) {
+        conversationMessages.getValue("c1") += ChatMessage(nextMessageId++, "assistant", text)
+        persistWorkspaces()
+    }
+    suspend fun shutdown() { viewModelScope.coroutineContext[Job]?.cancelAndJoin() }
+

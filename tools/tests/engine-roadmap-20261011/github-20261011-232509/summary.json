@@ -1,0 +1,292 @@
+{
+  "observed_at": "2026-10-11T23:25:14.1055783+08:00",
+  "proxy": "http://127.0.0.1:7890",
+  "scope": "Unauthenticated read-only GET; no clone, install, release download, external script execution, model call or credentials.",
+  "searches": [
+    {
+      "query": "langgraph in:name archived:false",
+      "url": "https://api.github.com/search/repositories?q=langgraph%20in%3Aname%20archived%3Afalse&sort=stars&per_page=5",
+      "total_count": 30628,
+      "results": [
+        {
+          "full_name": "langchain-ai/langgraph",
+          "html_url": "https://github.com/langchain-ai/langgraph",
+          "stars": 43064
+        },
+        {
+          "full_name": "google-gemini/gemini-fullstack-langgraph-quickstart",
+          "html_url": "https://github.com/google-gemini/gemini-fullstack-langgraph-quickstart",
+          "stars": 18346
+        },
+        {
+          "full_name": "langchain-ai/langgraphjs",
+          "html_url": "https://github.com/langchain-ai/langgraphjs",
+          "stars": 3345
+        },
+        {
+          "full_name": "wassim249/fastapi-langgraph-agent-production-ready-template",
+          "html_url": "https://github.com/wassim249/fastapi-langgraph-agent-production-ready-template",
+          "stars": 2697
+        },
+        {
+          "full_name": "langgraph4j/langgraph4j",
+          "html_url": "https://github.com/langgraph4j/langgraph4j",
+          "stars": 2048
+        }
+      ]
+    },
+    {
+      "query": "quickjs android in:description archived:false",
+      "url": "https://api.github.com/search/repositories?q=quickjs%20android%20in%3Adescription%20archived%3Afalse&sort=stars&per_page=5",
+      "total_count": 26,
+      "results": [
+        {
+          "full_name": "abner/flutter_js",
+          "html_url": "https://github.com/abner/flutter_js",
+          "stars": 542
+        },
+        {
+          "full_name": "HarlonWang/quickjs-wrapper",
+          "html_url": "https://github.com/HarlonWang/quickjs-wrapper",
+          "stars": 274
+        },
+        {
+          "full_name": "taoweiji/quickjs-android",
+          "html_url": "https://github.com/taoweiji/quickjs-android",
+          "stars": 224
+        },
+        {
+          "full_name": "seven332/quickjs-android",
+          "html_url": "https://github.com/seven332/quickjs-android",
+          "stars": 196
+        },
+        {
+          "full_name": "ufna/VaCuus",
+          "html_url": "https://github.com/ufna/VaCuus",
+          "stars": 33
+        }
+      ]
+    },
+    {
+      "query": "nodejs-mobile in:name archived:false",
+      "url": "https://api.github.com/search/repositories?q=nodejs-mobile%20in%3Aname%20archived%3Afalse&sort=stars&per_page=5",
+      "total_count": 245,
+      "results": [
+        {
+          "full_name": "nodejs-mobile/nodejs-mobile",
+          "html_url": "https://github.com/nodejs-mobile/nodejs-mobile",
+          "stars": 876
+        },
+        {
+          "full_name": "JaneaSystems/nodejs-mobile-react-native",
+          "html_url": "https://github.com/JaneaSystems/nodejs-mobile-react-native",
+          "stars": 333
+        },
+        {
+          "full_name": "nodejs-mobile/nodejs-mobile-react-native",
+          "html_url": "https://github.com/nodejs-mobile/nodejs-mobile-react-native",
+          "stars": 216
+        },
+        {
+          "full_name": "JaneaSystems/nodejs-mobile-samples",
+          "html_url": "https://github.com/JaneaSystems/nodejs-mobile-samples",
+          "stars": 178
+        },
+        {
+          "full_name": "JaneaSystems/nodejs-mobile-cordova",
+          "html_url": "https://github.com/JaneaSystems/nodejs-mobile-cordova",
+          "stars": 136
+        }
+      ]
+    },
+    {
+      "query": "wasm-micro-runtime in:name archived:false",
+      "url": "https://api.github.com/search/repositories?q=wasm-micro-runtime%20in%3Aname%20archived%3Afalse&sort=stars&per_page=5",
+      "total_count": 25,
+      "results": [
+        {
+          "full_name": "wasm-micro-runtime/wasm-micro-runtime",
+          "html_url": "https://github.com/wasm-micro-runtime/wasm-micro-runtime",
+          "stars": 6137
+        },
+        {
+          "full_name": "wasm-micro-runtime/wamr-rust-sdk",
+          "html_url": "https://github.com/wasm-micro-runtime/wamr-rust-sdk",
+          "stars": 77
+        },
+        {
+          "full_name": "wasm-micro-runtime/wamr-app-framework",
+          "html_url": "https://github.com/wasm-micro-runtime/wamr-app-framework",
+          "stars": 33
+        },
+        {
+          "full_name": "alphaparkinc/genpark-browser-native-wasm-microcontainer-node-runtime-skill",
+          "html_url": "https://github.com/alphaparkinc/genpark-browser-native-wasm-microcontainer-node-runtime-skill",
+          "stars": 8
+        },
+        {
+          "full_name": "wasm-micro-runtime/wamr.dev",
+          "html_url": "https://github.com/wasm-micro-runtime/wamr.dev",
+          "stars": 6
+        }
+      ]
+    }
+  ],
+  "repositories": [],
+  "requests": [
+    {
+      "method": "GET",
+      "url": "https://api.github.com/search/repositories?q=langgraph%20in%3Aname%20archived%3Afalse&sort=stars&per_page=5",
+      "proxy": "http://127.0.0.1:7890",
+      "started_at": "2026-10-11T23:25:09.5877679+08:00",
+      "status": 200,
+      "bytes": 30938,
+      "sha256": "83c22b326eed7ebcfd8e49c0ca7e7f32f3e0bacf88321dc7570d8005e188539a",
+      "response_file": "search-0.json",
+      "rate_remaining": "9",
+      "rate_reset": "1791732370",
+      "error": null,
+      "finished_at": "2026-10-11T23:25:11.4835546+08:00"
+    },
+    {
+      "method": "GET",
+      "url": "https://api.github.com/search/repositories?q=quickjs%20android%20in%3Adescription%20archived%3Afalse&sort=stars&per_page=5",
+      "proxy": "http://127.0.0.1:7890",
+      "started_at": "2026-10-11T23:25:11.5181039+08:00",
+      "status": 200,
+      "bytes": 26549,
+      "sha256": "2523cb3b5b2973f61cd6aa899992406075bb7b9217a663365f00b70f413e2bda",
+      "response_file": "search-1.json",
+      "rate_remaining": "8",
+      "rate_reset": "1791732370",
+      "error": null,
+      "finished_at": "2026-10-11T23:25:12.1281588+08:00"
+    },
+    {
+      "method": "GET",
+      "url": "https://api.github.com/search/repositories?q=nodejs-mobile%20in%3Aname%20archived%3Afalse&sort=stars&per_page=5",
+      "proxy": "http://127.0.0.1:7890",
+      "started_at": "2026-10-11T23:25:12.1303449+08:00",
+      "status": 200,
+      "bytes": 30058,
+      "sha256": "e1859774e44afd29084946ed6f20c1c48fcd0cae052228d89daea5f353ebcdbe",
+      "response_file": "search-2.json",
+      "rate_remaining": "7",
+      "rate_reset": "1791732370",
+      "error": null,
+      "finished_at": "2026-10-11T23:25:12.6909018+08:00"
+    },
+    {
+      "method": "GET",
+      "url": "https://api.github.com/search/repositories?q=wasm-micro-runtime%20in%3Aname%20archived%3Afalse&sort=stars&per_page=5",
+      "proxy": "http://127.0.0.1:7890",
+      "started_at": "2026-10-11T23:25:12.6922830+08:00",
+      "status": 200,
+      "bytes": 31739,
+      "sha256": "d00f63f353feafca3da8473d7ff99b0c4894dffcd4bd2f30aec6f5642c9e7926",
+      "response_file": "search-3.json",
+      "rate_remaining": "6",
+      "rate_reset": "1791732370",
+      "error": null,
+      "finished_at": "2026-10-11T23:25:13.3164780+08:00"
+    },
+    {
+      "method": "GET",
+      "url": "https://api.github.com/repos/langchain-ai/langgraph",
+      "proxy": "http://127.0.0.1:7890",
+      "started_at": "2026-10-11T23:25:13.3196986+08:00",
+      "status": 403,
+      "bytes": 278,
+      "sha256": "6ed2372b3681dbf9e0830d6f655813210ff80a3e776f907b82abfd24daf7a1a1",
+      "response_file": "langchain-ai--langgraph-metadata.json",
+      "rate_remaining": "0",
+      "rate_reset": "1791733774",
+      "error": "HTTP 403",
+      "finished_at": "2026-10-11T23:25:13.4203786+08:00"
+    },
+    {
+      "method": "GET",
+      "url": "https://api.github.com/repos/pydantic/pydantic-ai",
+      "proxy": "http://127.0.0.1:7890",
+      "started_at": "2026-10-11T23:25:13.4215665+08:00",
+      "status": 403,
+      "bytes": 278,
+      "sha256": "6ed2372b3681dbf9e0830d6f655813210ff80a3e776f907b82abfd24daf7a1a1",
+      "response_file": "pydantic--pydantic-ai-metadata.json",
+      "rate_remaining": "0",
+      "rate_reset": "1791733774",
+      "error": "HTTP 403",
+      "finished_at": "2026-10-11T23:25:13.5166884+08:00"
+    },
+    {
+      "method": "GET",
+      "url": "https://api.github.com/repos/quickjs-ng/quickjs",
+      "proxy": "http://127.0.0.1:7890",
+      "started_at": "2026-10-11T23:25:13.5174446+08:00",
+      "status": 403,
+      "bytes": 278,
+      "sha256": "6ed2372b3681dbf9e0830d6f655813210ff80a3e776f907b82abfd24daf7a1a1",
+      "response_file": "quickjs-ng--quickjs-metadata.json",
+      "rate_remaining": "0",
+      "rate_reset": "1791733774",
+      "error": "HTTP 403",
+      "finished_at": "2026-10-11T23:25:13.7248125+08:00"
+    },
+    {
+      "method": "GET",
+      "url": "https://api.github.com/repos/bytecodealliance/wasmtime",
+      "proxy": "http://127.0.0.1:7890",
+      "started_at": "2026-10-11T23:25:13.7264347+08:00",
+      "status": 403,
+      "bytes": 278,
+      "sha256": "6ed2372b3681dbf9e0830d6f655813210ff80a3e776f907b82abfd24daf7a1a1",
+      "response_file": "bytecodealliance--wasmtime-metadata.json",
+      "rate_remaining": "0",
+      "rate_reset": "1791733774",
+      "error": "HTTP 403",
+      "finished_at": "2026-10-11T23:25:13.8211088+08:00"
+    },
+    {
+      "method": "GET",
+      "url": "https://api.github.com/repos/bytecodealliance/wasm-micro-runtime",
+      "proxy": "http://127.0.0.1:7890",
+      "started_at": "2026-10-11T23:25:13.8218917+08:00",
+      "status": 403,
+      "bytes": 278,
+      "sha256": "6ed2372b3681dbf9e0830d6f655813210ff80a3e776f907b82abfd24daf7a1a1",
+      "response_file": "bytecodealliance--wasm-micro-runtime-metadata.json",
+      "rate_remaining": "0",
+      "rate_reset": "1791733774",
+      "error": "HTTP 403",
+      "finished_at": "2026-10-11T23:25:13.9163198+08:00"
+    },
+    {
+      "method": "GET",
+      "url": "https://api.github.com/repos/nodejs-mobile/nodejs-mobile",
+      "proxy": "http://127.0.0.1:7890",
+      "started_at": "2026-10-11T23:25:13.9169662+08:00",
+      "status": 403,
+      "bytes": 278,
+      "sha256": "6ed2372b3681dbf9e0830d6f655813210ff80a3e776f907b82abfd24daf7a1a1",
+      "response_file": "nodejs-mobile--nodejs-mobile-metadata.json",
+      "rate_remaining": "0",
+      "rate_reset": "1791733774",
+      "error": "HTTP 403",
+      "finished_at": "2026-10-11T23:25:14.0107313+08:00"
+    },
+    {
+      "method": "GET",
+      "url": "https://api.github.com/repos/termux/termux-packages",
+      "proxy": "http://127.0.0.1:7890",
+      "started_at": "2026-10-11T23:25:14.0113397+08:00",
+      "status": 403,
+      "bytes": 278,
+      "sha256": "6ed2372b3681dbf9e0830d6f655813210ff80a3e776f907b82abfd24daf7a1a1",
+      "response_file": "termux--termux-packages-metadata.json",
+      "rate_remaining": "0",
+      "rate_reset": "1791733774",
+      "error": "HTTP 403",
+      "finished_at": "2026-10-11T23:25:14.1051732+08:00"
+    }
+  ]
+}
