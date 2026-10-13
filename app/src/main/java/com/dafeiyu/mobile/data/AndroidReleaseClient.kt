@@ -11,6 +11,10 @@ import android.util.AtomicFile
 import androidx.core.content.FileProvider
 import java.io.File
 import java.io.InputStream
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.Path
+import java.nio.file.attribute.BasicFileAttributes
 import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.Signature
@@ -26,11 +30,49 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
 enum class AndroidInstallLaunch { INSTALLER_OPENED, SOURCE_PERMISSION_OPENED }
+
+/** A local, authenticated candidate; this says nothing about the server's latest release. */
+data class CachedAndroidUpdate(val manifest: AndroidReleaseManifest, val apk: File)
+
+/** Server freshness and an installable local download are separate facts. */
+data class AndroidUpdateAvailability(
+    val selectedManifest: AndroidReleaseManifest?,
+    val verifiedDownload: CachedAndroidUpdate?,
+    val onlineManifest: AndroidReleaseManifest?,
+)
+
+/** Callers supply authenticated metadata and APK-verified downloads; never infer trust from a path. */
+fun selectAndroidUpdateAvailability(
+    installedVersionCode: Long,
+    onlineManifest: AndroidReleaseManifest?,
+    cachedUpdate: CachedAndroidUpdate?,
+    downloadedUpdate: CachedAndroidUpdate?,
+): AndroidUpdateAvailability {
+    val local = listOfNotNull(downloadedUpdate, cachedUpdate)
+        .filter { it.manifest.versionCode > installedVersionCode }
+    // An equal-code online manifest wins ties. Only the exact authenticated manifest can use a local APK.
+    val selected = (listOfNotNull(onlineManifest) + local.map { it.manifest })
+        .filter { it.versionCode > installedVersionCode }.maxByOrNull { it.versionCode }
+    return AndroidUpdateAvailability(selected, local.firstOrNull { it.manifest == selected }, onlineManifest)
+}
+
+/** A slower lookup/download of an older release must not replace an already-verified higher one. */
+fun retainHigherVerifiedAndroidUpdate(
+    current: CachedAndroidUpdate?,
+    incoming: CachedAndroidUpdate?,
+): CachedAndroidUpdate? = when {
+    incoming == null -> current
+    current == null || incoming.manifest.versionCode >= current.manifest.versionCode -> incoming
+    else -> current
+}
 
 /** Signed metadata and APK verification. Installation is only opened by an explicit user action. */
 class AndroidReleaseClient(
@@ -115,9 +157,53 @@ class AndroidReleaseClient(
     }
 
     fun candidateFile(manifest: AndroidReleaseManifest): File {
-        require(manifest.version.matches(Regex("[A-Za-z0-9.-]{1,80}"))) { "更新版本路径无效" }
+        require(manifest.version.length <= 80 && CACHE_VERSION.matches(manifest.version)) { "更新版本路径无效" }
         return File(root, "${manifest.version}/app.apk")
     }
+
+    /** Read only bounded app-owned candidates. Invalid/incomplete entries cannot become trusted updates. */
+    suspend fun findCachedInstallableUpdate(channel: String = "stable"): Result<CachedAndroidUpdate?> =
+        withContext(Dispatchers.IO) {
+            resultUnlessCancelled {
+                require(channel in setOf("stable", "preview")) { "更新通道无效" }
+                val cacheRoot = checkedCacheRoot() ?: return@resultUnlessCancelled null
+                val candidates = mutableListOf<AndroidReleaseManifest>()
+                var entries = 0
+                Files.newDirectoryStream(cacheRoot).use { children ->
+                    for (child in children) {
+                        currentCoroutineContext().ensureActive()
+                        require(++entries <= MAX_CACHE_ENTRIES) { "更新缓存条目过多，请在线检查更新" }
+                        val directory = child.toFile()
+                        if (directory.name.length > 80 || !CACHE_VERSION.matches(directory.name)) continue
+                        try {
+                            val manifest = readSignedManifest(directory, channel)
+                            require(manifest.version == directory.name) { "更新缓存目录与签名版本不匹配" }
+                            requireInstallable(manifest)
+                            val apk = candidateFile(manifest)
+                            requireSafeCacheFile(apk, allowMissing = true)
+                            if (!apk.isFile || apk.length() != manifest.byteSize) continue
+                            candidates += manifest
+                        } catch (cancelled: CancellationException) { throw cancelled
+                        } catch (_: Exception) { currentCoroutineContext().ensureActive() }
+                        require(candidates.size <= MAX_CACHED_RELEASES) { "可安装更新缓存过多，请在线检查更新" }
+                    }
+                }
+                // Newer metadata is not enough: a damaged higher candidate must not hide a valid lower APK.
+                for (manifest in candidates.sortedByDescending { it.versionCode }) {
+                    currentCoroutineContext().ensureActive()
+                    try {
+                        requireTrustedManifest(manifest)
+                        val apk = candidateFile(manifest)
+                        verifyCandidate(manifest, apk)
+                        requireInstallable(manifest)
+                        currentCoroutineContext().ensureActive()
+                        return@resultUnlessCancelled CachedAndroidUpdate(manifest, apk)
+                    } catch (cancelled: CancellationException) { throw cancelled
+                    } catch (_: Exception) { currentCoroutineContext().ensureActive() }
+                }
+                null
+            }
+        }
 
     suspend fun findVerifiedDownload(manifest: AndroidReleaseManifest): Result<File?> = withContext(Dispatchers.IO) {
         resultUnlessCancelled {
@@ -156,19 +242,29 @@ class AndroidReleaseClient(
             }
         }
 
-    private fun verifyCandidate(manifest: AndroidReleaseManifest, apk: File) {
-        val signerHash = AndroidApkIntegrity.verify(apk, manifest, Build.VERSION.SDK_INT)
-        require(signerHash == RELEASE_CERT_SHA256) { "更新包不是本应用发行签名" }
-        val archive = app.packageManager.getPackageArchiveInfo(apk.absolutePath, PackageManager.GET_SIGNING_CERTIFICATES)
-            ?: error("无法读取更新 APK 的包信息")
-        require(archive.packageName == manifest.packageName && archive.longVersionCode == manifest.versionCode &&
-            archive.versionName == manifest.version) { "更新 APK 的包身份或版本与签名清单不匹配" }
-        val application = archive.applicationInfo ?: error("更新 APK 应用信息缺失")
-        require(application.minSdkVersion == manifest.minSdk && application.targetSdkVersion == manifest.targetSdk &&
-            application.flags and ApplicationInfo.FLAG_DEBUGGABLE == 0) { "更新 APK 的构建或系统要求不匹配" }
-        require(certificateHash(archive.signingInfo?.apkContentsSigners?.map { it.toByteArray() }) == signerHash) {
-            "系统读取的更新发行证书不匹配"
+    private suspend fun verifyCandidate(manifest: AndroidReleaseManifest, apk: File) {
+        requireSafeCacheFile(apk)
+        val verificationContext = currentCoroutineContext()
+        runInterruptible {
+            val signerHash = AndroidApkIntegrity.verify(apk, manifest, Build.VERSION.SDK_INT) {
+                verificationContext.ensureActive()
+            }
+            verificationContext.ensureActive()
+            require(signerHash == RELEASE_CERT_SHA256) { "更新包不是本应用发行签名" }
+            val archive = app.packageManager.getPackageArchiveInfo(apk.absolutePath, PackageManager.GET_SIGNING_CERTIFICATES)
+                ?: error("无法读取更新 APK 的包信息")
+            require(archive.packageName == manifest.packageName && archive.longVersionCode == manifest.versionCode &&
+                archive.versionName == manifest.version) { "更新 APK 的包身份或版本与签名清单不匹配" }
+            val application = archive.applicationInfo ?: error("更新 APK 应用信息缺失")
+            require(application.minSdkVersion == manifest.minSdk && application.targetSdkVersion == manifest.targetSdk &&
+                application.flags and ApplicationInfo.FLAG_DEBUGGABLE == 0) { "更新 APK 的构建或系统要求不匹配" }
+            require(certificateHash(archive.signingInfo?.apkContentsSigners?.map { it.toByteArray() }) == signerHash) {
+                "系统读取的更新发行证书不匹配"
+            }
+            verificationContext.ensureActive()
         }
+        currentCoroutineContext().ensureActive()
+        requireSafeCacheFile(apk)
     }
 
     private fun requireInstallable(manifest: AndroidReleaseManifest) {
@@ -202,9 +298,11 @@ class AndroidReleaseClient(
         require(verifier.verify(Base64.getDecoder().decode(encodedSignature))) { "更新清单签名校验失败" }
     }
 
-    private fun saveSignedManifest(manifest: AndroidReleaseManifest, bytes: ByteArray, encodedSignature: String) {
+    private suspend fun saveSignedManifest(manifest: AndroidReleaseManifest, bytes: ByteArray, encodedSignature: String): Unit = cacheMetadataMutex.withLock {
+        currentCoroutineContext().ensureActive()
         val path = File(candidateFile(manifest).parentFile, "manifest.signed")
-        require(path.parentFile?.mkdirs() == true || path.parentFile?.isDirectory == true)
+        checkedCacheDirectory(requireNotNull(path.parentFile), create = true)
+        requireSafeManifestFiles(requireNotNull(path.parentFile))
         val file = AtomicFile(path)
         val output = file.startWrite()
         try {
@@ -214,14 +312,67 @@ class AndroidReleaseClient(
         } catch (failure: Throwable) { file.failWrite(output); throw failure }
     }
 
-    private fun requireTrustedManifest(expected: AndroidReleaseManifest) {
-        val path = File(candidateFile(expected).parentFile, "manifest.signed")
+    private suspend fun requireTrustedManifest(expected: AndroidReleaseManifest) {
+        val directory = requireNotNull(candidateFile(expected).parentFile)
+        require(readSignedManifest(directory, expected.channel) == expected) { "更新清单已变更，请重新检查更新" }
+    }
+
+    private suspend fun readSignedManifest(directory: File, channel: String): AndroidReleaseManifest = cacheMetadataMutex.withLock {
+        checkedCacheDirectory(directory)
+        requireSafeManifestFiles(directory)
+        val path = File(directory, "manifest.signed")
         val envelope = AtomicFile(path).openRead().use { readBounded(it, AndroidReleaseManifestCodec.MAX_MANIFEST_BYTES + 2049) }
+        requireSafeManifestFiles(directory)
         val separator = envelope.indexOf('\n'.code.toByte())
         require(separator in 1..2048) { "本地签名更新清单无效" }
         val signature = envelope.copyOfRange(0, separator).toString(Charsets.US_ASCII)
         val bytes = envelope.copyOfRange(separator + 1, envelope.size)
-        require(authenticateManifest(bytes, signature, expected.channel) == expected) { "更新清单已变更，请重新检查更新" }
+        currentCoroutineContext().ensureActive()
+        authenticateManifest(bytes, signature, channel)
+    }
+
+    private fun checkedCacheRoot(create: Boolean = false): Path? {
+        // Android may alias filesDir itself; its real path is the trusted app-owned anchor.
+        val expected = app.filesDir.toPath().toRealPath().resolve("updates")
+        if (create && !Files.exists(expected, LinkOption.NOFOLLOW_LINKS)) Files.createDirectory(expected)
+        if (!Files.exists(expected, LinkOption.NOFOLLOW_LINKS)) return null
+        val attributes = Files.readAttributes(expected, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+        require(attributes.isDirectory && !attributes.isSymbolicLink && expected.toRealPath() == expected) {
+            "更新缓存目录不可为链接"
+        }
+        return expected
+    }
+
+    private fun checkedCacheDirectory(directory: File, create: Boolean = false): Path {
+        val cacheRoot = checkedCacheRoot(create) ?: error("更新缓存目录不存在")
+        require(directory.name.length <= 80 && CACHE_VERSION.matches(directory.name) &&
+            directory.parentFile?.canonicalFile == cacheRoot.toFile()) { "更新缓存路径无效" }
+        val expected = cacheRoot.resolve(directory.name)
+        if (create && !Files.exists(expected, LinkOption.NOFOLLOW_LINKS)) Files.createDirectory(expected)
+        val attributes = Files.readAttributes(expected, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+        require(attributes.isDirectory && !attributes.isSymbolicLink && expected.toRealPath() == expected) {
+            "更新版本目录不可为链接"
+        }
+        return expected
+    }
+
+    private fun requireSafeCacheFile(file: File, allowMissing: Boolean = false) {
+        val directory = checkedCacheDirectory(requireNotNull(file.parentFile))
+        require(file.name in setOf("app.apk", "manifest.signed", "manifest.signed.bak", "manifest.signed.new")) {
+            "更新缓存文件名无效"
+        }
+        val expected = directory.resolve(file.name)
+        if (allowMissing && !Files.exists(expected, LinkOption.NOFOLLOW_LINKS)) return
+        val attributes = Files.readAttributes(expected, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+        require(attributes.isRegularFile && !attributes.isSymbolicLink && expected.toRealPath() == expected) {
+            "更新缓存文件不可为链接"
+        }
+    }
+
+    private fun requireSafeManifestFiles(directory: File) {
+        for (name in listOf("manifest.signed", "manifest.signed.bak", "manifest.signed.new")) {
+            requireSafeCacheFile(File(directory, name), allowMissing = true)
+        }
     }
 
     private fun metadataPublicKey() = app.resources.openRawResource(com.dafeiyu.mobile.R.raw.apk_metadata_public).use {
@@ -249,10 +400,11 @@ class AndroidReleaseClient(
             .callTimeout(60, TimeUnit.SECONDS).followRedirects(false).build()
     }
 
-    private fun readBounded(input: InputStream, maximum: Int): ByteArray {
+    private suspend fun readBounded(input: InputStream, maximum: Int): ByteArray {
         val bytes = java.io.ByteArrayOutputStream()
         val buffer = ByteArray(4096)
         while (bytes.size() <= maximum) {
+            currentCoroutineContext().ensureActive()
             val count = input.read(buffer, 0, minOf(buffer.size, maximum + 1 - bytes.size()))
             if (count < 0) break
             bytes.write(buffer, 0, count)
@@ -273,5 +425,10 @@ class AndroidReleaseClient(
         const val BASE_URL = "https://202.189.21.218:8787"
         const val RELEASE_CERT_SHA256 = "d4341e66075d1e35909796cb5962b22f8aaed378ca50e057a1b25ed97fe0c64b"
         private const val HEX_PIN = "2c72728755267c607124b2ac86e431743c34af5c6069aa22bbcc401e0f626f0b"
+        private val CACHE_VERSION = Regex("[0-9]{1,5}\\.[0-9]{1,5}\\.[0-9]{1,5}(?:-[A-Za-z0-9]+(?:\\.[A-Za-z0-9]+)*)?")
+        private const val MAX_CACHE_ENTRIES = 128
+        private const val MAX_CACHED_RELEASES = 32
+        // AtomicFile is not itself a reader/writer lock. Cache recovery and online checks may run concurrently.
+        private val cacheMetadataMutex = Mutex()
     }
 }

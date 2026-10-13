@@ -1,4 +1,26 @@
-# 当前接续 · Dafeiyu调色盘与主题链路 · 2026-10-14
+# 当前接续 · 0.1.29 离线更新恢复已交付 · 2026-10-14
+
+持续移动端／PC 对齐目标仍 active，最新执行范围以 `docs/MOBILE-PC-PARITY-SPEC.md` 为准：主题交付 → 离线更新恢复 → 官方凭据可靠共享 → Aries 网页／手动文件／归档及剩余清单。目标工具只能修改状态，不能重写既有正文；不将整个未完成计划标为完成来换目标。本轮已完成第二项，下一版生产修改从 **0.1.30 / code31** 开始。主 App 真机安装继续沿用用户“先不推”的决定；调色盘真机安装已有授权但未连接，不重复索取旧端口。
+
+正式 **0.1.29 / code30** 已构建、发布到 stable 并覆盖安装 QA `emulator-5558`。APK：`../Temp_Android/Dist/Dafeiyu-Go-Mobile-0.1.29.apk`，**94,765,391 bytes**，SHA-256 **`66b6156a3cc72c72be560302764e800210d9f1a4b85d95605b0a0c7cef42fab1`**；正式包名、发行证书和信任公钥保持既有身份。发布回执 `qa/android-release-0129-20261014-execute/receipt.json` 所有9阶段 exit0／completed=true，原有版本目录没有覆盖，API镜像仍为 `sha256:f3807a00482e26b0d5e87fbaaa5e63a935c09aa2653029e466bb5cbd2bfa2177`。本轮没有安装 PKB110 主 App 或新调色盘。
+
+### 实现、构建、离线与设备证据（0.1.29）
+
+更新页独立发现本机已签名且完整下载的 APK，不等待服务器；在线版本与本机可安装版本分别展示。选择最高已验证版本，损坏的更高缓存不遮住有效较低缓存，旧异步结果不覆盖更高下载。缓存路径、原始元数据签名、APK摘要、真实 apksig、PackageManager 包身份／版本／SDK／ABI与固定发行证书全部检查；只有明确点击才可进入系统安装确认，点击时重验。SHA／ZIP及真实 apksig DataSource 分片加入取消探针，不承诺强制中断单次 JCA 或系统 Binder 调用。
+
+- 整仓 `build-offline-update-0.1.29-r1.log` **BUILD SUCCESSFUL，6m4s，122 tasks**，涵盖正式 assemble／lint及debug／androidTest；正式APK在此冻结。测试包可见性修正后的增量 `build-offline-update-0.1.29-debug-r2.log` **42s，67 tasks**；仅改debug manifest和测试报告清理，不改变正式APK字节。
+- 隔离候选 `qa/offline-update-next/report.json` **58/58 PASS**，实际 apksig8.9.2／真实签名APK及严格Android35／Compose编译；其中PackageManager／AtomicFile是JVM替身，不能替代下项设备结果。
+- QA 实际 `qa/offline-update-0-1-29-device-r2/report.json` **13/13 PASS，OK(1)，3.576s**：真实已安装0.1.28正式身份＋更高0.1.29签名APK，真实Android AtomicFile恢复、客户端重建、篡改／无签名／截断／symlink拒绝、通道校验及无安装／授权／联网副作用。r1在正式包查询处因debug缺包可见性声明失败，原失败保留；只补debug queries，r1独立UUID空目录已清理，不清用户数据。
+- 公网 `qa/android-release-smoke-0.1.29-r1/report.json` **5/5 PASS**：生产CA／hostname／SPKI、原始签名清单、最终正式APK身份／真实签名验证、实际八路重叠TLS Range及下载摘要通过。设备专项paidModelRequests=0，无权限授予或安装器弹出。
+- QA 正式 `install --no-streaming -r` Success，PackageManager为0.1.29/code30，保留数据。`qa/offline-update-0.1.29-delivery/` 保存安装／正式MainActivity启动／PID及本应用UID crash buffer、exit-info；第二次启动已到正式MainActivity，PID15944，本次取得的crash buffer为空，exit-info只有安装更新和isolated释放。该短启动检查不代替长期稳定性、更新页用户操作及视觉验收。
+
+### 跨仓库改动与后续（0.1.29）
+
+PC 可选0.1.6网页皮肤准备改为已校验本地包离线操作；缺资源／失败时继续普通DSH启动，不假开放mobile能力。最小8路径提交 `56f79a6` 后与远端已有稳定1.7.6／本机发布改动在隔离树合并，仅HANDOVER冲突保留双方完整段落；最终merge **`19ba427d17575aa2465adf3e6619d49cba07694f`** 已正常推送PC `main`，没有force或PC二进制发布。完整Release **34.44s，40既有warnings／0errors**，实际合并DLL离线专项 **42/42 PASS／0网络尝试**。相对远端仅7源码／资源＋对应交接段，其余远端blob/mode原样；共享106个modified/untracked文件字节保留，default index无无关staging。证据 `../Temp_SetupandLauncher/qa/theme-ui-final-20261014/reconcile-evidence/` 与 `reconcile-publication/receipt.json`。共享工作文件仍保留本机其他任务的版本与未提交内容，不直接从它们制作PC发行包。
+
+官方DeepSeek候选尚未启用：`qa/provider-transaction-next/` **81/81** 合成事务／实际AES-GCM恢复及 **4/4** 固定DSH helper检查，九个候选源Werror编译通过；候选不等于AndroidKeystore／真实DSH CAS／跨端7z通过。正在隔离补Controller／worker短门控、持久恢复／冲突UI及PC `.dym` 显式缺失语义；全链设备验收前生产继续在副作用前拒绝未接通路径。Aries web/files/archive新capability gate保持false，完整VM保留用户确认点。DeveloperCenter本轮只发布APK，Connect／Aries协议、冻结包和部署未变。
+
+# 上轮交付 · Dafeiyu调色盘与主题链路 · 2026-10-14
 
 用户已通知服务器恢复，并明确授权必要后端修改、上传替换、部署及公网联调，下面旧的“仅本地测试”是服务器下线期间的历史限制。持续parity目标仍active；本轮已完成调色盘1.0.2/code3、主App0.1.28/code29的主题导入／主题页／市场及手机DSH网页同步验收，接下来继续主App清单。
 

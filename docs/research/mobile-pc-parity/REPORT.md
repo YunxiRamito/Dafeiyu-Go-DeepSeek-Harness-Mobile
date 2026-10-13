@@ -69,4 +69,6 @@ APK 签名选用 Android Open Source Project 的 `com.android.tools.build:apksig
 
 更新复用既有签名服务契约，严格解析 `fileName` 等字段及 JSON 类型，拒绝重复字段、非法 UTF-8、版本越界、静默安装或降级策略。签名原始清单持久保存，下载和安装重新验证；APK 验证真实签名、摘要、证书、原生 ABI，并由 PackageManager 校对包名、版本与 SDK。统一下载层区分 `/api/download?` 缓存代理与原生 release/image 下载路由，后者不会被包装或当作准备状态 JSON。
 
+2026-10-14 离线更新恢复沿用上述固定来源和显式安装边界，不增加依赖。重新审查 apksig 8.9.2 的公开 `ApkVerifier.Builder(DataSource)`、DataSources 及单线程 v2/v3 内容摘要实现；对应 source jar 摘要仍为 `c7a0f43d1e40fdf39725ac090f5c7bbaeae82d1e0bfd9cf2ee507a70eb5136b5`。项目自己的 DataSource 适配器以 64 KiB 分块保留协程取消探针，slice 同样保留探针，仍由原库解析和验证签名。SHA 循环、ZIP 遍历也检查取消；单次 JCA/native 运算和系统 PackageManager 调用在返回后的下一边界检查，不承诺强制抢占。缓存恢复只接受已认证原始元数据及重新验签的真实 APK，线上通道状态与本机安装候选分开；实现和设备证据以 HANDOVER 为准。
+
 反馈附件复用项目已有 OkHttp 4.12.0，实读固定 tag `parent-4.12.0`／commit `4984568367caaf359b82c452bd28b5e192824d1c` 的 README、Apache-2.0 LICENSE 和 MultipartBody.kt，采用其长度计算、分界及字段转义，不复制上游源码、不增加网络库。服务器图片 GET/HEAD 提供实际 SHA-256、强 ETag 和 Range，Android 在受 pin 的 HEAD 后使用统一下载器，仍核对 JPEG、字节和尺寸。离线结果与公网部署分别记录到 HANDOVER。

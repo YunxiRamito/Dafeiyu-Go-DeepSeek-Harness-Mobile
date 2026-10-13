@@ -7,4 +7,4 @@ The application uses the unmodified `com.android.tools.build:apksig:8.9.2` Java 
 - Corresponding source: https://dl.google.com/dl/android/maven2/com/android/tools/build/apksig/8.9.2/apksig-8.9.2-sources.jar
 - Source archive SHA-256: `c7a0f43d1e40fdf39725ac090f5c7bbaeae82d1e0bfd9cf2ee507a70eb5136b5`
 
-Only its public ApkVerifier API is used. No source is copied into the application's Kotlin code. Android execution is checked separately from JVM verification because the upstream README describes use outside Android.
+The public ApkVerifier, DataSource, DataSink and DataSources APIs are used. A project-owned DataSource adapter adds cooperative cancellation checks while preserving the unmodified verifier and its signature checks. No upstream source is copied into the application's Kotlin code. Android execution is checked separately from JVM verification because the upstream README describes use outside Android.

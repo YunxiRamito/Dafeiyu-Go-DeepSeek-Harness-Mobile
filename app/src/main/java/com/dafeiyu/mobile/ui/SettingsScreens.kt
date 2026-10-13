@@ -70,6 +70,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.security.cert.CertificateFactory
@@ -2403,30 +2404,67 @@ private fun UpdateContent(repository: DemoRepository, notify: (String) -> Unit) 
     val scope = rememberCoroutineScope()
     val policy = repository.updatePolicy
     var manifest by remember { mutableStateOf<AndroidReleaseManifest?>(null) }
+    var cachedUpdate by remember { mutableStateOf<com.dafeiyu.mobile.data.CachedAndroidUpdate?>(null) }
+    var downloadedUpdate by remember { mutableStateOf<com.dafeiyu.mobile.data.CachedAndroidUpdate?>(null) }
+    var cacheLoading by remember { mutableStateOf(true) }
+    var cacheError by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(true) }
     var downloadBusy by remember { mutableStateOf(false) }
-    var downloadedApk by remember { mutableStateOf<File?>(null) }
     val progressFlow = remember { kotlinx.coroutines.flow.MutableStateFlow<ArtifactDownloadProgress?>(null) }
     val downloadProgress by progressFlow.collectAsState()
     var downloadJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var refreshRevision by remember { mutableIntStateOf(0) }
     var installBusy by remember { mutableStateOf(false) }
     var updateError by remember { mutableStateOf<String?>(null) }
+    var checkError by remember { mutableStateOf<String?>(null) }
 
+    // Cache recovery does not wait for the server, and never launches the installer.
     LaunchedEffect(releaseClient, refreshRevision) {
-        checking = true
+        val requestRevision = refreshRevision
+        cacheLoading = true
         try {
-            releaseClient.getCurrent("stable")
-                .onSuccess { value ->
-                    manifest = value
-                    updateError = null
-                    downloadedApk = releaseClient.findVerifiedDownload(value).getOrNull()
-                }
-                .onFailure { error -> updateError = error.message ?: "检查更新失败" }
-        } finally { checking = false }
+            val result = releaseClient.findCachedInstallableUpdate("stable")
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            if (requestRevision != refreshRevision) return@LaunchedEffect
+            result
+                .onSuccess { cachedUpdate = it; cacheError = null }
+                .onFailure { cachedUpdate = null; cacheError = it.message ?: "无法读取已下载更新" }
+        } finally { if (requestRevision == refreshRevision) cacheLoading = false }
     }
 
-    val availableUpdate = manifest?.takeIf { it.versionCode > installedPackage.versionCode }
+    LaunchedEffect(releaseClient, refreshRevision) {
+        val requestRevision = refreshRevision
+        checking = true
+        manifest = null
+        checkError = null
+        progressFlow.value = null
+        try {
+            val result = releaseClient.getCurrent("stable")
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            if (requestRevision != refreshRevision) return@LaunchedEffect
+            val value = result.getOrNull()
+            if (value == null) {
+                checkError = result.exceptionOrNull()?.message ?: "检查更新失败"
+                return@LaunchedEffect
+            }
+            manifest = value
+            checkError = null
+            val localResult = releaseClient.findVerifiedDownload(value)
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            if (requestRevision != refreshRevision) return@LaunchedEffect
+            localResult
+                .onSuccess { file ->
+                    downloadedUpdate = com.dafeiyu.mobile.data.retainHigherVerifiedAndroidUpdate(downloadedUpdate,
+                        file?.let { com.dafeiyu.mobile.data.CachedAndroidUpdate(value, it) })
+                }
+                .onFailure { cacheError = it.message ?: "已下载更新未通过校验" }
+        } finally { if (requestRevision == refreshRevision) checking = false }
+    }
+
+    val availability = com.dafeiyu.mobile.data.selectAndroidUpdateAvailability(installedPackage.versionCode,
+        manifest, cachedUpdate, downloadedUpdate)
+    val availableUpdate = availability.selectedManifest
+    val downloadedApk = availability.verifiedDownload?.apk
     fun downloadUpdate() {
         val target = availableUpdate ?: return
         if (downloadBusy) return
@@ -2436,7 +2474,8 @@ private fun UpdateContent(repository: DemoRepository, notify: (String) -> Unit) 
             try {
                 releaseClient.download(target, source = repository.downloadSource) { value -> progressFlow.value = value }
                     .onSuccess { file ->
-                        downloadedApk = file
+                        downloadedUpdate = com.dafeiyu.mobile.data.retainHigherVerifiedAndroidUpdate(downloadedUpdate,
+                            com.dafeiyu.mobile.data.CachedAndroidUpdate(target, file))
                         notify("${target.version} 已下载并通过校验，请点击立即更新")
                     }
                     .onFailure { error -> updateError = error.message ?: "下载更新失败" }
@@ -2474,15 +2513,29 @@ private fun UpdateContent(repository: DemoRepository, notify: (String) -> Unit) 
             }
         }
         Text("更新详情", style = MaterialTheme.typography.titleMedium)
-        when {
-            checking -> Hint("正在检查正式更新清单…")
-            updateError != null -> Text(updateError.orEmpty(), color = MaterialTheme.colorScheme.error)
-            availableUpdate != null -> {
-                Text("有新版本 ${availableUpdate.version}", style = MaterialTheme.typography.titleMedium)
-                Hint(availableUpdate.releaseNotes.ifBlank { "本次更新没有附加说明。" })
-            }
-            else -> Hint("当前已是最新版本（${installedPackage.versionName}）。")
+        if (availableUpdate != null) {
+            Text(if (downloadedApk != null) "已下载并校验 v${availableUpdate.version}" else "有新版本 ${availableUpdate.version}",
+                style = MaterialTheme.typography.titleMedium)
+            Hint(availableUpdate.releaseNotes.ifBlank { "本次更新没有附加说明。" })
         }
+        if (cacheLoading) Hint("正在校验本机已下载更新…")
+        when {
+            checking -> Hint("正在检查最新正式更新；已校验的下载可由你确认安装。")
+            checkError != null -> Text("当前无法检查最新版本：${checkError.orEmpty()}", color = MaterialTheme.colorScheme.error)
+            availability.onlineManifest != null -> {
+                val online = requireNotNull(availability.onlineManifest)
+                when {
+                    availableUpdate != null && availableUpdate.versionCode > online.versionCode ->
+                        Hint("本机有更高版本的已校验安装包；当前在线通道为 v${online.version}，本机安装包不代表在线最新版本。")
+                    online.versionCode <= installedPackage.versionCode ->
+                        Hint("在线通道当前版本为 v${online.version}；当前安装版本无需更新。")
+                    else -> Hint("在线通道当前版本为 v${online.version}。")
+                }
+            }
+            availableUpdate == null && !cacheLoading -> Hint("尚无已校验的更新包。")
+        }
+        cacheError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        updateError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         installedPackage.error?.let { Text("无法读取当前版本：$it", color = MaterialTheme.colorScheme.error) }
         if (availableUpdate != null) {
             FishButton(
