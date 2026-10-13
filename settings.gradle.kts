@@ -7,3 +7,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "DafeiyuGoMobile"
 include(":app")
+include(":glass-lab")

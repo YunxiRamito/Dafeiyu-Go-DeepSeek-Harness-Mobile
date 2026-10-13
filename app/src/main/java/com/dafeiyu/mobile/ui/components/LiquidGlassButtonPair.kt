@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -46,7 +48,9 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.ceil
 import kotlin.math.abs
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 
 /** Explicit contact holds the bridge; only scale/translation differences count as movement. */
 internal data class GlassPairMotionFrame(
@@ -56,6 +60,8 @@ internal data class GlassPairMotionFrame(
     val secondTranslation: Offset,
     val firstPressed: Boolean = false,
     val secondPressed: Boolean = false,
+    val firstDragging: Boolean = false,
+    val secondDragging: Boolean = false,
 )
 
 internal fun glassPairMotionStrength(
@@ -92,6 +98,75 @@ internal fun glassPairConnectionStrength(
 } ?: 0f
 
 /**
+ * Contact, moving drag and physical release have separate lifetimes. UP starts one monotonic
+ * neck contraction; spring rebound frames cannot repeatedly re-open that neck and make it flash.
+ * A held but stationary drag has one finite tail and never owns an idle frame loop.
+ */
+@Composable
+internal fun rememberGlassPairConnection(
+    first: GlassButtonDeformationState,
+    second: GlassButtonDeformationState,
+    enabled: Boolean,
+    density: Float,
+    appearMillis: Int = 40,
+    releaseMillis: Int = 260,
+): State<Float> {
+    val connection = remember(first, second) { Animatable(0f) }
+    LaunchedEffect(first, second, enabled, density, appearMillis, releaseMillis) {
+        connection.snapTo(0f)
+        if (!enabled) return@LaunchedEffect
+        var previous: GlassPairMotionFrame? = null
+        var lastChange = SystemClock.uptimeMillis()
+        var releaseLatched = false
+        var transition: Job? = null
+        snapshotFlow {
+            val a = first.visualFrame; val b = second.visualFrame
+            GlassPairMotionFrame(Offset(a.scaleX, a.scaleY), a.translation,
+                Offset(b.scaleX, b.scaleY), b.translation, first.pressed, second.pressed,
+                first.dragging, second.dragging)
+        }.collect { geometry ->
+            val now = SystemClock.uptimeMillis()
+            val prior = previous
+            val contact = geometry.firstPressed || geometry.secondPressed ||
+                geometry.firstDragging || geometry.secondDragging
+            val priorContact = prior?.let { it.firstPressed || it.secondPressed || it.firstDragging || it.secondDragging } == true
+            val pressed = geometry.firstPressed || geometry.secondPressed
+            val motion = prior?.let { glassPairMotionStrength(it, geometry, now - lastChange, density) } ?: 0f
+            previous = geometry
+            lastChange = now
+            when {
+                priorContact && !contact -> {
+                    releaseLatched = true
+                    transition?.cancel()
+                    transition = launch { connection.animateTo(0f, GlassMotion.scalar(releaseMillis)) }
+                }
+                !contact && releaseLatched -> Unit
+                pressed -> {
+                    releaseLatched = false
+                    if (connection.targetValue != 1f || transition?.isActive != true && connection.value < .999f) {
+                        transition?.cancel()
+                        transition = launch { connection.animateTo(1f, GlassMotion.scalar(appearMillis)) }
+                    }
+                }
+                motion > 0f -> {
+                    if (contact) releaseLatched = false
+                    transition?.cancel()
+                    transition = launch {
+                        connection.animateTo(maxOf(connection.value, motion), GlassMotion.scalar(appearMillis))
+                        delay(50L)
+                        connection.animateTo(0f, GlassMotion.scalar(releaseMillis))
+                    }
+                }
+                transition?.isActive != true && connection.value > 0f -> {
+                    transition = launch { connection.animateTo(0f, GlassMotion.scalar(releaseMillis)) }
+                }
+            }
+        }
+    }
+    return connection.asState()
+}
+
+/**
  * One optical surface behind the two existing launchers. The expanded drawing has no input or
  * semantics; only the original 48dp circles handle gestures. Unsupported paths retain their material.
  */
@@ -104,14 +179,18 @@ internal fun LiquidGlassButtonPair(
     content: @Composable BoxScope.(drawLauncherMaterial: Boolean) -> Unit,
 ) {
     val capture = LocalPageGlassBackdrop.current
-    val reducedTransparency = LocalReduceGlassTransparency.current
-    val reducedMotion = LocalReduceGlassMotion.current
-    val springEnabled = LocalGlassButtonSpring.current
     val density = LocalDensity.current.density
     val rightToLeft = LocalLayoutDirection.current == LayoutDirection.Rtl
     val darkTheme = MaterialTheme.colorScheme.background.luminance() < .5f
+    val themeStyle = LocalGlassThemeStyles.current?.style("circle", darkTheme)
+    val debugValue = LocalGlassDebugTuning.current ?: themeStyle?.tuning
+    val debug = remember(debugValue) { debugValue?.sanitized() }
+    val reducedTransparency = LocalReduceGlassTransparency.current || themeStyle?.glassEnabled == false
+    val reducedMotion = LocalReduceGlassMotion.current || themeStyle?.motionEnabled == false
+    val springEnabled = LocalGlassButtonSpring.current && themeStyle?.springEnabled != false
     val profile = GlassMaterialProfile.Button
-    val tint = profile.materialTint(MaterialTheme.colorScheme.surface.copy(alpha = .18f), darkTheme)
+    val tint = themeStyle?.surfaceTint ?: profile.materialTint(MaterialTheme.colorScheme.surface.copy(alpha = .18f), darkTheme)
+    val blurDp = debug?.blurDp ?: profile.blurDp
     val supported = Build.VERSION.SDK_INT >= 33 && capture != null && !reducedTransparency && !reducedMotion
     val lens = remember(supported) {
         if (supported) runCatching { GlassPairLensShader() }.onFailure {
@@ -119,53 +198,37 @@ internal fun LiquidGlassButtonPair(
         }.getOrNull() else null
     }
     val copy = rememberGraphicsLayer()
-    val blur = remember(supported, density) {
+    val blur = remember(supported, density, blurDp) {
         if (supported) runCatching {
-            RenderEffect.createBlurEffect(profile.blurDp * density, profile.blurDp * density, Shader.TileMode.CLAMP)
+            if (blurDp > 0f) RenderEffect.createBlurEffect(blurDp * density, blurDp * density, Shader.TileMode.CLAMP)
+            else RenderEffect.createOffsetEffect(0f, 0f)
         }.onFailure { Log.w("GlassPair", "Shared blur unavailable; retaining individual materials", it) }
             .getOrNull() else null
     }
-    val cache = remember(lens, blur) { GlassPairEffectCache() }
+    val cache = remember(lens, blur, debug) { GlassPairEffectCache() }
     var ready by remember(lens, capture) { mutableStateOf(false) }
     var origin by remember { mutableStateOf(Offset.Zero) }
     val currentFirstAlpha by rememberUpdatedState(firstAlpha)
     val currentSecondAlpha by rememberUpdatedState(secondAlpha)
-    val connection = remember(first, second) { Animatable(0f) }
-    LaunchedEffect(first, second, supported, springEnabled, density) {
-        connection.snapTo(0f)
-        if (!supported || !springEnabled) return@LaunchedEffect
-        var previous: GlassPairMotionFrame? = null
-        var lastChange = SystemClock.uptimeMillis()
-        snapshotFlow {
-            val a = first.visualFrame
-            val b = second.visualFrame
-            GlassPairMotionFrame(Offset(a.scaleX, a.scaleY), a.translation,
-                Offset(b.scaleX, b.scaleY), b.translation, first.pressed, second.pressed)
-        }.collectLatest { geometry ->
-            val now = SystemClock.uptimeMillis()
-            val strength = glassPairConnectionStrength(previous, geometry, now - lastChange, density)
-            previous = geometry
-            lastChange = now
-            if (strength > 0f) {
-                connection.animateTo(maxOf(connection.value, strength), GlassMotion.scalar(40))
-                // A stable hold needs no frame loop or timer. Release emits a new snapshot.
-                if (geometry.firstPressed || geometry.secondPressed) return@collectLatest
-                delay(50L)
-            }
-            // A finite tail includes release/rebound frames; no perpetual idle frame loop.
-            connection.animateTo(0f, GlassMotion.scalar(GlassMotion.PressMillis))
-        }
-    }
+    val connection = rememberGlassPairConnection(first, second, supported && springEnabled, density,
+        releaseMillis = debug?.bridgeReleaseMillis?.toInt() ?: 260)
     val ownsMaterial = supported && lens != null && ready
+    val guardDp = if (debug == null) 16f else ceil(maxOf(16f,
+        24f * (2f * (1f + debug.dragStretch * 2f) - 1f) + debug.dragDistanceDp * 2f + 4f))
+    val roundness = themeStyle?.roundness?.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 1f
     Box(Modifier.width(104.dp).height(48.dp)) {
         if (supported && lens != null && blur != null) {
-            Box(Modifier.align(Alignment.Center).requiredSize(136.dp, 80.dp)
+            Box(Modifier.align(Alignment.Center).requiredSize((104f + 2f * guardDp).dp, (48f + 2f * guardDp).dp)
                 .onGloballyPositioned { origin = it.localToRoot(Offset.Zero) }
+                .graphicsLayer {}
                 .drawWithContent {
                     capture.revision
                     val width = ceil(size.width).toInt().coerceAtLeast(1)
                     val height = ceil(size.height).toInt().coerceAtLeast(1)
-                    val margin = maxOf(glassSampleMargin(density, profile.blurDp), glassButtonShadowMargin(density))
+                    val shadowMargin = debug?.let { ceil((it.shadowBlurDp + it.shadowSpreadDp +
+                        maxOf(abs(it.shadowOffsetXDp), abs(it.shadowOffsetYDp)) + 1f) * density).toInt() }
+                        ?: glassButtonShadowMargin(density)
+                    val margin = maxOf(glassSampleMargin(density, blurDp), shadowMargin)
                     val sourceLeft = margin + capture.origin.x - origin.x
                     val sourceTop = margin + capture.origin.y - origin.y
                     val bounds = glassSampleBounds(width, height, margin, sourceLeft, sourceTop,
@@ -176,8 +239,8 @@ internal fun LiquidGlassButtonPair(
                     }
                     val firstVisual = first.visualFrame
                     val secondVisual = second.visualFrame
-                    val firstCenter = Offset((if (rightToLeft) 96f else 40f) * density, 40f * density)
-                    val secondCenter = Offset((if (rightToLeft) 40f else 96f) * density, 40f * density)
+                    val firstCenter = Offset((guardDp + if (rightToLeft) 80f else 24f) * density, (guardDp + 24f) * density)
+                    val secondCenter = Offset((guardDp + if (rightToLeft) 24f else 80f) * density, (guardDp + 24f) * density)
                     fun shape(center: Offset, state: GlassButtonDeformationState,
                         visual: GlassButtonVisualFrame, alpha: Float): GlassPairShape {
                         val transformedCenter = center + visual.translation
@@ -185,23 +248,27 @@ internal fun LiquidGlassButtonPair(
                             Offset(24f * density, 24f * density)
                         return GlassPairShape(
                             center = transformedCenter,
-                            radius = 24f * density,
+                            radius = 24f * density * roundness,
                             scaleX = visual.scaleX, scaleY = visual.scaleY,
                             press = visual.opticalPress,
                             touch = transformedCenter + Offset(localTouch.x * visual.scaleX, localTouch.y * visual.scaleY),
                             alpha = alpha.coerceIn(0f, 1f),
+                            halfSize = Offset(24f * density, 24f * density),
                         )
                     }
                     val firstShape = shape(firstCenter, first, firstVisual, currentFirstAlpha())
                     val secondShape = shape(secondCenter, second, secondVisual, currentSecondAlpha())
-                    val frame = GlassPairFrame(firstShape, secondShape,
-                        glassPairBlendWidth(firstShape, secondShape, connection.value))
+                    val desiredBlend = glassPairBlendWidth(firstShape, secondShape, connection.value,
+                        debug?.bridgeReachDp?.times(density))
+                    val blend = cache.bridge.width(desiredBlend,
+                        first.pressed || second.pressed || first.dragging || second.dragging)
+                    val frame = GlassPairFrame(firstShape, secondShape, blend)
                     val key = GlassPairEffectKey(width, height, margin, tint.toArgb(), density,
-                        darkTheme, frame, bounds)
+                        darkTheme, frame, bounds, debug)
                     if (cache.key != key) {
                         val effect = runCatching {
                             RenderEffect.createChainEffect(
-                                lens.effect(width, height, margin, tint.toArgb(), density, darkTheme, frame, bounds),
+                                lens.effect(width, height, margin, tint.toArgb(), density, darkTheme, frame, bounds, tuning = debug),
                                 blur,
                             ).asComposeRenderEffect()
                         }.getOrElse {
@@ -244,9 +311,11 @@ private data class GlassPairEffectKey(
     val darkTheme: Boolean,
     val frame: GlassPairFrame,
     val sampleBounds: Rect,
+    val tuning: GlassDebugTuning?,
 )
 
 private class GlassPairEffectCache {
+    val bridge = GlassPairBridgeContour()
     var key: GlassPairEffectKey? = null
     var effect: androidx.compose.ui.graphics.RenderEffect? = null
     var failed = false

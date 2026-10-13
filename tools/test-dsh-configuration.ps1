@@ -30,6 +30,7 @@ $sources = @('LinuxRuntimeContract.kt', 'LinuxSandboxContract.kt', 'LinuxSandbox
     'ConnectionPluginPackage.kt', 'ConnectionPackageValidator.kt') | ForEach-Object { Join-Path $dataRoot $_ }
 $sources += Join-Path $PSScriptRoot 'tests\archive-startup\CompileDependencies.kt'
 $sources += Join-Path $PSScriptRoot 'tests\provider\android-api\Resources.kt'
+$sources += Join-Path $PSScriptRoot 'tests\dsh-sharing\ProviderTransactionChecks.kt'
 $javaRoot = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { 'C:\Program Files\Java\JDK21' }
 $jar = Join-Path $testRoot 'configuration.jar'
 & (Join-Path $javaRoot 'bin\java.exe') '-Xmx256m' "-Djava.io.tmpdir=$testRoot" -cp $compilerClasspath `

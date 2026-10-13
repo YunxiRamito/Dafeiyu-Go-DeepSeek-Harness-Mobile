@@ -127,7 +127,7 @@ fun RunScreen(repository: DemoRepository, onChat: () -> Unit, onDetail: (String)
         Spacer(Modifier.height(24.dp))
         SectionLabel("消息")
         FishCard {
-            SettingRow("bell", "大肥鱼，来到手机上了", "先体验界面，一起决定下一步。") { onDetail("notice") }
+            SettingRow("bell", "Dafeiyu-GO，来到手机上了", "先体验界面，一起决定下一步。") { onDetail("notice") }
         }
         Text("启动与对话为演示交互，尚未连接真实 DSH。", fontSize = 11.sp, lineHeight = 17.sp,
             color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 20.dp, bottom = 24.dp))

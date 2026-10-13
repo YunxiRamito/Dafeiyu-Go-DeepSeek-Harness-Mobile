@@ -31,8 +31,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -138,13 +144,18 @@ fun FishButton(
     val deformation = rememberGlassButtonDeformationState()
     val tint = if (accent && enabled) palette.primary.copy(alpha = .86f) else palette.surface.copy(alpha = .28f)
     val interactionSource = remember { MutableInteractionSource() }
-    GlassSurface(buttonDeformation = deformation, modifier = modifier.applyButtonDeformation(enabled, deformation, consumeDrag = consumeDrag)
+    val buttonType = if (accent) "accent" else "regular"
+    GlassSurface(buttonDeformation = deformation, modifier = modifier.applyButtonDeformation(enabled, deformation,
+        consumeDrag = consumeDrag, styleType = buttonType)
         .clickable(enabled = enabled, interactionSource = interactionSource, indication = null,
             role = Role.Button, onClick = onClick), cornerRadius = 24.dp, tint = tint,
-        materialProfile = if (accent && enabled) GlassMaterialProfile.AccentButton else GlassMaterialProfile.Button) {
-        androidx.compose.runtime.CompositionLocalProvider(LocalContentColor provides (
-            if (!enabled) palette.onSurfaceVariant.copy(alpha = .5f) else if (accent) Color.White else palette.onSurface
-        )) {
+        styleType = buttonType, materialProfile = if (accent && enabled) GlassMaterialProfile.AccentButton else GlassMaterialProfile.Button) {
+        val style = LocalGlassThemeStyle.current
+        val contentColor = style?.contentColor?.let { if (enabled) it else it.copy(alpha = it.alpha * .5f) }
+            ?: if (!enabled) palette.onSurfaceVariant.copy(alpha = .5f) else if (accent) Color.White else palette.onSurface
+        val enabledStyle = if (!enabled) style?.copy(iconColor = style.iconColor.copy(alpha = style.iconColor.alpha * .5f)) else style
+        androidx.compose.runtime.CompositionLocalProvider(LocalContentColor provides contentColor,
+            LocalGlassThemeStyle provides enabledStyle) {
             Row(Modifier.heightIn(min = 48.dp).padding(horizontal = 16.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically, content = content)
@@ -168,9 +179,11 @@ fun FishNavigationRow(
     }
 }
 
-/** User-selected converted SF SVG assets. No Canvas drawing; source terms recorded separately. */
+/** Fixed Fluent vector assets; legacy sf_ identifiers retain their original compatibility names. */
 @Composable
 fun FishGlyph(name: String, modifier: Modifier = Modifier, tint: Color = LocalContentColor.current) {
+    val style = LocalGlassThemeStyle.current
+    val artwork = name.equals("app-icon", ignoreCase = true) || name.equals("deepseek", ignoreCase = true)
     val symbol = when (name.lowercase()) {
         "search" -> com.dafeiyu.mobile.R.drawable.sf_search
         "pause" -> com.dafeiyu.mobile.R.drawable.sf_pause
@@ -229,8 +242,16 @@ fun FishGlyph(name: String, modifier: Modifier = Modifier, tint: Color = LocalCo
     }
     androidx.compose.foundation.Image(
         painter = androidx.compose.ui.res.painterResource(symbol), contentDescription = null,
-        colorFilter = if (name.equals("app-icon", ignoreCase = true) || name.equals("deepseek", ignoreCase = true)) null
-            else androidx.compose.ui.graphics.ColorFilter.tint(tint),
-        modifier = modifier.size(24.dp),
+        colorFilter = if (artwork) null else androidx.compose.ui.graphics.ColorFilter.tint(style?.iconColor ?: tint),
+        modifier = modifier.size(24.dp).then(if (artwork || style == null || style.iconBlendMode == BlendMode.SrcOver) Modifier
+            else Modifier.drawWithCache {
+                val blendPaint = Paint().apply { blendMode = style.iconBlendMode }
+                val bounds = Rect(Offset.Zero, size)
+                onDrawWithContent {
+                    drawIntoCanvas { it.saveLayer(bounds, blendPaint) }
+                    drawContent()
+                    drawIntoCanvas { it.restore() }
+                }
+            }),
     )
 }

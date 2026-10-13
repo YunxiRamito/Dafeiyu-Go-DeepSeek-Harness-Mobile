@@ -11,12 +11,12 @@ case "$mode" in
 esac
 [ "$#" -le 4 ] || { printf '%s\n' 'Too many arguments.' >&2; exit 2; }
 
-image='sha256:a921a9554045dec628db752d18ca82a9e69bb590aa588ba353d75e0fe7230fe3'
+image='sha256:f3807a00482e26b0d5e87fbaaa5e63a935c09aa2653029e466bb5cbd2bfa2177'
 api='developer-center-api-1'
 release_root='/home/dafeiyu/developer-center/android-apks'
 public_key='/home/dafeiyu/developer-center/tls/android-manifest-public.pem'
-version='0.1.27'
-code='28'
+version='0.1.28'
+code='29'
 channel='stable'
 package='com.dafeiyu.mobile'
 certificate='d4341e66075d1e35909796cb5962b22f8aaed378ca50e057a1b25ed97fe0c64b'

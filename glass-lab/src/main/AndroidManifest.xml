@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:allowBackup="false"
+        android:label="Dafeiyu调色盘"
+        android:icon="@drawable/palette_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/LabTheme">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.exports"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/lab_export_paths" />
+        </provider>
+    </application>
+    <queries>
+        <package android:name="com.dafeiyu.mobile" />
+        <package android:name="com.dafeiyu.mobile.dev" />
+    </queries>
+</manifest>

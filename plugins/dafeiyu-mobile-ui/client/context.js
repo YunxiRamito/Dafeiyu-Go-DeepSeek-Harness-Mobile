@@ -10,6 +10,101 @@ export function createDafeiyuMobileContext(env = globalThis) {
   const sectionAttribute = 'data-dafeiyu-mobile-section';
   const activityAncestorAttribute = 'data-dafeiyu-activity-ancestor';
 
+  // Fixed portable schema from Material Lab 1.0.2. Only numeric ranges, hex
+  // colors and closed enums enter this adapter; neither CSS nor a photo does.
+  const themeRanges = Object.freeze({
+    blurDp: [0, 48, 2], refractionScale: [0, 4, 1], refractionFalloff: [.05, 8, 2],
+    dispersion: [0, .8, .1], bevelScale: [0, 4, 1], glassThicknessDp: [0, 36, 7],
+    innerRefractionStrength: [0, 4, 0], innerRefractionWidthDp: [0, 24, 4], innerDispersion: [0, 1, .18],
+    trackingLightWidthDp: [1, 80, 18], trackingLightIntensity: [0, 2, .65], pressDarken: [0, 1, .12],
+    reflectionStrength: [0, 4, .8], lightAngleDegrees: [0, 360, 233.1301], highlightStrength: [0, 4, 1],
+    rimStrength: [0, 1, .05], borderWidthDp: [0, 12, 0], borderOpacity: [0, 1, 0],
+    saturation: [0, 3, 1.25], dimAmount: [0, 1, 0], surfaceAlpha: [0, 1, 1], tintAlpha: [0, 1, .12],
+    pressScale: [.5, 1.5, 1.035], dragStretch: [0, .5, .045], dragCompression: [0, .5, .018],
+    dragDistanceDp: [0, 48, 6], dragResistance: [0, 4, 1], pressMillis: [0, 2000, 150],
+    releaseMillis: [0, 3000, 360], shadowBlurDp: [0, 48, 5.76], shadowSpreadDp: [0, 32, 0],
+    shadowOffsetXDp: [-32, 32, 0], shadowOffsetYDp: [-32, 32, 1.2], shadowOpacity: [0, 1, .08],
+    widthDp: [32, 360, 48], heightDp: [32, 320, 48], cornerDp: [0, 160, 24], roundness: [0, 1, 1],
+    iconSizeDp: [8, 64, 23], iconAlpha: [0, 1, 1], textSizeSp: [8, 32, 15], textAlpha: [0, 1, 1],
+    paddingDp: [0, 32, 12], iconTextGapDp: [0, 32, 8], textWeight: [100, 900, 500],
+    textLetterSpacingSp: [-2, 6, 0], contentOffsetXDp: [-24, 24, 0], contentOffsetYDp: [-24, 24, 0],
+    rotationDegrees: [-180, 180, 0], disabledAlpha: [0, 1, .4], contentOutlineWidthDp: [0, 3, 0],
+    contentOutlineAlpha: [0, 1, 0], contentHighlightAlpha: [0, 1, 0], shadowPressScale: [0, 2, 1],
+    springDamping: [.1, 1, .62], springStiffness: [50, 1200, 380], grainAlpha: [0, .3, 0],
+    grainSizeDp: [.3, 3, .8], innerShadowAlpha: [0, 1, 0], innerShadowWidthDp: [0, 24, 0],
+    sheenAlpha: [0, 1, 0], sheenWidth: [0, 1, .35], sheenAngleDegrees: [0, 360, 233.13],
+    focusBorderWidthDp: [0, 8, 2], focusBorderAlpha: [0, 1, .45], hoverAlpha: [0, 1, .06],
+    pressedTintAlpha: [0, 1, .08], fusionStrength: [0, 1, .55], fusionDistanceDp: [0, 64, 18],
+    fusionMillis: [0, 1500, 150], bridgeReleaseMillis: [0, 1500, 240], bridgeReachDp: [0, 64, 24],
+    buttonGapDp: [0, 80, 8], backgroundAlpha: [0, 1, 1], backgroundPatternScale: [.25, 4, 1],
+    backgroundBlurDp: [0, 32, 0],
+  });
+  const themeTypes = ['accent', 'circle', 'regular', 'panel'];
+  const themeColorKeys = ['surface', 'icon', 'text', 'highlight', 'border', 'shadow', 'background',
+    'backgroundAccent', 'contentOutline', 'contentHighlight', 'innerShadow', 'sheen', 'focus', 'hover', 'pressed', 'trackingLight'];
+
+  function normalizeMaterialTheme(raw) {
+    try {
+      const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+      const owns = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+      const exact = (value, keys) => object(value) && Object.keys(value).length === keys.length &&
+        Object.keys(value).every(key => keys.includes(key));
+      if (!exact(raw, ['schema', 'renderer', 'light', 'dark']) || raw.schema !== 1 ||
+          raw.renderer !== 'dafeiyu-native-glass') return null;
+      const result = { schema: 1, renderer: 'dafeiyu-native-glass' };
+      for (const mode of ['light', 'dark']) {
+        if (!exact(raw[mode], themeTypes)) return null;
+        const groups = {};
+        for (const type of themeTypes) {
+          const p = raw[mode][type];
+          if (!object(p) || !object(p.values) || !object(p.colors) ||
+              Object.keys(p).some(key => !['values', 'colors', 'iconBlend', 'icon', 'glassEnabled',
+                'motionEnabled', 'springEnabled', 'disabled', 'shape', 'pressEffect'].includes(key)) ||
+              Object.keys(p.values).some(key => !owns(themeRanges, key)) ||
+              Object.keys(p.colors).some(key => !themeColorKeys.includes(key))) return null;
+          const values = {};
+          for (const [key, [minimum, maximum, fallback]] of Object.entries(themeRanges)) {
+            const value = owns(p.values, key) ? p.values[key] : fallback;
+            // Android exports Float.toDouble(): e.g. .8f is .800000011920929.
+            // Accept only the decimal bound or its actual Float32 endpoint.
+            const low = Math.min(minimum, Math.fround(minimum));
+            const high = Math.max(maximum, Math.fround(maximum));
+            if (typeof value !== 'number' || !Number.isFinite(value) || value < low || value > high) return null;
+            values[key] = value;
+          }
+          const colors = {};
+          for (const key of themeColorKeys) {
+            const value = p.colors[key] ?? (key === 'surface' ? (mode === 'dark' ? '#FF1C1C1E' : '#FFFFFFFF') :
+              ['icon', 'text'].includes(key) ? (mode === 'dark' ? '#FFFFFFFF' : '#FF1C1C1E') : '#FFFFFFFF');
+            if (typeof value !== 'string' || !/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/iu.test(value)) return null;
+            colors[key] = value.toUpperCase();
+          }
+          const group = { values: Object.freeze(values), colors: Object.freeze(colors) };
+          for (const key of ['glassEnabled', 'motionEnabled', 'springEnabled', 'disabled']) {
+            const value = p[key] ?? key !== 'disabled';
+            if (typeof value !== 'boolean') return null;
+            group[key] = value;
+          }
+          for (const [key, choices, fallback] of [
+            ['iconBlend', ['srcOver', 'multiply', 'screen', 'overlay', 'difference', 'plus', 'srcIn'], 'srcOver'],
+            ['pressEffect', ['none', 'darken', 'glow', 'beam', 'lift'], 'glow'],
+            ['shape', ['rounded', 'pill', 'circle', 'rectangle'], 'rounded'],
+            ['icon', ['add', 'send', 'settings', 'folder', 'agent', 'archive', 'trash', 'shield'], 'add'],
+          ]) {
+            const value = p[key] ?? fallback;
+            if (!choices.includes(value)) return null;
+            group[key] = value;
+          }
+          groups[type] = Object.freeze(group);
+        }
+        result[mode] = Object.freeze(groups);
+      }
+      // All accepted data is ASCII and bounded by the fixed maps, not user CSS.
+      if (JSON.stringify(result).length > 128 * 1024) return null;
+      return Object.freeze(result);
+    } catch { return null; }
+  }
+
   function normalizeHostContext(raw) {
     try {
       if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
@@ -18,7 +113,10 @@ export function createDafeiyuMobileContext(env = globalThis) {
       if (version !== 1 || platform !== 'android' || surface !== 'mobile' ||
           !['local', 'online'].includes(mode) || !['system', 'light', 'dark'].includes(theme) ||
           typeof material !== 'boolean' || typeof motion !== 'boolean') return null;
-      return Object.freeze({ version, platform, surface, mode, theme, material, motion, preview: false });
+      const result = { version, platform, surface, mode, theme, material, motion, preview: false };
+      const materialTheme = normalizeMaterialTheme(raw.materialTheme);
+      if (materialTheme) result.materialTheme = materialTheme;
+      return Object.freeze(result);
     } catch {
       return null;
     }
@@ -87,6 +185,240 @@ export function createDafeiyuMobileContext(env = globalThis) {
       for (const [element, value] of desired) set(element, name, value, false);
     }
     return { set, release, clear, reconcile };
+  }
+
+  function createMaterialThemeController(document, root) {
+    const attributes = createAttributeOwner();
+    const styles = new Map();
+    const nodes = new Map();
+    const reduced = env.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const lessTransparent = env.matchMedia?.('(prefers-reduced-transparency: reduce)');
+    const darkSystem = env.matchMedia?.('(prefers-color-scheme: dark)');
+    let context = null;
+    let groups = null;
+    let pressed = null;
+    let pointer = null;
+    let origin = null;
+    let disposed = false;
+    const supports = (name, value) => { try { return env.CSS?.supports?.(name, value) === true; } catch { return false; } };
+    const backdrop = supports('backdrop-filter', 'blur(1px)') || supports('-webkit-backdrop-filter', 'blur(1px)');
+    const clamp = (value, low = 0, high = 1) => Math.max(low, Math.min(high, value));
+    const number = value => String(Math.round(value * 100000) / 100000);
+    const rgba = (color, multiplier = 1) => {
+      const hex = color.slice(1);
+      const offset = hex.length === 8 ? 2 : 0;
+      const alpha = hex.length === 8 ? parseInt(hex.slice(0, 2), 16) / 255 : 1;
+      const channels = [0, 2, 4].map(index => parseInt(hex.slice(offset + index, offset + index + 2), 16));
+      return `rgba(${channels.join(', ')}, ${number(clamp(alpha * multiplier))})`;
+    };
+
+    function setStyle(element, name, value) {
+      if (!element?.style?.setProperty) return;
+      let entries = styles.get(element);
+      let record = entries?.get(name);
+      const current = element.style.getPropertyValue(name);
+      const priority = element.style.getPropertyPriority(name);
+      if (record && (current !== record.installed || priority !== record.installedPriority)) return;
+      if (!record) {
+        if (!entries) styles.set(element, entries = new Map());
+        entries.set(name, record = { original: current, priority, installed: current, installedPriority: priority });
+      }
+      if (current !== value || priority) element.style.setProperty(name, value);
+      record.installed = value; record.installedPriority = '';
+    }
+
+    function restoreStyles(element) {
+      const entries = styles.get(element);
+      if (!entries) return;
+      for (const [name, record] of entries) {
+        if (element.style.getPropertyValue(name) !== record.installed ||
+            element.style.getPropertyPriority(name) !== record.installedPriority) continue;
+        if (record.original) element.style.setProperty(name, record.original, record.priority);
+        else element.style.removeProperty(name);
+      }
+      styles.delete(element);
+    }
+
+    function clearPress() {
+      if (pressed) {
+        attributes.release(pressed, 'data-dafeiyu-theme-pressed');
+        for (const [name, value] of Object.entries({ '--df-theme-drag-x': '0px', '--df-theme-drag-y': '0px',
+          '--df-theme-drag-scale-x': '1', '--df-theme-drag-scale-y': '1' })) setStyle(pressed, name, value);
+      }
+      pressed = null; pointer = null; origin = null;
+    }
+
+    function clear() {
+      clearPress(); attributes.clear();
+      for (const element of [...styles.keys()]) restoreStyles(element);
+      resizeObserver?.disconnect(); nodes.clear(); groups = null;
+    }
+
+    function enabled(p) { return context?.motion && p.motionEnabled && !reduced?.matches; }
+    function glass(p) { return context?.material && p.glassEnabled && !lessTransparent?.matches; }
+    function radius(element, p) {
+      const rect = element.getBoundingClientRect();
+      const width = Number(element.offsetWidth) || rect.width;
+      const height = Number(element.offsetHeight) || rect.height;
+      if (width > 0 && height > 0) setStyle(element, '--df-theme-radius', `${number(Math.min(width, height) * p.values.roundness / 2)}px`);
+    }
+    const resizeObserver = typeof env.ResizeObserver === 'function' ? new env.ResizeObserver(entries => {
+      if (disposed || !groups) return;
+      for (const { target } of entries) { const type = nodes.get(target); if (type) radius(target, groups[type]); }
+    }) : null;
+
+    function properties(p) {
+      const v = p.values; const c = p.colors;
+      const material = glass(p); const motion = enabled(p); const spring = motion && p.springEnabled;
+      const alpha = material ? v.tintAlpha * v.surfaceAlpha : 1;
+      const fallbackAlpha = material && !backdrop ? Math.max(alpha, .36) : alpha;
+      const reflection = material ? rgba(c.highlight, v.reflectionStrength * .12 * v.surfaceAlpha) : 'transparent';
+      const backReflection = material ? rgba(c.border, v.reflectionStrength * .04 * v.surfaceAlpha) : 'transparent';
+      const shadow = factor => `${number(v.shadowOffsetXDp)}px ${number(v.shadowOffsetYDp)}px ` +
+        `${number(v.shadowBlurDp * factor)}px ${number(v.shadowSpreadDp * factor)}px ${rgba(c.shadow, v.shadowOpacity)}`;
+      const inset = `inset 0 0 ${number(v.innerShadowWidthDp)}px ${rgba(c.innerShadow, v.innerShadowAlpha)}, ` +
+        `inset 0 0 0 ${number(v.borderWidthDp)}px ${rgba(c.border, v.borderOpacity * v.surfaceAlpha)}, ` +
+        `inset 0 1px 0 ${rgba(c.highlight, material ? v.rimStrength : .12)}`;
+      const blend = { srcOver: 'normal', multiply: 'multiply', screen: 'screen', overlay: 'overlay',
+        difference: 'difference', plus: 'plus-lighter', srcIn: 'normal' }[p.iconBlend];
+      return {
+        fill: material ? rgba(c.surface, fallbackAlpha) : rgba(`#FF${c.surface.slice(-6)}`),
+        text: rgba(c.text, v.textAlpha), icon: rgba(c.icon, v.iconAlpha),
+        'icon-size': `${number(v.iconSizeDp)}px`, 'icon-blend': supports('mix-blend-mode', blend) ? blend : 'normal',
+        filter: material && backdrop ? `blur(${number(v.blurDp)}px) saturate(${number(v.saturation)})` : 'none',
+        reflection: `linear-gradient(${number(v.lightAngleDegrees)}deg, ${reflection}, transparent 45%, ${backReflection}), ` +
+          `linear-gradient(${number(v.sheenAngleDegrees)}deg, transparent, ${material ? rgba(c.sheen, v.sheenAlpha * v.surfaceAlpha) : 'transparent'} 50%, transparent), ` +
+          `linear-gradient(${rgba('#FF000000', material ? v.dimAmount : 0)}, ${rgba('#FF000000', material ? v.dimAmount : 0)})`,
+        shadow: `${shadow(1)}, ${inset}`,
+        'pressed-shadow': `${shadow(v.shadowPressScale)}, ${inset}`, 'focus-width': `${number(v.focusBorderWidthDp)}px`,
+        'focus-color': rgba(c.focus, v.focusBorderAlpha), 'hover-fill': rgba(c.hover, v.hoverAlpha),
+        'tracking-color': rgba(c.trackingLight, material && motion ? v.trackingLightIntensity * v.highlightStrength * .35 : 0),
+        'tracking-width': `${number(v.trackingLightWidthDp)}px`, darken: rgba('#FF000000', material && motion ? v.pressDarken : 0),
+        'press-scale': number(spring ? v.pressScale : 1),
+        'press-duration': `${number(motion ? v.pressMillis : 0)}ms`, 'release-duration': `${number(motion ? v.releaseMillis : 0)}ms`,
+        'spring-ease': spring ? `cubic-bezier(.22, ${number(1 + (1 - v.springDamping) * .6)}, .32, 1)` : 'cubic-bezier(.16, 1, .3, 1)',
+      };
+    }
+
+    function classify() {
+      const desired = new Map();
+      const mark = (selector, type) => {
+        for (const node of document.querySelectorAll(selector)) {
+          if (node.getAttribute(controlAttribute) === 'close' || node.getAttribute('role') === 'switch' ||
+              node.closest('[data-dafeiyu-mobile-control="mobile-hidden"], [inert]')) continue;
+          const existing = node.getAttribute('data-dafeiyu-theme-kind');
+          if (existing !== null && !nodes.has(node)) continue;
+          desired.set(node, type);
+        }
+      };
+      mark('[data-dafeiyu-mobile-layout="sidebar"], [data-dafeiyu-mobile-layout="composer-card"], ' +
+        '[data-dafeiyu-mobile-layout="quick-actions"], [data-dafeiyu-mobile-layout="activity-panel"], ' +
+        '[data-dafeiyu-mobile-layout="presence-panel"], [data-dafeiyu-mobile-layout="startup-focus"], ' +
+        '[data-shortcut-modal="settings"], [data-plugin-entry], [data-agent-preset-id]', 'panel');
+      mark('[data-dafeiyu-mobile-control="model"], [data-dafeiyu-mobile-control="permission"], ' +
+        '[data-dafeiyu-mobile-control="action"], [data-dafeiyu-mobile-control="session-action"], ' +
+        '[data-dafeiyu-mobile-layout="quick-actions"] > button, [data-dafeiyu-mobile-layout="footer-actions"] > button, ' +
+        '[data-slot="settings.section"] button, [data-slot="settings.action"] button', 'regular');
+      mark('[data-dafeiyu-mobile-control="sidebar-toggle"], [data-dafeiyu-mobile-control="new-session"], ' +
+        '[data-dafeiyu-mobile-control="activity-hub"]', 'circle');
+      mark('[data-dafeiyu-mobile-control="send"], [data-slot="settings.action"] button[data-variant="primary"]', 'accent');
+      for (const [node] of nodes) if (!desired.has(node)) {
+        if (node === pressed) clearPress();
+        resizeObserver?.unobserve?.(node); restoreStyles(node);
+        for (const name of ['data-dafeiyu-theme-kind', 'data-dafeiyu-theme-glass', 'data-dafeiyu-theme-motion',
+          'data-dafeiyu-theme-spring', 'data-dafeiyu-theme-effect']) attributes.release(node, name);
+      }
+      attributes.reconcile('data-dafeiyu-theme-kind', desired);
+      for (const [node, type] of desired) {
+        const p = groups[type];
+        attributes.set(node, 'data-dafeiyu-theme-glass', String(glass(p)));
+        attributes.set(node, 'data-dafeiyu-theme-motion', String(enabled(p)));
+        attributes.set(node, 'data-dafeiyu-theme-spring', String(enabled(p) && p.springEnabled));
+        attributes.set(node, 'data-dafeiyu-theme-effect', p.pressEffect);
+        for (const key of Object.keys(properties(p))) setStyle(node, `--df-theme-${key}`, `var(--df-theme-${type}-${key})`);
+        // Legacy finite press transitions read this alias without changing the button's hit box.
+        setStyle(node, '--df-press-scale', `var(--df-theme-${type}-press-scale)`);
+        radius(node, p);
+        if (!nodes.has(node)) resizeObserver?.observe(node);
+      }
+      nodes.clear(); for (const entry of desired) nodes.set(...entry);
+      if (pressed && (!nodes.has(pressed) || !enabled(groups[nodes.get(pressed)]))) clearPress();
+    }
+
+    function update() {
+      if (disposed || !context?.materialTheme || root.getAttribute('data-dafeiyu-surface') !== 'mobile') { clear(); return; }
+      const appearance = context.theme === 'dark' || context.theme === 'system' &&
+        (document.body?.hasAttribute('data-ds-dark-theme') || darkSystem?.matches) ? 'dark' : 'light';
+      groups = context.materialTheme[appearance];
+      attributes.set(root, 'data-dafeiyu-material-theme', '1');
+      attributes.set(root, 'data-dafeiyu-material-theme-appearance', appearance);
+      // CSS gradients/blur are intentionally not advertised as native AGSL refraction or spectral optics.
+      attributes.set(root, 'data-dafeiyu-material-capability', backdrop ? 'css-backdrop' : 'css-tint');
+      for (const [type, p] of Object.entries(groups)) {
+        for (const [key, value] of Object.entries(properties(p))) setStyle(root, `--df-theme-${type}-${key}`, value);
+      }
+      classify();
+    }
+
+    function down(event) {
+      const previous = pointer;
+      clearPress();
+      if (previous !== null || event.isPrimary === false || !groups) return;
+      const node = event.target?.closest?.('button, [role="button"]');
+      const type = nodes.get(node);
+      if (!type || !enabled(groups[type]) || node.disabled || node.getAttribute('aria-disabled') === 'true' ||
+          node.closest('[hidden], [inert]')) return;
+      pressed = node; pointer = event.pointerId; origin = { x: event.clientX, y: event.clientY };
+      attributes.set(node, 'data-dafeiyu-theme-pressed', 'true', false);
+      move(event);
+    }
+
+    function move(event) {
+      if (!pressed || event.pointerId !== pointer || !groups) return;
+      const p = groups[nodes.get(pressed)];
+      if (!p) { clearPress(); return; }
+      const rect = pressed.getBoundingClientRect();
+      if (!(rect.width > 0 && rect.height > 0)) return;
+      const x = Number.isFinite(event.clientX) ? event.clientX : rect.left + rect.width / 2;
+      const y = Number.isFinite(event.clientY) ? event.clientY : rect.top + rect.height / 2;
+      setStyle(pressed, '--df-theme-touch-x', `${number(clamp((x - rect.left) / rect.width) * 100)}%`);
+      setStyle(pressed, '--df-theme-touch-y', `${number(clamp((y - rect.top) / rect.height) * 100)}%`);
+      if (!p.springEnabled) return;
+      const dx = x - (Number.isFinite(origin?.x) ? origin.x : x);
+      const dy = y - (Number.isFinite(origin?.y) ? origin.y : y);
+      const length = Math.hypot(dx, dy);
+      const progress = length > 0 ? 1 - Math.exp(-length / (32 * (1 + p.values.dragResistance))) : 0;
+      const distance = p.values.dragDistanceDp * progress;
+      const horizontal = length > 0 ? Math.abs(dx / length) : 0;
+      setStyle(pressed, '--df-theme-drag-x', `${number(length > 0 ? dx / length * distance : 0)}px`);
+      setStyle(pressed, '--df-theme-drag-y', `${number(length > 0 ? dy / length * distance : 0)}px`);
+      setStyle(pressed, '--df-theme-drag-scale-x', number(1 + progress * (horizontal * p.values.dragStretch - (1 - horizontal) * p.values.dragCompression)));
+      setStyle(pressed, '--df-theme-drag-scale-y', number(1 + progress * ((1 - horizontal) * p.values.dragStretch - horizontal * p.values.dragCompression)));
+    }
+    function end(event) { if (pointer === event.pointerId) clearPress(); }
+    function resetPointer() { clearPress(); }
+    document.addEventListener('pointerdown', down, true);
+    document.addEventListener('pointermove', move, { capture: true, passive: true });
+    document.addEventListener('pointerup', end, true);
+    document.addEventListener('pointercancel', end, true);
+    document.addEventListener('lostpointercapture', end, true);
+    env.addEventListener?.('blur', resetPointer);
+    env.addEventListener?.('resize', update);
+    for (const media of [reduced, lessTransparent, darkSystem]) media?.addEventListener?.('change', update);
+    return {
+      setContext(next) { clearPress(); context = next; update(); }, update,
+      dispose() {
+        if (disposed) return;
+        disposed = true; context = null; clear();
+        document.removeEventListener('pointerdown', down, true);
+        document.removeEventListener('pointermove', move, true);
+        document.removeEventListener('pointerup', end, true);
+        document.removeEventListener('pointercancel', end, true);
+        document.removeEventListener('lostpointercapture', end, true);
+        env.removeEventListener?.('blur', resetPointer); env.removeEventListener?.('resize', update);
+        for (const media of [reduced, lessTransparent, darkSystem]) media?.removeEventListener?.('change', update);
+      },
+    };
   }
 
   function installBridgeYield() {
@@ -529,6 +861,7 @@ export function createDafeiyuMobileContext(env = globalThis) {
     let expansionTimer = null;
     let footer = null;
     let sidebarTouch = null;
+    let materialTheme = null;
     let activityButton = null;
     let activityPanel = null;
     let activityAgents = null;
@@ -1558,6 +1891,7 @@ export function createDafeiyuMobileContext(env = globalThis) {
       updateMarkers(parts);
       sidebarTouch?.update();
       footer?.update?.(parts);
+      materialTheme?.update();
     }
 
     function scheduleDomUpdate() {
@@ -1666,6 +2000,8 @@ export function createDafeiyuMobileContext(env = globalThis) {
       env.removeEventListener?.('resize', updateViewport);
       sidebarTouch?.dispose();
       sidebarTouch = null;
+      materialTheme?.dispose();
+      materialTheme = null;
       removeNavigation();
       footer?.dispose?.();
       footer = null;
@@ -1698,6 +2034,7 @@ export function createDafeiyuMobileContext(env = globalThis) {
         env.addEventListener?.('blur', clearPressed);
         env.addEventListener?.('resize', updateViewport);
         sidebarTouch = createSidebarTouch(document, root, () => active && drawerOpen && !disposed);
+        materialTheme = createMaterialThemeController(document, root);
         if (typeof options?.createFooter === 'function') footer = options.createFooter(env, { closeDrawer: () => setDrawer(false) }) || null;
         if (typeof env.MutationObserver === 'function') {
           observer = new env.MutationObserver(scheduleDomUpdate);
@@ -1711,7 +2048,7 @@ export function createDafeiyuMobileContext(env = globalThis) {
               // A previously static title can gain an interaction without a
               // childList change. Re-run the conservative classifier so its
               // owned presentation marker is released immediately.
-              'tabindex', 'contenteditable', 'onclick'],
+              'tabindex', 'contenteditable', 'onclick', 'data-ds-dark-theme'],
           });
         }
       }
@@ -1726,6 +2063,7 @@ export function createDafeiyuMobileContext(env = globalThis) {
       for (const [name, value] of Object.entries(attributes)) rootAttributes.set(root, name, value);
       if (next.preview) rootAttributes.set(root, 'data-dafeiyu-preview', 'mobile');
       else rootAttributes.release(root, 'data-dafeiyu-preview');
+      materialTheme?.setContext(next);
       updateViewport();
       updateDom();
     }
@@ -1748,5 +2086,5 @@ export function createDafeiyuMobileContext(env = globalThis) {
     };
   }
 
-  return { normalizeHostContext, readContext, install };
+  return { normalizeHostContext, normalizeMaterialTheme, readContext, install };
 }

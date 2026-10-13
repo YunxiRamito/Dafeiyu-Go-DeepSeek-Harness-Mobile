@@ -1,6 +1,7 @@
 package com.dafeiyu.mobile.ui
 
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.app.Application
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -46,6 +47,12 @@ import com.dafeiyu.mobile.data.LocalDshHistoryController
 import com.dafeiyu.mobile.data.ModelRuntimeController
 import com.dafeiyu.mobile.data.RuntimeStatus
 import com.dafeiyu.mobile.data.SettingsRuntimeStore
+import com.dafeiyu.mobile.data.ThemeState
+import com.dafeiyu.mobile.data.ThemeStore
+import com.dafeiyu.mobile.data.ThemeSelection
+import com.dafeiyu.mobile.data.ThemeDocuments
+import com.dafeiyu.mobile.data.InstalledTheme
+import com.dafeiyu.mobile.glasslab.LabDocument
 import com.dafeiyu.mobile.data.Workspace
 import com.dafeiyu.mobile.data.WorkspaceSnapshot
 import com.dafeiyu.mobile.data.WorkspaceStore
@@ -147,6 +154,22 @@ class DshWebMainScreenSmoke {
         val service = DshRuntimeManager(isolated, runtime, installer)
         val holder = ViewModelStore()
         val repository = withContext(Dispatchers.Main) { DemoRepository().also { holder.put("screen", it) } }
+        val baselineTheme = LabDocument.defaults()
+        val customTheme = baselineTheme.copy(
+            light = baselineTheme.light + ("circle" to baselineTheme.light.getValue("circle")
+                .withColor("surface", "#FFCF3877").withValue("shadowBlurDp", 9.4f).withValue("roundness", .4f)),
+            dark = baselineTheme.dark + ("circle" to baselineTheme.dark.getValue("circle")
+                .withColor("surface", "#FF31ADC2").withValue("shadowBlurDp", 4.3f).withValue("roundness", .7f)),
+        )
+        val installedTheme = InstalledTheme(ThemeDocuments.CUSTOM_ID, "QA isolated theme", 0,
+            ThemeDocuments.sha256(customTheme.encode().toByteArray()), customTheme)
+        ThemeStore(isolated).save(ThemeSelection(installedTheme.id, installedTheme))
+        val themeApplication = object : Application() {
+            override fun getApplicationContext(): Context = isolated
+            override fun getFilesDir(): File = files
+        }
+        val themeState = withContext(Dispatchers.Main) { ThemeState(themeApplication).also { holder.put("theme", it) } }
+        withTimeout(10_000) { while (withContext(Dispatchers.Main) { themeState.isLoading }) delay(30) }
         val host = AtomicReference<DshWebLifecycleQaActivity>()
         var scenario: ActivityScenario<DshWebLifecycleQaActivity>? = null
         val localOwner = withContext(Dispatchers.Main) { StartedOwner() }
@@ -305,7 +328,7 @@ class DshWebMainScreenSmoke {
                     }
                     activity.setContent {
                         CompositionLocalProvider(LocalContext provides displayContext, LocalLifecycleOwner provides localOwner) {
-                            DafeiyuApp(repository)
+                            DafeiyuApp(repository, themeState)
                         }
                     }
                 }
@@ -317,6 +340,21 @@ class DshWebMainScreenSmoke {
                 }
                 awaitBundle(view, marker, session, report, ::persist)
                 report.put("mainScreenReadyElapsedMillis", SystemClock.elapsedRealtime() - began)
+            }
+            case("owned native custom theme reaches the real light WebView CSS") {
+                val view = attachedWeb()
+                val observed = withTimeout(10_000) {
+                    while (true) {
+                        val value = state(view, THEME_STATE)
+                        report.put("lastMaterialThemeState", value)
+                        if (value.optString("kind") == "circle" && value.optString("fill").contains("207, 56, 119")) return@withTimeout value
+                        delay(50)
+                    }
+                    @Suppress("UNREACHABLE_CODE") error("unreachable")
+                }
+                check(observed.getString("shadow").contains("9.4px"))
+                check(observed.getBoolean("hasContextTheme"))
+                report.put("lightMaterialTheme", observed)
             }
             case("the mobile webpage fills Activity content without a duplicate native home toolbar") {
                 val view = attachedWeb()
@@ -484,6 +522,19 @@ class DshWebMainScreenSmoke {
                 checkNotNull(scenario).moveToState(Lifecycle.State.RESUMED)
                 awaitBundle(attachedWeb(), marker, session, report, ::persist)
                 proveHistoryPixels(checkNotNull(host.get()), attachedWeb(), marker, session, evidence, "bundle-dark-resumed", report)
+                val observed = state(attachedWeb(), THEME_STATE)
+                check(observed.getString("fill").contains("49, 173, 194"))
+                check(observed.getString("shadow").contains("4.3px"))
+                report.put("darkMaterialTheme", observed)
+            }
+            case("restoring the native default removes only owned custom WebView styles") {
+                withContext(Dispatchers.Main) { themeState.select(ThemeDocuments.DEFAULT_ID) }
+                withTimeout(10_000) {
+                    while (state(attachedWeb(), THEME_STATE).optString("kind").isNotEmpty()) delay(50)
+                }
+                val observed = state(attachedWeb(), THEME_STATE)
+                check(observed.getString("fill").isEmpty() && !observed.getBoolean("hasContextTheme"))
+                report.put("defaultMaterialTheme", observed)
             }
             case("fixture RPC service stays healthy and original debug settings/index/identity stay unchanged") {
                 check(service.health()?.code in 200..299)
@@ -528,6 +579,14 @@ class DshWebMainScreenSmoke {
         val registry = LifecycleRegistry(this).apply { currentState = Lifecycle.State.STARTED }
         override val lifecycle: Lifecycle get() = registry
     }
+
+    private val THEME_STATE = """(() => {
+        const node=document.querySelector('[data-dafeiyu-mobile-control="sidebar-toggle"]');
+        return {kind:node?.getAttribute('data-dafeiyu-theme-kind')||'',
+            fill:node?getComputedStyle(node).getPropertyValue('--df-theme-fill'):'',
+            shadow:node?getComputedStyle(node).boxShadow:'',
+            hasContextTheme:!!globalThis.__DAFEIYU_DSH_CLIENT__?.materialTheme};
+    })()"""
 
     private suspend fun evaluate(view: WebView, script: String): String = withContext(Dispatchers.Main) {
         withTimeout(5000) { suspendCancellableCoroutine { continuation ->

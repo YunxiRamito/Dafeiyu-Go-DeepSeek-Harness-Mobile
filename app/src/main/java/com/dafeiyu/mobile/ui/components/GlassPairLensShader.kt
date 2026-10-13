@@ -61,6 +61,21 @@ internal data class GlassPairFrame(
     val blend: Float,
 )
 
+/** Draw-local geometry state. A rebound can move controls closer, but UP cannot grow a new neck. */
+internal class GlassPairBridgeContour {
+    private var previousContact = false
+    private var releasing = false
+    private var previousWidth = 0f
+
+    fun width(desiredWidth: Float, contact: Boolean): Float {
+        if (contact) releasing = false else if (previousContact) releasing = true
+        previousContact = contact
+        val desired = if (desiredWidth.isFinite()) desiredWidth.coerceAtLeast(0f) else 0f
+        previousWidth = if (releasing) min(previousWidth, desired) else desired
+        return previousWidth
+    }
+}
+
 /** Signed separation of the actual scaled rounded shapes, independent of their press values. */
 internal fun glassPairSurfaceGap(first: GlassPairShape, second: GlassPairShape): Float {
     val delta = second.center - first.center
@@ -100,16 +115,20 @@ internal fun glassPairSurfaceGap(first: GlassPairShape, second: GlassPairShape):
 }
 
 /** Smooth-min width in pixels. Callers supply availability; launcher pairs use actual motion. */
-internal fun glassPairBlendWidth(first: GlassPairShape, second: GlassPairShape, connection: Float = 1f): Float {
+internal fun glassPairBlendWidth(first: GlassPairShape, second: GlassPairShape, connection: Float = 1f,
+    reachPx: Float? = null, strength: Float = .80f): Float {
     if (first.alpha <= 0f || second.alpha <= 0f || !connection.isFinite() || connection <= 0f) return 0f
     val shortEdge = minOf(first.halfSize.x * first.scaleX, first.halfSize.y * first.scaleY,
         second.halfSize.x * second.scaleX, second.halfSize.y * second.scaleY) * 2f
     if (!shortEdge.isFinite() || shortEdge <= 0f) return 0f
     val gap = glassPairSurfaceGap(first, second)
     if (!gap.isFinite()) return 0f
-    val proximity = (1f - max(gap, 0f) / max(shortEdge * .50f, .001f)).coerceIn(0f, 1f)
+    val reach = reachPx?.takeIf { it.isFinite() }?.coerceAtLeast(0f) ?: shortEdge * .50f
+    if (reach <= 0f) return 0f
+    val proximity = (1f - max(gap, 0f) / max(reach, .001f)).coerceIn(0f, 1f)
     val eased = proximity * proximity * (3f - 2f * proximity)
-    return shortEdge * .80f * eased * connection.coerceIn(0f, 1f)
+    val amount = if (strength.isFinite()) strength.coerceIn(0f, 4f) else .80f
+    return shortEdge * amount * eased * connection.coerceIn(0f, 1f)
 }
 
 /**
@@ -119,6 +138,8 @@ internal fun glassPairBlendWidth(first: GlassPairShape, second: GlassPairShape, 
 @RequiresApi(33)
 internal class GlassPairLensShader {
     private val shader = RuntimeShader(SOURCE)
+    private var rawTuning: GlassDebugTuning? = null
+    private var normalizedTuning: GlassDebugTuning? = null
 
     /**
      * width/height exclude the recording margin. sampleBounds is capture's safe intersection
@@ -137,6 +158,7 @@ internal class GlassPairLensShader {
         frame: GlassPairFrame,
         sampleBounds: Rect,
         profile: GlassMaterialProfile = GlassMaterialProfile.Button,
+        tuning: GlassDebugTuning? = null,
     ): RenderEffect {
         require(width > 0 && height > 0 && margin >= 0) { "Invalid pair recording dimensions" }
         val recordingWidth = width.toLong() + margin.toLong() * 2L
@@ -158,8 +180,21 @@ internal class GlassPairLensShader {
         val limit = min(65536f, max(recordingWidth, recordingHeight).toFloat() * 4f)
         val first = frame.first.sanitized(limit)
         val second = frame.second.sanitized(limit)
-        val firstOptics = first.optics(safeDensity)
-        val secondOptics = second.optics(safeDensity)
+        if (rawTuning != tuning) {
+            rawTuning = tuning
+            normalizedTuning = tuning?.sanitized()
+        }
+        val debug = normalizedTuning
+        val firstOpticsBase = first.optics(safeDensity)
+        val secondOpticsBase = second.optics(safeDensity)
+        val firstOptics = if (debug == null) firstOpticsBase else firstOpticsBase.copy(
+            bevel = min(debug.glassThicknessDp * safeDensity, first.shortEdge() * .5f) * debug.bevelScale,
+            refraction = firstOpticsBase.refraction * debug.refractionScale,
+        )
+        val secondOptics = if (debug == null) secondOpticsBase else secondOpticsBase.copy(
+            bevel = min(debug.glassThicknessDp * safeDensity, second.shortEdge() * .5f) * debug.bevelScale,
+            refraction = secondOpticsBase.refraction * debug.refractionScale,
+        )
         val shortEdge = when {
             first.alpha <= 0f -> second.shortEdge()
             second.alpha <= 0f -> first.shortEdge()
@@ -170,15 +205,39 @@ internal class GlassPairLensShader {
         uploadShape("1", first, firstOptics, tint)
         uploadShape("2", second, secondOptics, tint)
         shader.setFloatUniform("blendK", frame.blend.finiteOr(0f).coerceIn(0f, limit))
-        val shadow = glassButtonShadowGeometry(shortEdge, safeDensity)
+        val shadow = glassButtonShadowGeometry(shortEdge, safeDensity, debug)
         shader.setFloatUniform("shadowGeometry", shadow.offsetY, shadow.spread, shadow.blurSize, shadow.opacity)
+        shader.setFloatUniform("shadowOffsetX", shadow.offsetX)
+        shader.setFloatUniform("shadowPressScale", debug?.shadowPressScale ?: 1f)
+        val shadowColor = debug?.shadowColor ?: androidx.compose.ui.graphics.Color.Black
+        shader.setFloatUniform("shadowColor", shadowColor.red, shadowColor.green, shadowColor.blue, shadowColor.alpha)
         val quietPanel = profile == GlassMaterialProfile.SidebarPanel
-        shader.setFloatUniform("specScale", glassSpecScale(profile.buttonStyle, darkTheme, quietPanel))
-        shader.setFloatUniform("rimFloor", glassRimFloor(profile.buttonStyle, darkTheme, quietPanel))
-        shader.setFloatUniform("satFactor", glassVibrancy(quietPanel))
+        shader.setFloatUniform("specScale", debug?.reflectionStrength ?: glassSpecScale(profile.buttonStyle, darkTheme, quietPanel))
+        shader.setFloatUniform("rimFloor", debug?.rimStrength ?: glassRimFloor(profile.buttonStyle, darkTheme, quietPanel))
+        shader.setFloatUniform("satFactor", debug?.saturation ?: glassVibrancy(quietPanel))
         shader.setFloatUniform("accentScatter", glassAccentScatter(darkTheme))
-        shader.setFloatUniform("falloff", 2f)
-        shader.setFloatUniform("dimAmount", profile.dimAmount)
+        shader.setFloatUniform("falloff", debug?.refractionFalloff ?: 2f)
+        shader.setFloatUniform("dimAmount", debug?.dimAmount ?: profile.dimAmount)
+        val light = glassDebugLightDirection(debug)
+        val highlight = debug?.highlightColor ?: androidx.compose.ui.graphics.Color.White
+        val border = debug?.borderColor ?: androidx.compose.ui.graphics.Color.White
+        shader.setFloatUniform("lightDir", light.x, light.y)
+        shader.setFloatUniform("highlightScale", debug?.highlightStrength ?: 1f)
+        shader.setFloatUniform("highlightTint", highlight.red, highlight.green, highlight.blue, highlight.alpha)
+        shader.setFloatUniform("borderWidth", (debug?.borderWidthDp ?: 0f) * safeDensity)
+        shader.setFloatUniform("borderTint", border.red, border.green, border.blue,
+            border.alpha * (debug?.borderOpacity ?: 0f))
+        shader.setFloatUniform("dispersionScale", debug?.dispersion ?: .10f)
+        shader.setFloatUniform("innerStrength", debug?.innerRefractionStrength ?: 0f)
+        shader.setFloatUniform("innerWidth", (debug?.innerRefractionWidthDp ?: 4f) * safeDensity)
+        shader.setFloatUniform("innerDispersion", debug?.innerDispersion ?: 0f)
+        shader.setFloatUniform("pressMode", glassPressEffectCode(debug))
+        shader.setFloatUniform("pressDarken", debug?.pressDarken ?: .12f)
+        shader.setFloatUniform("trackingWidth", debug?.let { it.trackingLightWidthDp * safeDensity } ?: shortEdge * .5f)
+        shader.setFloatUniform("trackingIntensity", debug?.trackingLightIntensity ?: 1f)
+        val tracking = debug?.trackingLightColor ?: androidx.compose.ui.graphics.Color.White
+        shader.setFloatUniform("trackingTint", tracking.red, tracking.green, tracking.blue, tracking.alpha)
+        shader.setFloatUniform("surfaceAlpha", debug?.surfaceAlpha ?: 1f)
         shader.setFloatUniform("sampleLo", left, top)
         shader.setFloatUniform("sampleHi", right, bottom)
         return RenderEffect.createRuntimeShaderEffect(shader, "content")
@@ -243,12 +302,30 @@ internal class GlassPairLensShader {
             uniform float3 optics2;
             uniform float blendK;
             uniform float4 shadowGeometry;
+            uniform float shadowOffsetX;
+            uniform float shadowPressScale;
+            uniform float4 shadowColor;
             uniform float specScale;
             uniform float rimFloor;
             uniform float satFactor;
             uniform float accentScatter;
             uniform float falloff;
             uniform float dimAmount;
+            uniform float2 lightDir;
+            uniform float highlightScale;
+            uniform float4 highlightTint;
+            uniform float borderWidth;
+            uniform float4 borderTint;
+            uniform float dispersionScale;
+            uniform float innerStrength;
+            uniform float innerWidth;
+            uniform float innerDispersion;
+            uniform float pressMode;
+            uniform float pressDarken;
+            uniform float trackingWidth;
+            uniform float trackingIntensity;
+            uniform float4 trackingTint;
+            uniform float surfaceAlpha;
             uniform float4 tint1;
             uniform float4 tint2;
             uniform float2 sampleLo;
@@ -316,6 +393,16 @@ internal class GlassPairLensShader {
                 return delta / max(length(delta), 1.0) * weight;
             }
 
+            float trackingWeight(float2 p, float d, float2 touch, float press, float opacity) {
+                float2 delta = p - touch;
+                float width = max(trackingWidth, 0.001);
+                float radial = exp(-dot(delta, delta) / (width * width * 0.30));
+                float beamDistance = abs(dot(delta, normalize(lightDir)));
+                float beam = exp(-(beamDistance * beamDistance) / (width * width * 0.30)) *
+                    (1.0 - smoothstep(width * 0.4, width, -d));
+                return press * opacity * (pressMode > 2.5 ? beam : radial);
+            }
+
             float4 readContent(float2 p) {
                 float4 tap = float4(content.eval(clamp(p, sampleLo, sampleHi)));
                 // Child shaders return premultiplied RGBA. Unpremultiply each tap
@@ -348,16 +435,17 @@ internal class GlassPairLensShader {
                 float opacity = pairOpacity(p, field.y);
                 // The same normalized downward shadow as cached independent contours.
                 // Evaluate its shifted union separately: material bounds cannot clip its tail.
-                float2 shadowPoint = p - float2(0.0, shadowGeometry.x);
+                float2 shadowPoint = p - float2(shadowOffsetX, shadowGeometry.x);
                 float2 shadowField = pairField(shadowPoint);
                 float tail = max(shadowField.x - shadowGeometry.y, 0.0);
                 float blurSize = max(shadowGeometry.z, 0.001);
                 float gaussian = tail / (blurSize * 0.50);
                 float shadow = shadowGeometry.w * exp(-0.5 * gaussian * gaussian) *
                     (1.0 - smoothstep(blurSize * 0.75, blurSize, tail)) *
-                    pairOpacity(shadowPoint, shadowField.y);
+                    pairOpacity(shadowPoint, shadowField.y) * shadowColor.a *
+                    (1.0 + (shadowPressScale - 1.0) * mix(press2, press1, shadowField.y));
                 if (cov <= 0.0 && shadow < 0.00001) return half4(0.0);
-                if (cov <= 0.0) return half4(0.0, 0.0, 0.0, half(shadow));
+                if (cov <= 0.0) return half4(half3(shadowColor.rgb * shadow), half(shadow));
 
                 float2 gradient = float2(
                     pairField(p + float2(1.0, 0.0)).x - pairField(p - float2(1.0, 0.0)).x,
@@ -374,21 +462,30 @@ internal class GlassPairLensShader {
                 float t = clamp(-d / bevel, 0.0, 1.0);
                 float gB = pow(5.0, -falloff);
                 float slope = (pow(1.0 + 4.0 * t, -falloff) - gB) / max(1.0 - gB, 0.0001);
-                float weight1 = touchWeight(p, shape1, scale1, halfSize1, touch1, press1);
-                float weight2 = touchWeight(p, shape2, scale2, halfSize2, touch2, press2);
+                float weight1 = pressMode > 1.5 ? touchWeight(p, shape1, scale1, halfSize1, touch1, press1) : 0.0;
+                float weight2 = pressMode > 1.5 ? touchWeight(p, shape2, scale2, halfSize2, touch2, press2) : 0.0;
                 float localPress = clamp(weight1 + weight2, 0.0, 1.0);
                 float refr = optics.y * (1.0 + 0.6 * localPress);
-                float2 offset = -normal * slope * refr * normalStrength;
+                float2 offset = -normal * slope * refr * normalStrength * (optics.x > 0.001 ? 1.0 : 0.0);
                 offset -= (towardTouch(p, touch1, weight1) +
                     towardTouch(p, touch2, weight2)) * (refr * 0.5);
                 // Bound the actual combined displacement, including both touches and
                 // the largest dispersion tap. This is a budget, not a no-fold proof.
                 float maxOffset = min(optics.y, bevel * 0.50) / 1.10;
                 offset *= min(1.0, maxOffset / max(length(offset), 0.0001));
-                float dispersion = 0.10 * slope;
-                float4 red = readContent(coord + offset * (1.0 - dispersion));
-                float4 green = readContent(coord + offset);
-                float4 blue = readContent(coord + offset * (1.0 + dispersion));
+                float dispersion = dispersionScale * slope;
+                // Real inward compressed-band sampling, with independently displaced RGB taps.
+                float shortEdge = 2.0 * min(mix(halfSize2, halfSize1, field.y).x,
+                    mix(halfSize2, halfSize1, field.y).y);
+                float wallWidth = min(innerWidth, shortEdge * 0.5);
+                float wallDepth = min(max(optics.x, wallWidth * 0.5), shortEdge * 0.45);
+                float wallBand = wallWidth > 0.001 ?
+                    1.0 - smoothstep(0.0, max(wallWidth, 0.001), abs(-d - wallDepth)) : 0.0;
+                float wallShift = min(innerStrength * wallWidth, shortEdge * 0.45) * wallBand * normalStrength;
+                float2 wallOffset = -normal * wallShift;
+                float4 red = readContent(coord + offset * (1.0 - dispersion) + wallOffset * (1.0 - innerDispersion));
+                float4 green = readContent(coord + offset + wallOffset);
+                float4 blue = readContent(coord + offset * (1.0 + dispersion) + wallOffset * (1.0 + innerDispersion));
                 // A common transmission alpha keeps all dispersed RGB channels valid
                 // on captures that contain transparent pixels.
                 float transmission = min(red.a, min(green.a, blue.a));
@@ -404,7 +501,7 @@ internal class GlassPairLensShader {
                 col = transmitColour(col, shade) * (1.0 - dimAmount);
                 float materialAlpha = transmission + shade.a * (1.0 - transmission);
                 float3 rgb = col * transmission + shade.rgb * shade.a * (1.0 - transmission);
-                float facing = dot(normal, float2(-0.6, -0.8));
+                float facing = dot(normal, normalize(lightDir));
                 float lobeF = pow(max(facing, 0.0), 4.5);
                 float lobeB = pow(max(-facing, 0.0), 4.5);
                 float inside = 1.0 - smoothstep(-0.75, 0.0, d);
@@ -413,15 +510,27 @@ internal class GlassPairLensShader {
                     pow(clamp(1.0 + d / max(bevel * 0.5, 1.0), 0.0, 1.0), 1.5);
                 float spec = inside * normalStrength *
                     (hair * (rimFloor + 0.70 * (lobeF + lobeB) * specScale) +
-                        glow * 0.10 * lobeF * specScale) * (1.0 - localPress * 0.20);
-                float front = inside * localPress * 0.10;
-                float reflection = clamp(spec + front, 0.0, 0.90);
-                rgb = rgb * (1.0 - reflection) + float3(reflection);
+                        glow * 0.10 * lobeF * specScale * highlightScale) * (1.0 - localPress * 0.20);
+                float reflection = clamp(spec, 0.0, 0.90) * highlightTint.a;
+                rgb = rgb * (1.0 - reflection) + highlightTint.rgb * reflection;
                 materialAlpha += reflection * (1.0 - materialAlpha);
-                float surface = cov * opacity;
+                float tracking = trackingWeight(p, d, touch1, press1, shape1.w) +
+                    trackingWeight(p, d, touch2, press2, shape2.w);
+                float trackingAlpha = pressMode > 1.5 ? clamp(inside * tracking * 0.10 *
+                    highlightScale * trackingIntensity * trackingTint.a, 0.0, 0.95) : 0.0;
+                rgb = rgb * (1.0 - trackingAlpha) + trackingTint.rgb * trackingAlpha;
+                materialAlpha += trackingAlpha * (1.0 - materialAlpha);
+                float borderCoverage = borderWidth > 0.0 ? clamp(borderWidth + d, 0.0, 1.0) : 0.0;
+                float borderAlpha = borderCoverage * borderTint.a;
+                rgb = rgb * (1.0 - borderAlpha) + borderTint.rgb * borderAlpha;
+                materialAlpha += borderAlpha * (1.0 - materialAlpha);
+                if (pressMode > 0.5 && pressMode < 1.5)
+                    rgb *= 1.0 - pressDarken * mix(press2, press1, field.y);
+                float surface = cov * opacity * surfaceAlpha;
                 rgb = clamp(rgb, float3(0.0), float3(materialAlpha)) * surface;
                 float alpha = materialAlpha * surface;
-                // Black shadow under the premultiplied surface.
+                // Coloured shadow under the premultiplied surface (black when tuning is absent).
+                rgb += shadowColor.rgb * shadow * (1.0 - alpha);
                 alpha += shadow * (1.0 - alpha);
                 return half4(half3(rgb), half(clamp(alpha, 0.0, 1.0)));
             }

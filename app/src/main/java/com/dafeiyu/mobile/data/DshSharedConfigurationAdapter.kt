@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -81,30 +82,26 @@ class DshSharedConfigurationAdapter(
             val settings = rpc.call(accessUrl, "settings/describe", JSONObject())
             check(settings.optBoolean("writable")) { "DSH 当前配置只读，无法同步提供商" }
             val namespace = DshSharedConfigurationMapping.namespace(settings, "llm-pi-ai")
-            val profiles = DshSharedConfigurationMapping.prepareProfiles(namespace, current, converted.getJSONObject("providers"))
-            converted.put("providers", profiles)
             val credentials = bridge.readCredentialDocument()
-            val updates = DshSharedConfigurationMapping.credentialUpdates(current, converted,
-                DshSharedConfigurationMapping.deepSeekCredentialReference(settings), namespace)
-                .put("expectedRevision", credentials.getString("revision"))
-            val operations = DshSharedConfigurationMapping.mutations(namespace, profiles, DshSharedConfigurationMapping.managedRoutes(current))
-            check(store.read().revision == current.getLong("revision")) { "手机提供商已变化，请重试同步" }
-            val credentialWrite = bridge.writeCredentialDocument(updates)
-            var persistedRevision = namespace.getLong("revision")
-            if (operations.length() > 0) {
-                val result = rpc.call(accessUrl, "settings/mutate", JSONObject().put("ns", "llm-pi-ai")
-                    .put("expectedRevision", namespace.getLong("revision")).put("ops", operations))
-                check(result.getString("ns") == "llm-pi-ai" && result.getLong("revision") > namespace.getLong("revision")) {
-                    "DSH 没有返回已持久化的提供商版本"
-                }
-                DshSharedConfigurationMapping.verifyMutation(result, operations)
-                persistedRevision = result.getLong("revision")
-            }
-            check(store.read().revision == current.getLong("revision")) { "手机提供商已变化；DSH 已提交部分同步，请刷新后重试" }
-            current.put("dshSync", DshSharedConfigurationMapping.syncReceipt(profiles.keys().asSequence().toList())
-                .put("officialManaged", current.getJSONObject("credentials").has("deepseek") || current.optJSONObject("dshSync")?.optBoolean("officialManaged") == true)
-                .put("settingsRevision", persistedRevision).put("credentialRevision", credentialWrite.getString("revision")))
-            store.importPortableIfRevision(current, current.getLong("revision"))
+            val plan = DshSharedConfigurationMapping.credentialPublication(current, converted, settings, credentials)
+            var snapshot: ModelProviderSnapshot? = null
+            DshCredentialPublisher.publish(plan,
+                requireNativeUnchanged = { check(store.read().revision == current.getLong("revision")) { "手机提供商已变化，请重试同步" } },
+                stageReferences = bridge::stageCredentialReferences,
+                readCredentials = bridge::readCredentialDocument,
+                mutateSettings = { operations -> rpc.call(accessUrl, "settings/mutate", JSONObject().put("ns", "llm-pi-ai")
+                    .put("expectedRevision", namespace.getLong("revision")).put("ops", operations)) },
+                readSettings = { rpc.call(accessUrl, "settings/describe", JSONObject()) },
+                commitReceipt = { persistedRevision, credentialRevision ->
+                    current.put("dshSync", DshSharedConfigurationMapping.syncReceipt(plan.profiles.keys().asSequence().toList())
+                        .put("officialManaged", current.getJSONObject("credentials").has("deepseek") || current.optJSONObject("dshSync")?.optBoolean("officialManaged") == true)
+                        .put("settingsRevision", persistedRevision).put("credentialRevision", credentialRevision)
+                        .put("retiredReferences", JSONArray(plan.retiredReferences.toList()))
+                        .put("retiredRecords", JSONArray(plan.retiredRecords.toList())))
+                    snapshot = store.importPortableIfRevision(current, current.getLong("revision"))
+                },
+                cleanCredentials = { updates -> bridge.writeCredentialDocument(updates) })
+            requireNotNull(snapshot)
         }
     }
 
@@ -113,6 +110,59 @@ class DshSharedConfigurationAdapter(
     fun orderCatalog(catalog: JSONObject): JSONObject = DshSharedConfigurationMapping.orderCatalog(catalog, store.read().providers)
 
     private companion object { val locks = ConcurrentHashMap<String, Mutex>() }
+}
+
+internal data class DshCredentialPublication(
+    val profiles: JSONObject,
+    val operations: JSONArray,
+    val candidates: JSONArray,
+    val namespaceRevision: Long,
+    val credentialRevision: String,
+    val retiredReferences: Set<String>,
+    val retiredRecords: Set<String>,
+)
+
+/** Only fresh, unreferenced API keys are written before settings CAS. A lost
+ * RPC response may hide a successful commit, so failure/cancellation never
+ * deletes candidates or restores an old ref over a concurrent user's edit. */
+internal object DshCredentialPublisher {
+    suspend fun publish(plan: DshCredentialPublication, requireNativeUnchanged: () -> Unit,
+        stageReferences: suspend (JSONArray, String) -> JSONObject,
+        readCredentials: suspend () -> JSONObject, mutateSettings: suspend (JSONArray) -> JSONObject,
+        readSettings: suspend () -> JSONObject, commitReceipt: (Long, String) -> Unit,
+        cleanCredentials: suspend (JSONObject) -> JSONObject) {
+        requireNativeUnchanged()
+        val stagedRevision = if (plan.candidates.length() == 0) plan.credentialRevision
+            else stageReferences(plan.candidates, plan.credentialRevision).getString("revision")
+        requireNativeUnchanged()
+        check(readCredentials().getString("revision") == stagedRevision) { "DSH 凭据已变化，未提交提供商设置；原凭据保留" }
+        val persistedRevision = if (plan.operations.length() == 0) plan.namespaceRevision else {
+            val result = mutateSettings(plan.operations)
+            check(result.getString("ns") == "llm-pi-ai" && result.getLong("revision") > plan.namespaceRevision) {
+                "DSH 没有确认提供商设置持久化；候选和旧凭据均保留，请刷新后重试"
+            }
+            DshSharedConfigurationMapping.verifyMutation(result, plan.operations)
+            result.getLong("revision")
+        }
+        // Save ownership before optional cleanup. If cleanup fails, a retry
+        // still recognizes a newly published route and does not claim it foreign.
+        requireNativeUnchanged()
+        commitReceipt(persistedRevision, stagedRevision)
+        if (plan.retiredReferences.isEmpty() && plan.retiredRecords.isEmpty()) return
+        try {
+            val latest = readSettings()
+            val namespace = DshSharedConfigurationMapping.namespace(latest, "llm-pi-ai")
+            check(namespace.getLong("revision") == persistedRevision)
+            DshSharedConfigurationMapping.verifyMutation(namespace, plan.operations)
+            val credentials = readCredentials()
+            val updates = DshSharedConfigurationMapping.retiredCredentialUpdates(plan, latest, credentials)
+            if (updates.getJSONArray("refs").length() > 0 || updates.getJSONArray("records").length() > 0)
+                cleanCredentials(updates)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) {
+            throw IOException("DSH 提供商设置已保存；旧凭据清理未完成，保留待清理记录，请刷新后重试")
+        }
+    }
 }
 
 internal object DshSharedConfigurationMapping {
@@ -164,7 +214,13 @@ internal object DshSharedConfigurationMapping {
             providers += config
             val reference = raw.optString("apiKeyEnv").takeIf { it.isNotBlank() && it != "null" }
             val record = records.optJSONObject("llm-pi-ai/$route")
-            val value = if (reference != null && refs.has(reference)) JSONObject().put("type", "api_key").put("key", refs.getString(reference))
+            val value = if (reference != null && refs.has(reference)) {
+                // An explicit key overrides the stored key but not the cloud
+                // environment/files that the same pi-ai route still consumes.
+                val direct = if (record?.optString("kind") == "api-key") JSONObject(record.toString()).apply { remove("kind") }
+                    else JSONObject()
+                direct.put("type", "api_key").put("key", refs.getString(reference))
+            }
                 else if (record?.optString("kind") == "grant") JSONObject(record.getJSONObject("payload").toString())
                 else if (record?.optString("kind") == "api-key") JSONObject(record.toString()).apply { remove("kind"); put("type", "api_key") }
                 else null
@@ -222,56 +278,140 @@ internal object DshSharedConfigurationMapping {
         return copy
     }
 
-    fun credentialUpdates(current: JSONObject, converted: JSONObject, officialRef: String, namespace: JSONObject): JSONObject {
-        val refs = JSONArray()
-        val records = JSONArray()
-        val secrets = current.getJSONObject("credentials")
-        val nativeProviders = current.getJSONArray("providers")
-        val published = converted.getJSONObject("providers")
-        if (!secrets.has("deepseek") && current.optJSONObject("dshSync")?.optBoolean("officialManaged") == true)
-            refs.put(JSONObject().put("ref", officialRef).put("value", JSONObject.NULL))
-        for (index in 0 until nativeProviders.length()) {
-            val config = ModelProviderConfig.fromJson(nativeProviders.getJSONObject(index))
-            val credential = secrets.optJSONObject(config.id) ?: continue
-            ModelProviderCredential.validate(credential)
-            if (config.protected) {
-                require(credential.getString("type") == "api_key" && credential.has("key"))
-                refs.put(JSONObject().put("ref", officialRef).put("value", credential.getString("key")))
-            } else if (config.enabled) {
-                val route = config.dshRoute ?: config.id
-                val profile = published.getJSONObject(route)
-                if (profile.has("apiKeyEnv")) refs.put(JSONObject().put("ref", profile.getString("apiKeyEnv"))
-                    .put("value", credential.getString("key")))
-                val record = if (credential.getString("type") == "oauth") JSONObject().put("kind", "grant")
-                    .put("payload", JSONObject(credential.toString()))
-                else JSONObject(credential.toString()).apply { remove("type"); remove("files"); put("kind", "api-key") }
-                records.put(JSONObject().put("provider", route).put("record", record).also {
-                    credential.optJSONObject("files")?.let { files -> it.put("files", JSONObject(files.toString())) }
-                })
-            }
-        }
+    /** One namespace can safely switch API-key references. Pinned pi-ai records
+     * are addressed by route, not a swappable reference; OAuth/cloud mutations
+     * and official-key changes are refused before staging anything. */
+    fun credentialPublication(current: JSONObject, converted: JSONObject, settings: JSONObject, credentials: JSONObject,
+        newReference: (String) -> String = { id -> "DAFEIYU_PROVIDER_${id.uppercase().replace('-', '_')}_${UUID.randomUUID().toString().replace("-", "")}" },
+    ): DshCredentialPublication {
+        val namespace = namespace(settings, "llm-pi-ai")
         val old = namespace.getJSONObject("value").optJSONObject("providers") ?: JSONObject()
-        val activeReferences = published.keys().asSequence().mapNotNull { published.getJSONObject(it).optString("apiKeyEnv").takeIf(String::isNotBlank) }.toSet()
-        for (route in managedRoutes(current).filterNot(published::has)) {
-            records.put(JSONObject().put("provider", route).put("record", JSONObject.NULL))
-            val reference = old.optJSONObject(route)?.optString("apiKeyEnv")
-            if (reference != null && reference.startsWith("DAFEIYU_PROVIDER_") && reference !in activeReferences &&
-                (0 until refs.length()).none { refs.getJSONObject(it).getString("ref") == reference }) {
-                refs.put(JSONObject().put("ref", reference).put("value", JSONObject.NULL))
+        val profiles = prepareProfiles(namespace, current, converted.getJSONObject("providers"))
+        val secrets = current.getJSONObject("credentials")
+        val refs = credentials.getJSONObject("refs")
+        val records = credentials.getJSONObject("records")
+        val officialRef = deepSeekCredentialReference(settings)
+        val official = secrets.optJSONObject("deepseek")
+        if (official != null || current.optJSONObject("dshSync")?.optBoolean("officialManaged") == true) {
+            require(official == null || plainApiKey(official)) { "官方认证变更需要独立事务，目前未接通；原 DSH 凭据未修改" }
+            val desired = official?.optString("key")?.takeIf(String::isNotEmpty)
+            require(desired == refs.optString(officialRef).takeIf(String::isNotEmpty)) {
+                "官方 DeepSeek 密钥变更需要独立事务，目前未接通；原 DSH 凭据未修改，请在 DSH 设置后重新读取"
             }
         }
-        val uniqueReferences = JSONObject()
-        for (index in 0 until refs.length()) {
-            val item = refs.getJSONObject(index)
-            val reference = item.getString("ref")
-            require(!uniqueReferences.has(reference) || sameJson(uniqueReferences.get(reference), item.get("value"))) {
-                "多个提供商使用同一凭据名称但内容不同，请先调整 DSH 凭据配置"
+        val candidates = JSONArray()
+        val allocated = mutableSetOf<String>()
+        val retiredReferences = mutableSetOf<String>()
+        val retiredRecords = mutableSetOf<String>()
+        current.optJSONObject("dshSync")?.optJSONArray("retiredReferences")?.let { pending ->
+            for (index in 0 until pending.length()) {
+                val reference = pending.getString(index)
+                require(reference.matches(Regex("DAFEIYU_PROVIDER_[A-Za-z0-9_]+")))
+                if (refs.has(reference)) retiredReferences += reference
             }
-            uniqueReferences.put(reference, item.get("value"))
         }
-        return JSONObject().put("refs", JSONArray(uniqueReferences.keys().asSequence().map { reference ->
-            JSONObject().put("ref", reference).put("value", uniqueReferences.get(reference))
-        }.toList())).put("records", records)
+        current.optJSONObject("dshSync")?.optJSONArray("retiredRecords")?.let { pending ->
+            for (index in 0 until pending.length()) {
+                val route = pending.getString(index)
+                require(route.matches(Regex("[a-z0-9]+(?:-[a-z0-9]+)*")))
+                if (records.has("llm-pi-ai/$route")) retiredRecords += route
+            }
+        }
+        fun freshReference(id: String): String = newReference(id).also { reference ->
+            require(reference.matches(Regex("DAFEIYU_PROVIDER_[A-Za-z0-9_]+")) && allocated.add(reference) &&
+                !refs.has(reference) && !mentions(settings, reference)) { "候选凭据名称已占用；原 DSH 凭据未修改" }
+        }
+        val native = current.getJSONArray("providers")
+        for (index in 0 until native.length()) {
+            val config = ModelProviderConfig.fromJson(native.getJSONObject(index))
+            if (config.protected || !config.enabled) continue
+            val route = config.dshRoute ?: config.id
+            val candidate = profiles.getJSONObject(route)
+            val original = old.optJSONObject(route)
+            val oldReference = original?.optString("apiKeyEnv")?.takeIf(String::isNotBlank)
+            val credential = secrets.optJSONObject(config.id)?.let(ModelProviderCredential::validate)
+            val storedRecord = records.optJSONObject("llm-pi-ai/$route")
+            if (credential != null && !plainApiKey(credential) || storedRecord != null && !plainApiKeyRecord(storedRecord)) {
+                val stored = portableRecord(credentials, route)
+                if (stored?.optString("type") == "api_key" && oldReference != null && refs.has(oldReference))
+                    stored.put("key", refs.getString(oldReference))
+                require(credential != null && stored != null && sameJson(credential, stored) &&
+                    (oldReference == null || credential.has("key") && refs.optString(oldReference) == credential.getString("key"))) {
+                    "OAuth 或云认证变更需要独立事务，目前未接通；原 DSH 凭据未修改，请在 DSH 完成认证后重新读取"
+                }
+                if (oldReference != null) candidate.put("apiKeyEnv", oldReference)
+                else candidate.remove("apiKeyEnv")
+                continue
+            }
+            val key = credential?.optString("key")?.takeIf(String::isNotEmpty)
+            if (key != null) {
+                if (oldReference != null && refs.optString(oldReference) == key) candidate.put("apiKeyEnv", oldReference)
+                else {
+                    val reference = freshReference(config.id)
+                    candidate.put("apiKeyEnv", reference)
+                    candidates.put(JSONObject().put("ref", reference).put("value", key))
+                }
+            } else if (oldReference != null || storedRecord != null) {
+                // An absent fresh ref makes the explicit key removal fail loud;
+                // unsetting apiKeyEnv could expose an ambient or old record key.
+                candidate.put("apiKeyEnv", freshReference(config.id))
+            } else candidate.remove("apiKeyEnv")
+            if (oldReference != null && oldReference != candidate.optString("apiKeyEnv") && oldReference.startsWith("DAFEIYU_PROVIDER_"))
+                retiredReferences += oldReference
+            if (storedRecord != null && candidate.has("apiKeyEnv")) retiredRecords += route
+        }
+        for (route in managedRoutes(current).filterNot(profiles::has)) {
+            val record = records.optJSONObject("llm-pi-ai/$route")
+            require(record == null || plainApiKeyRecord(record)) {
+                "OAuth 或云认证移除需要独立事务，目前未接通；原 DSH 凭据未修改"
+            }
+            if (record != null) retiredRecords += route
+            old.optJSONObject(route)?.optString("apiKeyEnv")?.takeIf { it.startsWith("DAFEIYU_PROVIDER_") }?.let { retiredReferences += it }
+        }
+        return DshCredentialPublication(profiles, mutations(namespace, profiles, managedRoutes(current)), candidates,
+            namespace.getLong("revision"), credentials.getString("revision"), retiredReferences, retiredRecords)
+    }
+
+    fun retiredCredentialUpdates(plan: DshCredentialPublication, settings: JSONObject, credentials: JSONObject): JSONObject {
+        val refs = JSONArray()
+        for (reference in plan.retiredReferences) if (!mentions(settings, reference) && credentials.getJSONObject("refs").has(reference))
+            refs.put(JSONObject().put("ref", reference).put("value", JSONObject.NULL))
+        val profiles = namespace(settings, "llm-pi-ai").getJSONObject("value").optJSONObject("providers") ?: JSONObject()
+        val records = JSONArray()
+        for (route in plan.retiredRecords) {
+            val record = credentials.getJSONObject("records").optJSONObject("llm-pi-ai/$route") ?: continue
+            val reference = profiles.optJSONObject(route)?.optString("apiKeyEnv")
+            if (plainApiKeyRecord(record) && (!profiles.has(route) || reference != null &&
+                    reference == plan.profiles.optJSONObject(route)?.optString("apiKeyEnv") && reference.startsWith("DAFEIYU_PROVIDER_")))
+                records.put(JSONObject().put("provider", route).put("record", JSONObject.NULL))
+        }
+        return JSONObject().put("expectedRevision", credentials.getString("revision")).put("refs", refs).put("records", records)
+    }
+
+    private fun plainApiKey(value: JSONObject): Boolean = value.optString("type") == "api_key" &&
+        value.optJSONObject("env")?.length().let { it == null || it == 0 } &&
+        value.optJSONObject("files")?.length().let { it == null || it == 0 }
+
+    private fun plainApiKeyRecord(value: JSONObject): Boolean = value.optString("kind") == "api-key" &&
+        value.optJSONObject("env")?.length().let { it == null || it == 0 }
+
+    private fun portableRecord(credentials: JSONObject, route: String): JSONObject? {
+        val raw = credentials.getJSONObject("records").optJSONObject("llm-pi-ai/$route") ?: return null
+        val copy = if (raw.optString("kind") == "grant") JSONObject(raw.getJSONObject("payload").toString())
+            else JSONObject(raw.toString()).apply { remove("kind"); put("type", "api_key") }
+        credentials.optJSONObject("portableFiles")?.optJSONObject("llm-pi-ai/$route")?.let { files ->
+            copy.put("files", JSONObject(files.toString()))
+            copy.optJSONObject("env")?.let { environment ->
+                listOf("GOOGLE_APPLICATION_CREDENTIALS", "AWS_SHARED_CREDENTIALS_FILE", "AWS_CONFIG_FILE").forEach(environment::remove)
+            }
+        }
+        return copy
+    }
+
+    private fun mentions(value: Any?, reference: String): Boolean = when (value) {
+        is JSONObject -> value.keys().asSequence().any { mentions(value.get(it), reference) }
+        is JSONArray -> (0 until value.length()).any { mentions(value.get(it), reference) }
+        else -> value == reference
     }
 
     fun mutations(namespace: JSONObject, profiles: JSONObject, ownedRoutes: Set<String>): JSONArray {

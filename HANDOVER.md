@@ -1,4 +1,56 @@
-# 当前批次 · 0.1.27 / code28 · 2026-10-13
+# 当前接续 · Dafeiyu调色盘与主题链路 · 2026-10-14
+
+用户已通知服务器恢复，并明确授权必要后端修改、上传替换、部署及公网联调，下面旧的“仅本地测试”是服务器下线期间的历史限制。持续parity目标仍active；本轮已完成调色盘1.0.2/code3、主App0.1.28/code29的主题导入／主题页／市场及手机DSH网页同步验收，接下来继续主App清单。
+
+正式交付已完成。调色盘1.0.2的debug＋androidTest＋Lint在 `build-palette-1.0.2-debug-r1.log` 通过，QA `palette-1.0.2-device-r1/instrumentation.log` **OK(6)，22.137s**：原专项18/18及五项真实GPU／光学／颈部／角部检查通过；数据契约r3为25/25，uniform核对75项／0问题。正式调色盘 APK 为 `../Temp_Android/Dist/Dafeiyu-Palette-1.0.2.apk`，23,028,614 bytes，SHA-256 `fc6abbb9ffbe66d9da913eadb8371a10f314e361b7a6b0e1be827748f273dbb3`。主App0.1.28的debug＋androidTest＋Lint在 `build-theme-app-0.1.28-debug-r1.log` 通过；正式 `assembleRelease + lintRelease` 成功，APK 为 `../Temp_Android/Dist/Dafeiyu-Go-Mobile-0.1.28.apk`，94,735,947 bytes，SHA-256 `beb60c670fbb81d4c5dfc01510900e07a9da97dac4ecba08d3b4139895909e5a`，包名 `com.dafeiyu.mobile`、code29、发行证书 `d4341e66075d1e35909796cb5962b22f8aaed378ca50e057a1b25ed97fe0c64b`。正式包已部署并选为 stable；公网签名清单、最终 APK 身份和实际八路 TLS Range 下载 **5/5 PASS**，证据 `qa/android-release-0128-20261014-execute/receipt.json` 与 `qa/android-release-smoke-0.1.28-r1/report.json`。最终整合 `qa/formal-main-0.1.28/final-receipt.json` **29/29 PASS**。主 App 真机“不推”仍保留，独立调色盘真机安装已获授权；本次 ADB 只有 QA `emulator-5558`，用户视觉验收及真机安装待连接信息。
+
+需求基线和最新优先级统一维护于 `docs/MOBILE-PC-PARITY-SPEC.md`；持续目标工具只能改状态，不能改写已有目标正文，当前目标保持active。主题市场后端已部署到公网镜像 `sha256:f3807a00482e26b0d5e87fbaaa5e63a935c09aa2653029e466bb5cbd2bfa2177`，clear-blue／warm-light revision1 的公网 HTTPS／摘要／Range／鉴权检查 **68/68 PASS**；主App主题市场实际下载、显式应用和冷启动保持 **7/7 PASS**。canonical `dafeiyu-mobile-ui@0.1.6` 为108,166 bytes、SHA-256 `bbf352c83c4da7e6d6f1fd5b975dd91735e0c41cefaed7a1bd440053ec4ff2a3`，PC Release DLL实际解析、校验和嵌入资源检查通过，证据 `../Temp_SetupandLauncher/qa/theme-ui-final-20261014/`. 主Agent已对照实际 APK、网页包、发布回执和设备证据整合；下一轮继续共享提供商、离线更新入口和剩余主App清单。
+
+### 实现、构建与设备验收（0.1.28／调色盘1.0.2）
+
+调色盘更名及用户九色图标、参考底图／相册、74滑条／16颜色、76数值字段／八组完整保存、玻璃厚度／内圈色散／圆角、五种按压效果、松手先细后断及一致接近范围已接入。软盘按钮每次生成独立快照 URI，避免撤销旧文件授权；正式调色盘保持无 INTERNET、包身份与发行签名一致，覆盖安装保留参数。
+
+主App新增个性化主题页、默认／自定义／两列市场封面、文件导入和调色盘跳转。只有严格材质数据进入原生与手机DSH网页；不导入按钮功能／图标身份／布局，不把预览相册图片发送到网页。恢复默认移除当前客户端主题，普通PC不启用。实际APK内manifest／0.1.6 tgz／12成员与canonical逐字节一致，runtime loader的旧硬编码已修为0.1.6；API30–32的光学降级仍未设备实测，浏览器CSS不宣称等同AGSL折射。
+
+- 调色盘正式 `assembleRelease + lintRelease` 成功（1m38s、56 tasks）；正式主App `build-theme-app-0.1.28-release-r1.log` **BUILD SUCCESSFUL，4m31s，56 tasks**。debug r4 **3m8s，76 tasks**；仅更新WebView计算样式断言的test r5 **42s，49 tasks**，生产源码未改变，未重新构建已发布APK。
+- 原生ThemePersistenceSmoke／ThemeApplicationDeviceTest改后复验 `qa/app-theme-0.1.28-runtime-r2/instrumentation.log` **OK(2)，6.588s**，分别9/9与5/5；真实Android AtomicFile、主题应用及默认恢复通过。此前r1证据保留，不用于替代改后结果。
+- 真实生产Repo／DSH服务／硬件WebView专项 `qa/app-theme-webview-0.1.28/instrumentation.log` **OK(1)，41.873s，11/11 PASS**。读取实际computed CSS：浅色fill `rgba(207,56,119,0.12)`、shadow9.4px，暗色fill `rgba(49,173,194,0.1)`、shadow4.3px；覆盖默认移除、真实正文／窗口像素、加号菜单、DSH设置、原生设置往返和stop/resume。原debug主题选择字节不变，UUID自有存储／服务已清理；paid=0。旧inline CSS断言失败保留，修正测试后通过，没有为通过断言修改生产CSS。
+- 正式QA `install -r` 成功，主Agent查看真实DSH正文／composer和三项加号菜单；正式Palette软盘实际跳转正式主App、选择自定义并显示使用中，`qa/formal-main-0.1.28/handoff-report.json` 通过。正式包不可run-as，不声称私有数据hash检查；可用UID10235 crash buffer为空，exit-info只有安装更新和isolated release，没有crash／ANR记录。用户视觉、PKB110稳定性与新Palette真机安装仍待验收。
+- 实际市场下载clear-blue后明确点击“使用”、force-stop／冷启动恢复，自定义原稿保留，`qa/app-theme-0.1.28-market/report.json` **7/7 PASS**。从exec-out读取原始下载27,221B及canonical持久化27,952B摘要分别为 `4bc413b17628b3a21335b218a073b42774def533a6ebdf3fab34a165da279df1`、`96925a00dc3db32d34e0867f8143632ddee4869a3e086db3125dd36838f68ed8`。早期adb shell捕获多CRLF记录另存，未把文本换行失败说成主题内容错误。
+
+### 跨仓库改动与后续
+
+Android、canonical CSS、PC assets和嵌入helper已绑定同一0.1.6包。DeveloperCenter主题市场已部署和发布revision1，备份 `/home/dafeiyu/developer-center-backups/android-themes-20261013t211958z`，取回部署receipt、来源hash和回滚计划到 `qa/theme-market-deploy-20261014/`；没有替換TLS／数据库或发外部push。Connect／Aries本轮未新增协议、部署或改冻结pin；网页／文件／归档公网capability gate继续false。PC新Release DLL校验通过，不据此发布PC1.8.0或重启用户服务；各仓库原未提交改动保留。0.1.27已于上轮实际发布，下面历史“未公开”由完成receipt取代；0.1.28也已不可变发布，后续生产修改须进入0.1.29/code30，不能覆盖旧APK。
+
+共享提供商安全修复已纳0.1.28：编辑目录导入项保留隐藏字段，非官方API Key候选使用独立引用及持久化核验。官方DeepSeek／OAuth／云凭据的新增或替换尚未完成，生产仍在副作用前拒绝不支持路径。官方Key事务候选在 `qa/provider-transaction-next/` 获strict编译、41项合成事务／加密恢复及4项实际固定DSH helper验证，但尚未整合／设备验证；需补本机双vault、延后发布、反向同步门控与DYM删除往返，不能把候选当已完成。下一项主App修复为已签名、已下载APK的离线恢复入口，保留用户显式安装和所有身份／证书校验。
+
+## 上轮交付 · 材质实验台 1.0.0 / code1 · 2026-10-14
+
+用户当前优先要求独立材质调试 App，慢慢调满意后合并导出配置供主 App 应用。服务后端已暂时下线；**在用户通知恢复前，后端修改与接入只做本地测试，不连接、部署或发布至公网后端**。原移动端／PC 对齐目标仍 active，实验台交付不代表整个 parity 计划完成。主 App 保持 **0.1.27 / code28**，本轮只安装实验台。用户已明确授权配对并安装实验台到 PKB110；下面“真机本轮不推”仅描述上轮主 App，不能用来阻止本次实验台安装。
+
+### 实现与使用
+
+独立模块 `glass-lab`，正式身份 **`com.dafeiyu.mobile.glasslab`**，调试身份增加 `.dev`，桌面名称“材质实验台”。提供 **66 项数值滑条、15 项颜色**，主题按钮／圆形按钮／普通按钮／玻璃面板的浅色与暗色分别保存，共八组。共享生产玻璃渲染的13个指定源文件，通过默认null的 `GlassDebugTuning` 覆盖接线；不编入主 App 的账户、模型或运行环境。正式实验台无 INTERNET 权限，不接任何后端或付费模型。
+
+阴影、模糊、折射、色散、反射、高光、描边、表面透明度、图标混合、内容排版、按压／拖动／弹簧、粘连、纹理、内阴影、光泽及交互状态可真实调节。提供精确数值、单项／组／组件／全部重置、对照、放大、页面与双按钮场景、撤销／重做、命名方案及完整 JSON 保存／分享／复制／导入。主题切换同时改变系统状态栏与导航栏图标，避免暗色实验台沿用系统浅色图标设置。
+
+预览底图是按钮下面的背景：12种纯色、10种渐变、HSV饱和度／明度调色盘、色相条、RGBA和色码输入，独立于按钮表面颜色。用户选择后，切换主题或组件保持该底图；完整配置续存和导出均包含它。启动异步恢复完成前禁编辑，450ms合并自动保存、onStop入队及进程级串行writer防旧实例覆盖；同存储根的AtomicFile完整读写事务使用共享锁，保留损坏原件并支持last-good回退。尚未完成落盘前被系统强杀不能保证零丢失，不作该承诺。
+
+### 构建、离线与设备证据
+
+- 最终调试＋设备测试包＋Lint：`../Temp_Android/build-glass-lab-debug-final.log` **BUILD SUCCESSFUL，1m46s，76 tasks**；最终正式 `assembleRelease + lintRelease`：`build-glass-lab-release-final.log` **BUILD SUCCESSFUL，1m43s，56 tasks**，Lint **0错误／27警告**。共享生产源码的主 App Kotlin编译已在 `build-glass-lab-r8.log` 通过，本轮后续只修改实验台源码。构建输出全部先写G盘日志，整仓构建串行。
+- 真实数据／JSON／undo专项 `qa/material-lab-data-r4/report.json` **19/19 PASS**，包含所有参数边界、八组独立、完整导出、旧JSON兼容、全局底图及损坏字段拒绝。它不替代Android落盘或光学运行验证。
+- 实际 QA API37 专项 `qa/material-lab-device-final/` **15/15 PASS，OK(1)，13.721s**，覆盖UI滑条、精确输入、撤销／重做、两主题与系统栏、底图独立、真实AtomicFile及并发读写、命名方案、八组JSON、自动保存、AGSL全部66参数两端点、真实组件区域像素变化、双按钮按压／拖动／静止退场、四类型降级及Activity重建。主 Agent查看实际像素；真机视觉由用户验收。API30及API31–32降级尚未设备实测。
+- `qa/material-lab-export-r1/report-r2.json` **5/5 PASS**：真实系统SAF保存24425字节完整JSON、UI输入4.7dp、系统分享chooser实际文件、分享与保存内容一致、force-stop后PID4726→5183且文件及可见4.7dp保持。只打开分享chooser，未发送到任何接收方；CLI捕获增加CRLF，初次原始文本比较失败保留在report.json，统一换行后全文相等且无字段差异。
+- Shader静态声明／setter／正文使用核对 `qa/material-lab-render/uniforms.json` **61项／0缺失或多余**，两实际源hash与报告一致；AGSL运行时验证由上述设备专项提供。双按钮底图生产者与消费者分别独立graphicsLayer，修复静止重录；r5及最终专项Compose idle正常完成。此前Espresso反射、测试滑条点位、读取AtomicFile活动临时文件及Pair idle失败日志保留，不能引用旧报告冒称通过。
+
+最终正式 APK：`../Temp_Android/Dist/Dafeiyu-Glass-Lab-1.0.0.apk`，**19,765,483 bytes / SHA-256 `c5c03566f567c764aa7a9c2878584ae0d74ea6c576f4495469fa4cb76e3e5c5b`**。apksigner v2验证成功，RSA4096发行证书SHA-256 `d4341e66075d1e35909796cb5962b22f8aaed378ca50e057a1b25ed97fe0c64b`；非debuggable、min30／target35、无网络权限。证据在 `qa/material-lab-release-final/`。PKB110 **`192.168.5.201:43475`** 与 QA **`emulator-5558`** 均 `install -r` **Success／exit0**，PackageManager核对1.0.0/code1，保留数据、未代授权限、未操作真机UI。正式QA短启动／深浅色可见性另有截图与PID日志；真机渲染稳定性及最终用户效果 **待验收**。1.0.0尚未公开APK发布。
+
+### 跨仓库改动与接续
+
+本轮只修改Android仓库的实验台、共享渲染调参入口及需求／研究／说明／交接文档；PC、canonical CSS、Connect、Aries、DeveloperCenter未新增修改或部署。GitHub研究按7890代理审查固定QWEA0提交的README、源码与MIT，记录在 `docs/research/material-lab.md`；Fluent图标及三份许可证随实验台打包。发行私钥、临时QA文件及APK不进入公开源码。用户调满意后从右上角“方案与导出”保存或分享完整JSON；后续按文件应用正式App外观，继续parity剩余本地工作，公网恢复与完整VM确认点仍遵循用户边界。
+
+## 上轮主 App · 0.1.27 / code28 · 2026-10-13
 
 ### 当前接续：正式包 QA 主页面通过，真机本轮不推
 

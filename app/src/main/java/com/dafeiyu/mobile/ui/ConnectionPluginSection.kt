@@ -90,7 +90,7 @@ internal class ConnectionPluginUiState(
     val progressLabel: String get() = operation?.label ?: ConnectionPackageOperation.READ.label
 
     fun matches(query: String): Boolean = query.isBlank() ||
-        "大肥鱼连接插件 dafeiyu-go-connect 设备 同步 APK 内置 ${ConnectPluginHost.VERSION} ${currentVersion.orEmpty()}"
+        "Dafeiyu-GO连接插件 dafeiyu-go-connect 设备 同步 APK 内置 ${ConnectPluginHost.VERSION} ${currentVersion.orEmpty()}"
             .contains(query.trim(), ignoreCase = true)
 
     fun refresh() = perform(ConnectionPackageOperation.READ)
@@ -202,7 +202,7 @@ internal fun ConnectionPluginSection(state: ConnectionPluginUiState) {
             ) {
                 FishGlyph("link", Modifier.size(28.dp), colors.primary)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("大肥鱼连接插件", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Dafeiyu-GO 连接插件", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     Text("dafeiyu-go-connect", fontSize = 12.sp, color = colors.onSurfaceVariant)
                 }
             }

@@ -510,17 +510,18 @@ fun SettingsDetailScreen(route: String, repository: DemoRepository, onBack: () -
         // Titles must equal the source row titles on the settings home (title morph contract).
         "models" -> "模型" to "给每一种想法，选择合适的模型"
         "appearance" -> "个性化" to "一套界面，两种光线"
+        "themes" -> "主题" to "Dafeiyu-GO · 选择你的材质与色彩"
         "notifications" -> "通知" to "有需要的时候，再提醒你"
         "backup" -> "备份" to "把值得保留的内容，带在身边"
         "archive" -> "对话归档" to "整理对话，保留或彻底删除"
         "network" -> "下载源" to "选择适合你的线路"
         "online" -> "在线服务" to "连接手机、电脑与 Aries 服务"
         "server-metrics" -> "服务器" to "实时数据 · 每2秒更新"
-        "about" -> "关于" to "大肥鱼 Go · 随身的创作伙伴"
+        "about" -> "关于" to "Dafeiyu-GO · 随身的创作伙伴"
         "developer" -> "开发者" to "管理手机推荐与公开服务"
         "runtime" -> "虚拟机运行详情" to "查看实际运行环境与诊断"
-        "notice" -> "公告" to "来自大肥鱼的一封短信"
-        else -> "详情" to "大肥鱼 Go"
+        "notice" -> "公告" to "来自 Dafeiyu-GO 的一封短信"
+        else -> "详情" to "Dafeiyu-GO"
     }
     val scroll = rememberScrollState()
     val headerRange = with(LocalDensity.current) { 112.dp.toPx() }
@@ -544,7 +545,8 @@ fun SettingsDetailScreen(route: String, repository: DemoRepository, onBack: () -
                 "update" -> UpdateContent(repository, notify)
                 "feedback" -> MobileFeedbackContent(notify)
                 "models" -> ModelsContent(repository, notify)
-                "appearance" -> AppearanceContent(repository)
+                "appearance" -> AppearanceContent(repository) { displayedRoute = "themes" }
+                "themes" -> ThemesContent()
                 "notifications" -> NotificationsContent(repository, notify)
                 "backup" -> BackupContent(repository, notify)
                 "archive" -> ConversationArchiveContent(repository, notify)
@@ -640,9 +642,20 @@ private fun ModelsContent(repository: DemoRepository, notify: (String) -> Unit) 
 
 
 @Composable
-private fun AppearanceContent(repository: DemoRepository) {
+private fun AppearanceContent(repository: DemoRepository, onThemes: () -> Unit) {
     DetailCard {
-        Text("主题", style = MaterialTheme.typography.titleMedium)
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(onClick = onThemes)
+            .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            FishGlyph("sun", Modifier.size(23.dp), MaterialTheme.colorScheme.primary)
+            Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
+                Text("主题", style = MaterialTheme.typography.titleMedium)
+                Hint("${LocalAppThemeState.current?.activeTitle ?: "默认"} · 自定义与主题市场")
+            }
+            FishGlyph("chevron", Modifier.size(16.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    DetailCard {
+        Text("外观模式", style = MaterialTheme.typography.titleMedium)
         Column(Modifier.selectableGroup()) {
             SelectionRow("跟随系统", "随设备的浅色或深色模式变化", repository.themeMode == "system", "sun") { repository.updateThemeMode("system") }
             FishDivider()
@@ -654,6 +667,9 @@ private fun AppearanceContent(repository: DemoRepository) {
     DetailCard {
         Text("主题色", style = MaterialTheme.typography.titleMedium)
         Hint("用于按钮、选中状态和页面高光；选择会立即应用并保存")
+        if (LocalAppThemeState.current?.document != null) {
+            Hint("当前主题带有自定义颜色。下面的主题色会保留，恢复默认主题后使用。")
+        }
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1065,7 +1081,7 @@ private fun NetworkContent(repository: DemoRepository, notify: (String) -> Unit)
     val choices = listOf(
         Triple("official", "官方来源", "直接使用项目的官方下载地址"),
         Triple("cdn", "CDN 加速", "优先使用加速线路，失败时尝试官方来源"),
-        Triple("backend", "大肥鱼后端", "通过大肥鱼下载服务获取组件"),
+        Triple("backend", "Dafeiyu-GO 后端", "通过 Dafeiyu-GO 下载服务获取组件"),
     )
     DetailCard {
         Column(Modifier.selectableGroup()) {
@@ -1078,7 +1094,7 @@ private fun NetworkContent(repository: DemoRepository, notify: (String) -> Unit)
             }
         }
     }
-    Hint("下载源用于 Ubuntu 和开发工具组件；新下载使用当前选择，已开始的传输沿用原线路。CDN 线路可回退到官方来源，大肥鱼后端使用独立下载服务。")
+    Hint("下载源用于 Ubuntu 和开发工具组件；新下载使用当前选择，已开始的传输沿用原线路。CDN 线路可回退到官方来源，Dafeiyu-GO 后端使用独立下载服务。")
 }
 
 @Composable
@@ -1364,7 +1380,7 @@ private fun OnlineContent(repository: DemoRepository, notify: (String) -> Unit, 
         val choices = listOf(
             Triple("official", "官方来源", "直接使用项目的官方下载地址"),
             Triple("cdn", "CDN 加速", "优先使用加速线路，失败时尝试官方来源"),
-            Triple("backend", "大肥鱼后端", "通过大肥鱼下载服务获取组件"),
+            Triple("backend", "Dafeiyu-GO 后端", "通过 Dafeiyu-GO 下载服务获取组件"),
         )
         Column(Modifier.selectableGroup()) {
             choices.forEachIndexed { index, (value, title, subtitle) ->
@@ -1375,7 +1391,7 @@ private fun OnlineContent(repository: DemoRepository, notify: (String) -> Unit, 
                 if (index < choices.lastIndex) FishDivider()
             }
         }
-        Hint("下载源用于新组件下载，已开始的传输沿用原线路。CDN 可回退到官方来源；大肥鱼后端使用独立下载服务。")
+        Hint("下载源用于新组件下载，已开始的传输沿用原线路。CDN 可回退到官方来源；Dafeiyu-GO 后端使用独立下载服务。")
     }
 
     if (showPairingDialog) {
@@ -2453,7 +2469,7 @@ private fun UpdateContent(repository: DemoRepository, notify: (String) -> Unit) 
             horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             FishGlyph("app-icon", Modifier.size(54.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("大肥鱼 GO", style = MaterialTheme.typography.titleLarge)
+                Text("Dafeiyu-GO", style = MaterialTheme.typography.titleLarge)
                 Hint("当前版本 ${installedPackage.versionName}")
             }
         }
@@ -2494,7 +2510,7 @@ private fun UpdateContent(repository: DemoRepository, notify: (String) -> Unit) 
         }
     }
     DetailCard {
-        Text("保持大肥鱼 GO 最新", style = MaterialTheme.typography.titleLarge)
+        Text("保持 Dafeiyu-GO 最新", style = MaterialTheme.typography.titleLarge)
         Column(Modifier.selectableGroup()) {
             SelectionRow("自动下载", "有新版本时下载并校验，由你确认安装", policy == "auto", "download") { repository.updateUpdatePolicy("auto") }
             FishDivider()
@@ -2967,7 +2983,7 @@ private fun AboutContent(repository: DemoRepository, onDeveloper: () -> Unit) {
 
     DetailCard {
         FishGlyph("app-icon", Modifier.size(64.dp))
-        Text("大肥鱼 Go", style = MaterialTheme.typography.headlineMedium)
+        Text("Dafeiyu-GO", style = MaterialTheme.typography.headlineMedium)
         Text("把想法，带到更远的地方。", style = MaterialTheme.typography.bodyLarge)
         TextButton(onClick = {
             val now = android.os.SystemClock.elapsedRealtime()

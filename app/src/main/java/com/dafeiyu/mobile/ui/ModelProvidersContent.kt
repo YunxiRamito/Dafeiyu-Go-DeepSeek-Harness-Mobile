@@ -396,9 +396,7 @@ private fun ProviderEditor(existing: ModelProviderConfig?, catalog: List<Runtime
             scope.launch {
                 busy = true; failure = null
                 try {
-                    val config = ModelProviderConfig(id.trim(), name.trim(), builtinProvider = builtinId.trim().takeIf { builtin },
-                        api = api.takeUnless { builtin }, baseUrl = url.trim().takeUnless { builtin },
-                        modelsJson = if (builtin) "[]" else models, enabled = existing?.enabled ?: true).validated()
+                    val config = providerEditedConfiguration(existing, id, name, builtin, builtinId, api, url, models)
                     require(!config.protected) { "DeepSeek 官方使用专用 API Key 入口" }
                     val credential = providerCredential(apiKey, env, googleAdc, awsCredentials, awsConfig)
                     onSave(config, credential)
@@ -409,6 +407,22 @@ private fun ProviderEditor(existing: ModelProviderConfig?, catalog: List<Runtime
                 finally { busy = false }
             }
         }) { Text(if (busy) "保存中" else "保存") } }, dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("取消") } })
+}
+
+/** Editing a catalog-backed DSH import must retain its resolved overrides and
+ * route. Those fields are hidden by the catalog picker, not reset by it. A null
+ * credential passed to onSave likewise keeps the existing vault authentication. */
+internal fun providerEditedConfiguration(existing: ModelProviderConfig?, id: String, name: String, builtin: Boolean,
+    builtinId: String, api: String, url: String, models: String): ModelProviderConfig {
+    val original = existing ?: ModelProviderConfig(id.trim(), name.trim())
+    require(existing == null || id.trim() == existing.id) { "提供商 ID 不可在编辑时修改" }
+    return original.copy(
+        name = name.trim(),
+        builtinProvider = builtinId.trim().takeIf { builtin },
+        api = if (builtin) original.api else api,
+        baseUrl = if (builtin) original.baseUrl else url.trim(),
+        modelsJson = if (builtin) original.modelsJson else models,
+    ).validated()
 }
 
 internal fun providerCredential(key: String, env: String, googleAdc: String, awsCredentials: String, awsConfig: String): JSONObject? {

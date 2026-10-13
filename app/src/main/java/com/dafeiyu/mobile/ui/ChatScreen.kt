@@ -720,7 +720,7 @@ private fun ChatMessageRow(message: ChatMessage, repository: DemoRepository, onQ
     }
     val exportReply: (() -> Unit)? = if (!user && complete && responseText.isNotBlank()) ({
         choosingResponseLocation = true
-        try { responseExport.launch("大肥鱼回复-${message.id}.txt") }
+        try { responseExport.launch("Dafeiyu-GO-回复-${message.id}.txt") }
         catch (_: Exception) {
             choosingResponseLocation = false
             repository.updateNotice("无法打开保存选择器，请重试")
@@ -730,7 +730,7 @@ private fun ChatMessageRow(message: ChatMessage, repository: DemoRepository, onQ
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (!user) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FishGlyph("deepseek", Modifier.width(24.dp).height(18.dp))
-            Text("大肥鱼", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurfaceVariant)
+            Text("Dafeiyu-GO", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.onSurfaceVariant)
         }
         if (!user) message.streamSnapshot?.let { snapshot ->
             val retryScope = rememberCoroutineScope()

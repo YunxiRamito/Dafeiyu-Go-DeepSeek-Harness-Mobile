@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 
 const name = 'dafeiyu-mobile-ui';
-const version = '0.1.5';
+const version = '0.1.6';
 const pinnedDsh = '0.2.1-alpha.1';
 const check = (value, code) => { if (!value) throw new Error(code); };
 const missing = error => { if (error.code === 'ENOENT') return null; throw error; };

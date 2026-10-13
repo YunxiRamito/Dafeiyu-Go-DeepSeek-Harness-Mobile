@@ -2,6 +2,7 @@ package com.dafeiyu.mobile.ui
 
 import android.net.Uri
 import android.webkit.WebView
+import com.dafeiyu.mobile.data.ThemeDocuments
 import androidx.webkit.JavaScriptReplyProxy
 import androidx.webkit.ScriptHandler
 import androidx.webkit.WebMessageCompat
@@ -25,13 +26,16 @@ import org.json.JSONObject
 
 /** Display preferences are application-owned; this signal grants no task authority. */
 internal data class DshWebClientContext(val mode: String, val theme: String,
-    val material: Boolean, val motion: Boolean) {
+    val material: Boolean, val motion: Boolean, val materialTheme: String? = null) {
+    private val validatedMaterialTheme = materialTheme?.let { ThemeDocuments.validateMaterialContext(it).toString() }
     init {
         require(mode in setOf("local", "online") && theme in setOf("system", "light", "dark"))
+        require(materialTheme == null || materialTheme.toByteArray(Charsets.UTF_8).size <= 128 * 1024)
     }
     fun toJson(): JSONObject = JSONObject().put("version", 1).put("platform", "android")
         .put("surface", "mobile").put("mode", mode).put("theme", theme)
         .put("material", material).put("motion", motion)
+        .apply { validatedMaterialTheme?.let { put("materialTheme", JSONObject(it)) } }
 }
 
 /** Fixed application routes only. A missing callback never advertises a capability. */

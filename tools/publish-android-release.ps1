@@ -16,7 +16,7 @@ $env:TEMP = $evidence
 $env:TMP = $evidence
 $source = [IO.Path]::GetFullPath($ReleaseDirectory)
 if (!$source.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or
-    (Split-Path $source -Leaf) -ne '0.1.27') { throw 'Use the fixed 0.1.27 release prepared under Temp_Android.' }
+    (Split-Path $source -Leaf) -ne '0.1.28') { throw 'Use the fixed 0.1.28 release prepared under Temp_Android.' }
 if (!(Test-Path -LiteralPath $source -PathType Container)) { throw 'Prepared release is missing.' }
 $files = @('app.apk', 'manifest.json', 'manifest.sig')
 $children = @(Get-ChildItem -LiteralPath $source -Force)
@@ -27,14 +27,14 @@ $manifest = Get-Content -LiteralPath (Join-Path $source 'manifest.json') -Raw -E
 $apk = Join-Path $source 'app.apk'
 $digest = (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant()
 $size = (Get-Item -LiteralPath $apk).Length
-if ($manifest.version -ne '0.1.27' -or $manifest.versionCode -ne 28 -or $manifest.channel -ne 'stable' -or
+if ($manifest.version -ne '0.1.28' -or $manifest.versionCode -ne 29 -or $manifest.channel -ne 'stable' -or
     $manifest.packageName -ne 'com.dafeiyu.mobile' -or $manifest.buildType -ne 'release' -or
     $manifest.signingCertificateSha256 -ne 'd4341e66075d1e35909796cb5962b22f8aaed378ca50e057a1b25ed97fe0c64b' -or
     $manifest.sha256 -cne $digest -or $manifest.byteSize -ne $size) { throw 'Fixed formal release identity differs from APK bytes.' }
 $helper = Join-Path $PSScriptRoot 'android-release-helper.sh'
 $helperHash = (Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash.ToLowerInvariant()
 $receipt = [ordered]@{
-    schema = 1; version = '0.1.27'; code = 28; channel = 'stable'; package = 'com.dafeiyu.mobile'
+    schema = 1; version = '0.1.28'; code = 29; channel = 'stable'; package = 'com.dafeiyu.mobile'
     sha256 = $digest; bytes = $size; helperSha256 = $helperHash
     sourceFiles = @($files | ForEach-Object {
         [ordered]@{ name = $_; sha256 = (Get-FileHash -LiteralPath (Join-Path $source $_) -Algorithm SHA256).Hash.ToLowerInvariant() }
@@ -87,10 +87,10 @@ $receipt.remoteStage = $stage
 Save-Receipt
 # Paths contain only validated fixed segments. A new source parent is mandatory;
 # no release path or current pointer is written by this upload step.
-$prepareCommand = "set -eu; umask 077; test ! -e '$stage'; test ! -L '$stage'; mkdir '$stage'; mkdir '$stage/0.1.27'"
+$prepareCommand = "set -eu; umask 077; test ! -e '$stage'; test ! -L '$stage'; mkdir '$stage'; mkdir '$stage/0.1.28'"
 Invoke-Process $ssh ($sshArgs + @($hostTarget, $prepareCommand)) 'prepare-unique-source'
 foreach ($file in $files) {
-    Invoke-Process $scp ($scpArgs + @((Join-Path $source $file), ($hostTarget + ':' + $stage + '/0.1.27/' + $file))) `
+    Invoke-Process $scp ($scpArgs + @((Join-Path $source $file), ($hostTarget + ':' + $stage + '/0.1.28/' + $file))) `
         ('upload-' + $file.Replace('.', '-')) '' 600000
 }
 foreach ($phase in @('verify-source', 'deploy', 'verify-deployed', 'publish')) {

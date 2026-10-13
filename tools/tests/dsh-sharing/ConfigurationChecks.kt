@@ -117,13 +117,20 @@ fun main() = runBlocking {
             .put(JSONObject().put("id", "unexpected-model")) }
         refuses { DshSharedConfigurationMapping.verifyMutation(namespace(appended, stored), operations) }
     }
-    test("credential cleanup preserves external reference names and only clears app-generated owned refs") {
+    test("post-CAS cleanup preserves external reference names and only clears unreferenced app refs") {
         val managed = state(direct).put("dshSync", DshSharedConfigurationMapping.syncReceipt(listOf(custom.id)))
-        val updates = DshSharedConfigurationMapping.credentialUpdates(managed, JSONObject().put("providers", JSONObject()), "OFFICIAL_REF", ns)
+        val doc = JSONObject().put("revision", "a".repeat(64)).put("refs", JSONObject().put("EXISTING_REF", "OFFLINE_KEY"))
+            .put("records", JSONObject().put("llm-pi-ai/${custom.id}", JSONObject().put("kind", "api-key").put("key", "OFFLINE_KEY")))
+        fun described(value: JSONObject) = JSONObject().put("namespaces", JSONArray().put(value).put(JSONObject().put("ns", "llm-deepseek-api-key")
+            .put("value", JSONObject().put("apiKeyEnv", "OFFICIAL_REF"))))
+        val plan = DshSharedConfigurationMapping.credentialPublication(managed, JSONObject().put("providers", JSONObject()), described(ns), doc)
+        val updates = DshSharedConfigurationMapping.retiredCredentialUpdates(plan, described(namespace(JSONObject())), doc)
         check(updates.getJSONArray("refs").length() == 0)
         check(updates.getJSONArray("records").getJSONObject(0).isNull("record"))
         val appRef = namespace(JSONObject().put(custom.id, JSONObject().put("apiKeyEnv", "DAFEIYU_PROVIDER_OFFLINE_CUSTOM")))
-        val cleanup = DshSharedConfigurationMapping.credentialUpdates(managed, JSONObject().put("providers", JSONObject()), "OFFICIAL_REF", appRef)
+        doc.getJSONObject("refs").put("DAFEIYU_PROVIDER_OFFLINE_CUSTOM", "OFFLINE_KEY")
+        val owned = DshSharedConfigurationMapping.credentialPublication(managed, JSONObject().put("providers", JSONObject()), described(appRef), doc)
+        val cleanup = DshSharedConfigurationMapping.retiredCredentialUpdates(owned, described(namespace(JSONObject())), doc)
         check(cleanup.getJSONArray("refs").getJSONObject(0).isNull("value"))
     }
     test("catalog order follows launcher vault and keeps unrecognized groups stable") {
@@ -186,5 +193,6 @@ fun main() = runBlocking {
         check(previous == authorizationRequests && apiRequests == 4); checks++
         println("PASS arbitrary endpoints and remote/malformed URLs refused before network access")
     } finally { server.stop(0) }
-    println("Shared configuration: $checks PASS; JVM loopback/mapper fixtures, no Android Keystore or model request.")
+    checks += providerTransactionChecks()
+    println("Shared configuration: $checks PASS; JVM loopback/mapper/transaction fixtures, no Android Keystore or model request.")
 }

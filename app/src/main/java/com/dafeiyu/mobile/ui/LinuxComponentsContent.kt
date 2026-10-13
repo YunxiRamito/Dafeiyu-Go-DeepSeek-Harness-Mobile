@@ -61,7 +61,7 @@ import kotlin.math.roundToInt
 
 internal fun componentDownloadSourceLabel(source: String): String = when (source) {
     "official" -> "官方来源"
-    "backend" -> "大肥鱼后端"
+    "backend" -> "Dafeiyu-GO 后端"
     else -> "CDN 加速"
 }
 

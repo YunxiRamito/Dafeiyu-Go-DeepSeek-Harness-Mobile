@@ -9,11 +9,13 @@ package com.dafeiyu.mobile.ui.components
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,8 +28,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -67,6 +73,7 @@ class GlassButtonDeformationState internal constructor() {
     var touchPosition by mutableStateOf(Offset.Zero)
         internal set
     internal var visualFrame by mutableStateOf(GlassButtonVisualFrame())
+    internal var circularHit by mutableStateOf(false)
     val interactionStrength: Float get() = if (pressed) 1f else 0f
 
     internal fun reset() {
@@ -130,20 +137,37 @@ fun Modifier.applyButtonDeformation(
     circularHit: Boolean = false,
     consumeDrag: Boolean = true,
     drawShadow: Boolean = true,
+    shadowShape: Shape? = null,
+    styleType: String? = null,
 ): Modifier = composed {
+    val scopeStyle = LocalGlassThemeStyle.current ?: LocalGlassThemeStyles.current?.style(
+        styleType ?: if (circularHit) "circle" else "regular",
+        MaterialTheme.colorScheme.background.luminance() < .5f,
+    )
+    val debugValue = LocalGlassDebugTuning.current ?: scopeStyle?.tuning
+    val debug = remember(debugValue) { debugValue?.sanitized() }
+    val buttonShadowShape = shadowShape ?: scopeStyle?.roundness?.takeIf { it.isFinite() }?.let {
+        RoundedCornerShape(CornerSize(it.coerceIn(0f, 1f) * 50f))
+    } ?: if (circularHit) CircleShape else RoundedCornerShape(24.dp)
     val deformation = state ?: rememberGlassButtonDeformationState()
+    SideEffect { deformation.circularHit = circularHit }
     DisposableEffect(deformation, enabled) {
         if (!enabled) deformation.visualFrame = GlassButtonVisualFrame()
         onDispose { deformation.visualFrame = GlassButtonVisualFrame() }
     }
     if (!enabled) return@composed this.then(if (drawShadow && (circularHit || state != null))
-        Modifier.glassButtonShadow(if (circularHit) CircleShape else RoundedCornerShape(24.dp)) else Modifier)
-    val reduceMotion = LocalReduceGlassMotion.current
+        Modifier.glassButtonShadow(buttonShadowShape, debug) else Modifier)
+    val reduceMotion = LocalReduceGlassMotion.current || scopeStyle?.motionEnabled == false
     // Geometry (scale/stretch/offset) is off when motion is reduced or the spring setting is off.
-    val noSpring = reduceMotion || !LocalGlassButtonSpring.current
+    val noSpring = reduceMotion || !LocalGlassButtonSpring.current || scopeStyle?.springEnabled == false
     val density = LocalDensity.current
     val haptics by rememberUpdatedState(LocalGlassHaptics.current)
-    val translationLimit = with(density) { 6.dp.toPx() }
+    val translationLimit = with(density) { (debug?.dragDistanceDp ?: 6f).dp.toPx() }
+    val pressScale = debug?.pressScale ?: glassButtonPressScale(true, circularHit, false)
+    val pressMillis = debug?.pressMillis?.toInt() ?: GlassMotion.PressMillis
+    val releaseMillis = debug?.releaseMillis?.toInt() ?: GlassMotion.ReleaseMillis
+    val stretch = debug?.dragStretch ?: .045f
+    val compression = debug?.dragCompression ?: .018f
     val delta = deformation.delta
     val distance = sqrt(delta.x * delta.x + delta.y * delta.y)
     val intensity = (distance / with(density) { 52.dp.toPx() }).coerceIn(0f, 1f)
@@ -151,30 +175,40 @@ fun Modifier.applyButtonDeformation(
     val directionY = if (distance > .01f) abs(delta.y) / distance else 0f
     val pressProgress = animateFloatAsState(
         if (deformation.pressed && !reduceMotion) 1f else 0f,
-        GlassMotion.scalar(if (deformation.pressed) GlassMotion.PressMillis else GlassMotion.ReleaseMillis, reduceMotion),
+        GlassMotion.scalar(if (deformation.pressed) pressMillis else releaseMillis, reduceMotion),
         label = "glassButtonPress",
     )
+    // Optical pressure fades monotonically; geometry may bounce. Lab can tune the physical release
+    // without making highlights flash or changing the original production animation (null tuning).
+    val geometryProgress = if (debug == null) pressProgress else animateFloatAsState(
+        if (deformation.pressed && !noSpring) 1f else 0f,
+        if (noSpring) snap() else if (deformation.pressed) GlassMotion.scalar(pressMillis)
+            else spring(dampingRatio = debug.springDamping, stiffness = debug.springStiffness),
+        label = "glassButtonGeometryPress",
+    )
     val releaseSpec: FiniteAnimationSpec<Float> = if (noSpring || deformation.dragging) snap()
-        else GlassMotion.scalar()
+        else if (debug != null) spring(dampingRatio = debug.springDamping, stiffness = debug.springStiffness)
+        else GlassMotion.scalar(releaseMillis)
     val stretchX = animateFloatAsState(
-        if (noSpring) 1f else 1f + directionX * intensity * .045f - directionY * intensity * .018f,
+        if (noSpring) 1f else 1f + directionX * intensity * stretch - directionY * intensity * compression,
         releaseSpec, label = "glassButtonStretchX",
     )
     val stretchY = animateFloatAsState(
-        if (noSpring) 1f else 1f + directionY * intensity * .045f - directionX * intensity * .018f,
+        if (noSpring) 1f else 1f + directionY * intensity * stretch - directionX * intensity * compression,
         releaseSpec, label = "glassButtonStretchY",
     )
-    val resisted = GlassMotion.radialResistance(delta, translationLimit)
+    val resisted = GlassMotion.radialResistance(delta * (debug?.dragResistance ?: 1f), translationLimit)
     val offsetX = animateFloatAsState(if (noSpring) 0f else resisted.x, releaseSpec, label = "glassButtonOffsetX")
-    val offsetY = animateFloatAsState(if (noSpring) 0f else resisted.y, releaseSpec, label = "glassButtonOffsetY")
-    LaunchedEffect(deformation, reduceMotion, noSpring, circularHit, pressProgress, stretchX, stretchY, offsetX, offsetY) {
+    val lift = if (debug?.pressEffect == "lift" && deformation.pressed && !noSpring) with(density) { 3.dp.toPx() } else 0f
+    val offsetY = animateFloatAsState(if (noSpring) 0f else resisted.y - lift, releaseSpec, label = "glassButtonOffsetY")
+    LaunchedEffect(deformation, reduceMotion, noSpring, circularHit, pressScale, pressProgress, geometryProgress, stretchX, stretchY, offsetX, offsetY) {
         // Observe only animation inputs, never the published frame, so publication cannot feed back.
         snapshotFlow {
             if (reduceMotion) {
                 GlassButtonVisualFrame()
             } else {
                 val press = pressProgress.value
-                val scale = if (noSpring) 1f else 1f + (glassButtonPressScale(true, circularHit, false) - 1f) * press
+                val scale = if (noSpring) 1f else (1f + (pressScale - 1f) * geometryProgress.value).coerceIn(.25f, 2f)
                 GlassButtonVisualFrame(
                     scaleX = scale * stretchX.value,
                     scaleY = scale * stretchY.value,
@@ -244,7 +278,7 @@ fun Modifier.applyButtonDeformation(
             translationY = frame.translation.y
         }
         .then(if (drawShadow && (circularHit || state != null))
-            Modifier.glassButtonShadow(if (circularHit) CircleShape else RoundedCornerShape(24.dp)) else Modifier)
+            Modifier.glassButtonShadow(buttonShadowShape, debug) { deformation.visualFrame.opticalPress } else Modifier)
 }
 
 

@@ -117,7 +117,7 @@ internal class DshMobileUiPackage(context: Context) {
     private fun ByteArray.toHex() = joinToString("") { "%02x".format(it) }
 
     companion object {
-        const val VERSION = "0.1.5"
+        const val VERSION = "0.1.6"
         private const val MAX_ARCHIVE = 1024 * 1024
         private const val MAX_EXPANDED = 2L * 1024 * 1024
         private val locks = ConcurrentHashMap<String, Mutex>()

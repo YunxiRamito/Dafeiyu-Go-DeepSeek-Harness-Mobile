@@ -8,7 +8,10 @@ package com.dafeiyu.mobile.ui.components
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.LinearGradient
+import android.graphics.RadialGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
@@ -30,6 +33,7 @@ import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalRippleConfiguration
@@ -64,6 +68,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -168,6 +173,7 @@ fun GlassSurface(
     dragState: GlassDragState = rememberGlassDragState(),
     drawMaterial: Boolean = true,
     materialProfile: GlassMaterialProfile = LocalGlassMaterialProfile.current,
+    styleType: String? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val density = LocalDensity.current
@@ -175,44 +181,73 @@ fun GlassSurface(
     val profile = if (providedProfile == GlassMaterialProfile.Standard && buttonDeformation != null) GlassMaterialProfile.Button else providedProfile
     val buttonStyle = profile.buttonStyle
     val darkTheme = MaterialTheme.colorScheme.background.luminance() < .5f
-    val materialTint = profile.materialTint(tint, darkTheme)
-    val radiusPx = with(density) { cornerRadius.toPx() }
+    val explicitDebug = LocalGlassDebugTuning.current.takeIf { LocalGlassThemeStyle.current == null }
+    val themeType = glassThemeType(profile, tint, buttonDeformation?.circularHit == true, buttonDeformation != null, styleType)
+    val themeStyle = if (explicitDebug != null) null else LocalGlassThemeStyles.current?.style(themeType, darkTheme)
+    val debugValue = explicitDebug ?: themeStyle?.tuning
+    val debug = remember(debugValue) { debugValue?.sanitized() }
+    val materialTint = themeStyle?.surfaceTint ?: if (debug == null) profile.materialTint(tint, darkTheme) else tint
+    val pageCapture = LocalPageGlassBackdrop.current
+    val transparencyReduced = reduceTransparency || themeStyle?.glassEnabled == false
+    val roundness = themeStyle?.roundness?.takeIf { it.isFinite() }?.coerceIn(0f, 1f)
+    var measuredSize by remember { mutableStateOf(IntSize.Zero) }
+    val surfaceShape = remember(roundness, cornerRadius) {
+        if (roundness == null) RoundedCornerShape(cornerRadius) else RoundedCornerShape(CornerSize(roundness * 50f))
+    }
+    val blurDp = debug?.blurDp ?: profile.blurDp
+    val dimAmount = debug?.dimAmount ?: profile.dimAmount
+    val radiusPx = if (roundness == null) with(density) { cornerRadius.toPx() }
+        else min(measuredSize.width, measuredSize.height) * .5f * roundness
     val gripHeight = with(density) { 18.dp.toPx() }
-    val maxX = with(density) { 24.dp.toPx() }
-    val maxY = with(density) { 40.dp.toPx() }
+    val maxX = with(density) { (debug?.dragDistanceDp?.coerceAtLeast(.001f) ?: 24f).dp.toPx() }
+    val maxY = with(density) { (debug?.dragDistanceDp?.coerceAtLeast(.001f) ?: 40f).dp.toPx() }
     val opaqueColor = profile.opaqueMaterial(materialTint, MaterialTheme.colorScheme.surface).toArgb()
-    val reduceMotion = LocalReduceGlassMotion.current
+    val reduceMotion = LocalReduceGlassMotion.current || themeStyle?.motionEnabled == false
+    val springEnabled = LocalGlassButtonSpring.current && themeStyle?.springEnabled != false
     val scope = rememberCoroutineScope()
+    val panelMotionReduced = reduceMotion || (debug != null && !springEnabled)
     // Material and foreground read the same published animation frame, just like the pair lens.
     val opticalPress = if (reduceMotion) 0f else buttonDeformation?.visualFrame?.opticalPress ?: 0f
-    val dragOffset = if (draggable) dragState.offset else androidx.compose.ui.geometry.Offset.Zero
+    val dragOffset = if (draggable) {
+        if (debug == null) dragState.offset else if (panelMotionReduced) Offset.Zero else GlassMotion.radialResistance(
+            dragState.offset * debug.dragResistance, debug.dragDistanceDp * density.density,
+        )
+    } else androidx.compose.ui.geometry.Offset.Zero
     val pressedScale by animateFloatAsState(
-        targetValue = if (draggable && dragState.active && !reduceMotion) 1.015f else 1f,
-        animationSpec = GlassMotion.scalar(180, reduceMotion),
+        targetValue = if (draggable && dragState.active && !panelMotionReduced) debug?.pressScale ?: 1.015f else 1f,
+        animationSpec = GlassMotion.scalar(debug?.let { if (dragState.active) it.pressMillis.toInt() else it.releaseMillis.toInt() } ?: 180, reduceMotion),
         label = "glassGripScale",
     )
+    CompositionLocalProvider(LocalGlassThemeStyle provides themeStyle, LocalGlassDebugTuning provides debug,
+        LocalReduceGlassTransparency provides transparencyReduced, LocalReduceGlassMotion provides reduceMotion,
+        LocalGlassButtonSpring provides springEnabled) {
     Box(
         modifier
+            .onSizeChanged { measuredSize = it }
             .graphicsLayer {
                 translationX = dragOffset.x
                 translationY = dragOffset.y
                 scaleX = pressedScale
                 scaleY = pressedScale
-                rotationY = if (reduceMotion) 0f else dragOffset.x / maxX * 2f
+                rotationY = if (panelMotionReduced) 0f else dragOffset.x / maxX * 2f
                 cameraDistance = 16f * density.density
             }
             .then(if (drawMaterial && buttonStyle && buttonDeformation == null)
-                Modifier.glassButtonShadow(RoundedCornerShape(cornerRadius)) else Modifier)
-            .clip(RoundedCornerShape(cornerRadius))
-            .glassPanelDrag(draggable, dragState, scope, gripHeight, maxX, maxY, reduceMotion),
+                Modifier.glassButtonShadow(surfaceShape, debug) else Modifier)
+            .clip(surfaceShape)
+            .glassPanelDrag(draggable, dragState, scope, gripHeight, maxX, maxY, panelMotionReduced),
     ) {
         if (drawMaterial) {
-            val pageCapture = LocalPageGlassBackdrop.current
-            if (reduceTransparency) {
+            // Only the sampled material fades. Text/icons, hit geometry and accessibility stay intact.
+            val materialModifier = Modifier.matchParentSize().then(
+                if (debug != null && !transparencyReduced) Modifier.graphicsLayer { alpha = debug.surfaceAlpha }
+                else Modifier,
+            )
+            if (transparencyReduced) {
                 // Reduced transparency / liquid glass off: opaque theme surface plus a hairline so the
                 // control stays separable from same-coloured pages. No sampling, blur or shader.
                 val edgeColor = glassReducedEdgeColor(darkTheme)
-                Box(Modifier.matchParentSize().drawWithCache {
+                Box(materialModifier.drawWithCache {
                     val stroke = Stroke(1.dp.toPx())
                     val inset = stroke.width / 2f
                     val corner = CornerRadius((radiusPx - inset).coerceAtLeast(0f))
@@ -225,39 +260,53 @@ fun GlassSurface(
                     }
                 })
             } else if (pageCapture != null) {
-                LivePageGlassMaterial(pageCapture, Modifier.matchParentSize(), radiusPx,
-                    materialTint, opticalPress, buttonDeformation?.touchPosition, reduceMotion, profile)
+                LivePageGlassMaterial(pageCapture, materialModifier, radiusPx,
+                    materialTint, opticalPress, buttonDeformation?.touchPosition, reduceMotion, profile, debug)
             } else AndroidView(
                 factory = { GlassDrawingView(it) },
-                modifier = Modifier.matchParentSize(),
+                modifier = materialModifier,
                 update = { view ->
-                    view.configure(backdrop, radiusPx, materialTint.toArgb(), opaqueColor, reduceTransparency, reduceMotion, if (buttonDeformation != null) opticalPress else if (draggable) dragState.interactionStrength else 0f,
-                        buttonDeformation?.touchPosition?.x ?: -1f, buttonDeformation?.touchPosition?.y ?: -1f, profile.blurDp, buttonStyle, darkTheme, profile.dimAmount, profile.useRefraction, profile.useHighlights, profile == GlassMaterialProfile.SidebarPanel)
+                    view.configure(backdrop, radiusPx, materialTint.toArgb(), opaqueColor, transparencyReduced, reduceMotion, if (buttonDeformation != null) opticalPress else if (draggable) dragState.interactionStrength else 0f,
+                        buttonDeformation?.touchPosition?.x ?: -1f, buttonDeformation?.touchPosition?.y ?: -1f, blurDp, buttonStyle, darkTheme, dimAmount, profile.useRefraction, profile.useHighlights || debug != null, profile == GlassMaterialProfile.SidebarPanel, debug)
                 },
             )
         }
-        if (drawMaterial && buttonStyle && !reduceTransparency && !reduceMotion && opticalPress > 0f &&
+        if (drawMaterial && buttonStyle && pageCapture == null && !transparencyReduced && !reduceMotion && opticalPress > 0f &&
             (Build.VERSION.SDK_INT < 33 || !profile.useRefraction)) {
             // Touch glow: brush is built once per size (drawWithCache); per frame only the translation
             // and alpha change. The parent clip keeps the glow inside the button outline.
             Box(Modifier.matchParentSize().drawWithCache {
-                val glowRadius = maxOf(size.width, size.height).coerceAtLeast(1f) * .65f
+                val glowRadius = debug?.trackingLightWidthDp?.times(density.density)
+                    ?: maxOf(size.width, size.height).coerceAtLeast(1f) * .65f
                 val mid = Offset(size.width / 2f, size.height / 2f)
-                val glow = Brush.radialGradient(listOf(Color.White.copy(alpha = .18f), Color.Transparent),
-                    center = mid, radius = glowRadius)
+                val glowColor = debug?.trackingLightColor ?: Color.White
+                val glowAlpha = (.18f * (debug?.highlightStrength ?: 1f) * (debug?.trackingLightIntensity ?: 1f) *
+                    glowColor.alpha * (debug?.surfaceAlpha ?: 1f)).coerceIn(0f, 1f)
+                val glow = Brush.radialGradient(listOf(glowColor.copy(alpha = glowAlpha), Color.Transparent),
+                    center = mid, radius = glowRadius.coerceAtLeast(.001f))
+                val light = glassDebugLightDirection(debug)
+                val beam = Brush.linearGradient(listOf(Color.Transparent, glowColor.copy(alpha = glowAlpha), Color.Transparent),
+                    mid - light * glowRadius, mid + light * glowRadius)
                 onDrawBehind {
+                    if (debug?.pressEffect == "none" || debug?.pressEffect == "lift") return@onDrawBehind
+                    if (debug?.pressEffect == "darken") {
+                        drawRect(Color.Black, alpha = debug.pressDarken * opticalPress)
+                        return@onDrawBehind
+                    }
                     val center = glassGlowCenter(buttonDeformation?.touchPosition ?: Offset(size.width / 2f, size.height / 2f),
                         size.width, size.height)
                     // Gradient is anchored at the layout centre; translate shifts it onto the touch point.
                     translate(center.x - mid.x, center.y - mid.y) {
-                        drawRect(glow, topLeft = Offset(mid.x - glowRadius, mid.y - glowRadius),
+                        if (debug?.pressEffect == "beam") drawRect(beam,
+                            topLeft = Offset(-center.x + mid.x, -center.y + mid.y), size = size, alpha = opticalPress.coerceIn(0f, 1f))
+                        else drawRect(glow, topLeft = Offset(mid.x - glowRadius, mid.y - glowRadius),
                             size = Size(glowRadius * 2f, glowRadius * 2f), alpha = opticalPress.coerceIn(0f, 1f))
                     }
                 }
             })
         }
         GlassInteractionProvider {
-            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            CompositionLocalProvider(LocalContentColor provides (themeStyle?.contentColor ?: MaterialTheme.colorScheme.onSurface)) {
                 if (draggable) {
                     Box(Modifier.padding(top = 18.dp), content = content)
                     Box(
@@ -269,6 +318,7 @@ fun GlassSurface(
                 }
             }
         }
+    }
     }
 }
 
@@ -290,7 +340,7 @@ private class BackdropTextureView @JvmOverloads constructor(
 }
 private interface BackdropRenderer {
     val refractionActive: Boolean
-    fun prepare(width: Int, height: Int, radius: Float, tint: Int, density: Float, reducedMotion: Boolean, interaction: Float, touchX: Float, touchY: Float, blurDp: Float, buttonStyle: Boolean, darkTheme: Boolean, dimAmount: Float, useRefraction: Boolean, quietPanel: Boolean)
+    fun prepare(width: Int, height: Int, radius: Float, tint: Int, density: Float, reducedMotion: Boolean, interaction: Float, touchX: Float, touchY: Float, blurDp: Float, buttonStyle: Boolean, darkTheme: Boolean, dimAmount: Float, useRefraction: Boolean, quietPanel: Boolean, tuning: GlassDebugTuning?)
     fun draw(canvas: Canvas, source: View, dx: Float, dy: Float, width: Int, height: Int): Boolean
 }
 
@@ -336,8 +386,25 @@ private class GlassDrawingView(context: Context) : View(context) {
     private var rimWidth = -1
     private var rimHeight = -1
     private var rimAppearance: GlassEdgeAppearance? = null
-    fun configure(state: GlassBackdropState?, radius: Float, tint: Int, opaque: Int, reduced: Boolean, motion: Boolean, interactionStrength: Float = 0f, touchX: Float = -1f, touchY: Float = -1f, blurDp: Float = 3.5f, buttonStyle: Boolean = false, darkTheme: Boolean = false, dimAmount: Float = 0f, useRefraction: Boolean = true, useHighlights: Boolean = false, quietPanel: Boolean = false) {
+    private var debug: GlassDebugTuning? = null
+    private var fallbackColorFilter: ColorMatrixColorFilter? = null
+    private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val pressPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var pressGlow: RadialGradient? = null
+    private var pressBeam: LinearGradient? = null
+    private var pressShaderWidth = -1
+    private var pressShaderHeight = -1
+    private var pressShaderTuning: GlassDebugTuning? = null
+    fun configure(state: GlassBackdropState?, radius: Float, tint: Int, opaque: Int, reduced: Boolean, motion: Boolean, interactionStrength: Float = 0f, touchX: Float = -1f, touchY: Float = -1f, blurDp: Float = 3.5f, buttonStyle: Boolean = false, darkTheme: Boolean = false, dimAmount: Float = 0f, useRefraction: Boolean = true, useHighlights: Boolean = false, quietPanel: Boolean = false, tuning: GlassDebugTuning? = null) {
         if (backdrop !== state) { backdrop?.unregister(this); backdrop = state; state?.register(this) }
+        if (debug != tuning) {
+            debug = tuning
+            highlightWidth = -1
+            rimWidth = -1
+            fallbackColorFilter = tuning?.let {
+                ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(it.saturation) })
+            }
+        }
         if (this.buttonStyle != buttonStyle || this.darkTheme != darkTheme) highlightWidth = -1
         this.radius = radius; this.tint = tint; this.opaque = opaque; this.reduced = reduced; reducedMotion = motion; interaction = interactionStrength.coerceIn(0f, 1f); this.touchX = touchX; this.touchY = touchY; this.blurDp = blurDp; this.buttonStyle = buttonStyle; this.darkTheme = darkTheme; this.dimAmount = dimAmount.coerceIn(0f, 1f); this.useRefraction = useRefraction
         if (this.useHighlights != useHighlights) highlightWidth = -1
@@ -345,6 +412,7 @@ private class GlassDrawingView(context: Context) : View(context) {
         this.quietPanel = quietPanel
         if (reduced || state == null) releaseBitmapBackdrop()
         updateHighlightShader()
+        updatePressShaders()
         prepareRenderer()
         invalidate()
     }
@@ -352,12 +420,13 @@ private class GlassDrawingView(context: Context) : View(context) {
         if (width <= 0 || height <= 0 || rendererFailed) return
         try {
             renderer?.prepare(width, height, radius.coerceIn(0f, min(width, height) / 2f), tint,
-                resources.displayMetrics.density, reducedMotion, interaction, touchX, touchY, blurDp, buttonStyle, darkTheme, dimAmount, useRefraction, quietPanel)
+                resources.displayMetrics.density, reducedMotion, interaction, touchX, touchY, blurDp, buttonStyle, darkTheme, dimAmount, useRefraction, quietPanel, debug)
         } catch (failure: RuntimeException) { rendererFailed = true; Log.w("DafeiyuGlass", "Hardware material failed; using bitmap", failure) }
     }
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         highlightWidth = -1
         updateHighlightShader()
+        updatePressShaders()
         prepareRenderer()
         postInvalidateOnAnimation()
     }
@@ -367,11 +436,59 @@ private class GlassDrawingView(context: Context) : View(context) {
             return
         }
         if (highlightWidth == width && highlightHeight == height) return
-        val colors = intArrayOf(0x20FFFFFF, 0x0AFFFFFF, 0x00FFFFFF)
-        highlightFill = LinearGradient(0f, 0f, width.toFloat(), height.toFloat(),
+        val tuning = debug
+        val highlight = tuning?.highlightColor ?: Color.White
+        val strength = tuning?.highlightStrength ?: 1f
+        val colors = if (tuning == null) intArrayOf(0x20FFFFFF, 0x0AFFFFFF, 0x00FFFFFF)
+            else intArrayOf(highlight.copy(alpha = (.125f * strength * highlight.alpha).coerceIn(0f, 1f)).toArgb(),
+                highlight.copy(alpha = (.04f * strength * highlight.alpha).coerceIn(0f, 1f)).toArgb(),
+                highlight.copy(alpha = 0f).toArgb())
+        val direction = glassDebugLightDirection(tuning)
+        val startX = if (tuning == null) 0f else width * (.5f + direction.x * .5f)
+        val startY = if (tuning == null) 0f else height * (.5f + direction.y * .5f)
+        val endX = if (tuning == null) width.toFloat() else width - startX
+        val endY = if (tuning == null) height.toFloat() else height - startY
+        highlightFill = LinearGradient(startX, startY, endX, endY,
             colors, floatArrayOf(0f, .38f, 1f), Shader.TileMode.CLAMP)
         highlightWidth = width
         highlightHeight = height
+    }
+    private fun updatePressShaders() {
+        if (width <= 0 || height <= 0) return
+        if (pressShaderWidth == width && pressShaderHeight == height && pressShaderTuning == debug) return
+        val tuning = debug
+        val light = glassDebugLightDirection(tuning)
+        val radius = (tuning?.trackingLightWidthDp?.times(resources.displayMetrics.density)
+            ?: max(width, height) * .65f).coerceAtLeast(.001f)
+        val color = tuning?.trackingLightColor ?: Color.White
+        val alpha = (.18f * (tuning?.highlightStrength ?: 1f) * (tuning?.trackingLightIntensity ?: 1f) * color.alpha).coerceIn(0f, 1f)
+        val opaque = color.copy(alpha = alpha).toArgb()
+        val clear = color.copy(alpha = 0f).toArgb()
+        val x = width * .5f; val y = height * .5f
+        pressGlow = RadialGradient(x, y, radius, intArrayOf(opaque, clear), null, Shader.TileMode.CLAMP)
+        pressBeam = LinearGradient(x - light.x * radius, y - light.y * radius,
+            x + light.x * radius, y + light.y * radius, intArrayOf(clear, opaque, clear), null, Shader.TileMode.CLAMP)
+        pressShaderWidth = width; pressShaderHeight = height; pressShaderTuning = tuning
+    }
+    private fun drawPressFallback(canvas: Canvas) {
+        if (interaction <= 0f || reducedMotion || reduced || debug?.pressEffect == "none" || debug?.pressEffect == "lift") return
+        if (debug?.pressEffect == "darken") {
+            pressPaint.shader = null
+            pressPaint.color = android.graphics.Color.argb((interaction * requireNotNull(debug).pressDarken * 255f).toInt(), 0, 0, 0)
+            canvas.drawRect(bounds, pressPaint)
+            return
+        }
+        pressPaint.shader = if (debug?.pressEffect == "beam") pressBeam else pressGlow
+        if (pressPaint.shader == null) return
+        pressPaint.color = android.graphics.Color.WHITE
+        pressPaint.alpha = (interaction * 255f).toInt().coerceIn(0, 255)
+        val center = glassGlowCenter(Offset(if (touchX < 0f) width * .5f else touchX,
+            if (touchY < 0f) height * .5f else touchY), width.toFloat(), height.toFloat())
+        val dx = center.x - width * .5f; val dy = center.y - height * .5f
+        val saved = canvas.save()
+        canvas.translate(dx, dy)
+        canvas.drawRect(-dx, -dy, width - dx, height - dy, pressPaint)
+        canvas.restoreToCount(saved)
     }
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
@@ -438,13 +555,14 @@ private class GlassDrawingView(context: Context) : View(context) {
                 }
             }
         }
-        if (!reduced && useHighlights && highlightFill != null) {
+        if (!reduced && useHighlights && highlightFill != null && (debug == null || !opticalRendered)) {
             paint.style = Paint.Style.FILL
             paint.shader = highlightFill
             paint.color = android.graphics.Color.WHITE
             canvas.drawRoundRect(bounds, r, r, paint)
             paint.shader = null
         }
+        if (Build.VERSION.SDK_INT >= 33 && useRefraction && !opticalRendered) drawPressFallback(canvas)
         }
         if (opticalRendered || reduced) return
         paint.shader = null; paint.style = Paint.Style.STROKE
@@ -453,13 +571,25 @@ private class GlassDrawingView(context: Context) : View(context) {
             buttonStyle -> GlassMaterialProfile.Button
             else -> GlassMaterialProfile.Standard
         }
-        val edge = if (useHighlights) GlassEdgeAppearance(.80f, .12f, .42f, .82f) else edgeProfile.edgeAppearance(darkTheme)
+        val tuning = debug
+        val edge = if (tuning != null) {
+            val reflection = tuning.reflectionStrength
+            val floor = tuning.rimStrength
+            GlassEdgeAppearance((floor + reflection * .55f).coerceIn(0f, 1f), floor,
+                (floor + reflection * .35f).coerceIn(0f, 1f), .86f)
+        } else if (useHighlights) GlassEdgeAppearance(.80f, .12f, .42f, .82f) else edgeProfile.edgeAppearance(darkTheme)
         paint.strokeWidth = resources.displayMetrics.density * edge.widthDp
         if (rimShader == null || rimWidth != width || rimHeight != height || rimAppearance != edge) {
+            val highlight = tuning?.highlightColor ?: Color.White
             val edgeColors = floatArrayOf(edge.front, edge.middle, edge.back).map {
-                android.graphics.Color.argb((it * 255f).toInt(), 255, 255, 255)
+                if (tuning == null) android.graphics.Color.argb((it * 255f).toInt(), 255, 255, 255)
+                else highlight.copy(alpha = (it * highlight.alpha).coerceIn(0f, 1f)).toArgb()
             }.toIntArray()
-            rimShader = LinearGradient(0f, 0f, width.toFloat(), height.toFloat(),
+            val direction = glassDebugLightDirection(tuning)
+            val startX = if (tuning == null) 0f else width * (.5f + direction.x * .5f)
+            val startY = if (tuning == null) 0f else height * (.5f + direction.y * .5f)
+            rimShader = LinearGradient(startX, startY, if (tuning == null) width.toFloat() else width - startX,
+                if (tuning == null) height.toFloat() else height - startY,
                 edgeColors, floatArrayOf(0f, .52f, 1f), Shader.TileMode.CLAMP)
             rimWidth = width; rimHeight = height; rimAppearance = edge
         }
@@ -467,6 +597,15 @@ private class GlassDrawingView(context: Context) : View(context) {
         val half = paint.strokeWidth / 2f
         bounds.inset(half, half); canvas.drawRoundRect(bounds, max(0f, r - half), max(0f, r - half), paint)
         paint.style = Paint.Style.FILL; paint.shader = null
+        if (tuning != null && tuning.borderWidthDp > 0f && tuning.borderOpacity > 0f) {
+            borderPaint.style = Paint.Style.STROKE
+            borderPaint.strokeWidth = min(tuning.borderWidthDp * resources.displayMetrics.density, min(width, height).toFloat())
+            borderPaint.color = tuning.borderColor.copy(alpha = tuning.borderColor.alpha * tuning.borderOpacity).toArgb()
+            bounds.set(0f, 0f, width.toFloat(), height.toFloat())
+            val borderHalf = borderPaint.strokeWidth / 2f
+            bounds.inset(borderHalf, borderHalf)
+            canvas.drawRoundRect(bounds, max(0f, r - borderHalf), max(0f, r - borderHalf), borderPaint)
+        }
     }
     /** API30 fallback samples the same texture at low resolution; no optical refraction is claimed. */
     private fun drawBitmapBackdrop(canvas: Canvas, source: View, dx: Float, dy: Float) {
@@ -487,7 +626,9 @@ private class GlassDrawingView(context: Context) : View(context) {
         sampled.scale(scale, scale); sampled.translate(-dx, -dy)
         try { source.draw(sampled); GlassRendererDiagnostics.status = "背景采样降级" } finally { sampled.restoreToCount(saved) }
         paint.shader = null; paint.color = android.graphics.Color.WHITE
+        paint.colorFilter = fallbackColorFilter
         canvas.drawBitmap(bitmap, null, bounds, paint)
+        paint.colorFilter = null
     }
 }
 
@@ -514,16 +655,21 @@ private class HardwareGlassRenderer : BackdropRenderer {
     private var cachedDimAmount = -1f
     private var cachedUseRefraction = true
     private var cachedQuietPanel = false
+    private var cachedTuning: GlassDebugTuning? = null
+    private var cachedSaturation = Float.NaN
+    private var saturationEffect: RenderEffect? = null
     private var margin = 0
     private var cachedSampleBounds: androidx.compose.ui.geometry.Rect? = null
     private var drawLogged = false
     override fun prepare(width: Int, height: Int,
-        radius: Float, tint: Int, density: Float, reducedMotion: Boolean, interaction: Float, touchX: Float, touchY: Float, blurDp: Float, buttonStyle: Boolean, darkTheme: Boolean, dimAmount: Float, useRefraction: Boolean, quietPanel: Boolean) {
+        radius: Float, tint: Int, density: Float, reducedMotion: Boolean, interaction: Float, touchX: Float, touchY: Float, blurDp: Float, buttonStyle: Boolean, darkTheme: Boolean, dimAmount: Float, useRefraction: Boolean, quietPanel: Boolean, tuning: GlassDebugTuning?) {
         if (width == cachedWidth && height == cachedHeight && radius == cachedRadius &&
-            tint == cachedTint && density == cachedDensity && reducedMotion == cachedMotion && interaction == cachedInteraction && touchX == cachedTouchX && touchY == cachedTouchY && blurDp == cachedBlurDp && buttonStyle == cachedButtonStyle && darkTheme == cachedDarkTheme && dimAmount == cachedDimAmount && useRefraction == cachedUseRefraction && quietPanel == cachedQuietPanel) return
+            tint == cachedTint && density == cachedDensity && reducedMotion == cachedMotion && interaction == cachedInteraction && touchX == cachedTouchX && touchY == cachedTouchY && blurDp == cachedBlurDp && buttonStyle == cachedButtonStyle && darkTheme == cachedDarkTheme && dimAmount == cachedDimAmount && useRefraction == cachedUseRefraction && quietPanel == cachedQuietPanel && tuning == cachedTuning) return
         val blur = blurDp * density
         if (blurEffect == null || density != cachedDensity || blurDp != cachedBlurDp) {
-            blurEffect = RenderEffect.createBlurEffect(blur, blur, Shader.TileMode.CLAMP)
+            // A zero slider means no blur; Android rejects a zero-radius createBlurEffect.
+            blurEffect = if (blur > 0f) RenderEffect.createBlurEffect(blur, blur, Shader.TileMode.CLAMP)
+                else RenderEffect.createOffsetEffect(0f, 0f)
         }
         margin = glassSampleMargin(density, blurDp)
         val activeBlur = requireNotNull(blurEffect)
@@ -537,7 +683,7 @@ private class HardwareGlassRenderer : BackdropRenderer {
                 }
                 effect = RenderEffect.createChainEffect(
                     requireNotNull(lens).effect(width, height, margin, radius, tint, density, reducedMotion,
-                        interaction, touchX, touchY, buttonStyle, darkTheme, quietPanel, dimAmount), activeBlur,
+                        interaction, touchX, touchY, buttonStyle, darkTheme, quietPanel, dimAmount, tuning = tuning), activeBlur,
                 )
             } catch (failure: RuntimeException) {
                 lensFailed = true
@@ -545,10 +691,19 @@ private class HardwareGlassRenderer : BackdropRenderer {
                 Log.w("DafeiyuGlass", "AGSL effect failed; using blur", failure)
             }
         }
+        if (tuning != null && (lens == null || lensFailed || !useRefraction) && tuning.saturation != 1f) {
+            if (saturationEffect == null || cachedSaturation != tuning.saturation) {
+                saturationEffect = RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(ColorMatrix().apply {
+                    setSaturation(tuning.saturation)
+                }))
+                cachedSaturation = tuning.saturation
+            }
+            effect = RenderEffect.createChainEffect(requireNotNull(saturationEffect), activeBlur)
+        }
         node.setRenderEffect(effect)
         cachedSampleBounds = null
         cachedWidth = width; cachedHeight = height; cachedRadius = radius
-        cachedTint = tint; cachedDensity = density; cachedBlurDp = blurDp; cachedMotion = reducedMotion; cachedInteraction = interaction; cachedTouchX = touchX; cachedTouchY = touchY; cachedButtonStyle = buttonStyle; cachedDarkTheme = darkTheme; cachedDimAmount = dimAmount; cachedUseRefraction = useRefraction; cachedQuietPanel = quietPanel
+        cachedTint = tint; cachedDensity = density; cachedBlurDp = blurDp; cachedMotion = reducedMotion; cachedInteraction = interaction; cachedTouchX = touchX; cachedTouchY = touchY; cachedButtonStyle = buttonStyle; cachedDarkTheme = darkTheme; cachedDimAmount = dimAmount; cachedUseRefraction = useRefraction; cachedQuietPanel = quietPanel; cachedTuning = tuning
     }
     override fun draw(canvas: Canvas, source: View, dx: Float, dy: Float, width: Int, height: Int): Boolean {
         if (effect == null) return false
@@ -560,7 +715,7 @@ private class HardwareGlassRenderer : BackdropRenderer {
                 effect = RenderEffect.createChainEffect(requireNotNull(lens).effect(width, height, margin,
                     cachedRadius, cachedTint, cachedDensity, cachedMotion, cachedInteraction,
                     cachedTouchX, cachedTouchY, cachedButtonStyle, cachedDarkTheme, cachedQuietPanel, cachedDimAmount,
-                    sampleBounds), requireNotNull(blurEffect))
+                    sampleBounds, cachedTuning), requireNotNull(blurEffect))
                 node.setRenderEffect(effect)
                 cachedSampleBounds = sampleBounds
             } catch (failure: RuntimeException) {
@@ -593,23 +748,46 @@ internal class LensShader {
     }
     fun effect(width: Int, height: Int, margin: Int, radius: Float, tint: Int, density: Float, reducedMotion: Boolean, interaction: Float, touchX: Float, touchY: Float, buttonStyle: Boolean, darkTheme: Boolean, quietPanel: Boolean = false, dimAmount: Float = 0f,
         sampleBounds: androidx.compose.ui.geometry.Rect = requireNotNull(glassSampleBounds(width, height, margin,
-            margin.toFloat(), margin.toFloat(), width, height))): RenderEffect {
+            margin.toFloat(), margin.toFloat(), width, height)), tuning: GlassDebugTuning? = null): RenderEffect {
         val geometry = glassLensGeometry(width, height, density)
+        // Both renderer paths normalize once when a profile changes, outside the animation frame.
+        val debug = tuning
+        val light = glassDebugLightDirection(debug)
+        val highlight = debug?.highlightColor ?: Color.White
+        val border = debug?.borderColor ?: Color.White
         shader.setFloatUniform("size", width.toFloat(), height.toFloat())
         shader.setFloatUniform("margin", margin.toFloat())
         shader.setFloatUniform("radius", radius.coerceIn(0f, min(width, height) / 2f))
-        shader.setFloatUniform("bevel", geometry.bevel)
-        shader.setFloatUniform("falloff", 2f)
+        val bevel = if (debug == null) geometry.bevel else
+            min(debug.glassThicknessDp * density, min(width, height) * .5f) * debug.bevelScale
+        shader.setFloatUniform("bevel", bevel)
+        shader.setFloatUniform("falloff", debug?.refractionFalloff ?: 2f)
         shader.setFloatUniform("hairWidth", geometry.hairWidth)
-        shader.setFloatUniform("refractPx", if (reducedMotion) 0f else geometry.refraction)
+        shader.setFloatUniform("refractPx", if (reducedMotion) 0f else geometry.refraction * (debug?.refractionScale ?: 1f))
         shader.setFloatUniform("interaction", if (reducedMotion) 0f else interaction.coerceIn(0f, 1f))
         shader.setFloatUniform("touchPos", if (touchX < 0f) width / 2f else touchX, if (touchY < 0f) height / 2f else touchY)
-        shader.setFloatUniform("dispersion", if (reducedMotion) 0f else .10f)
-        shader.setFloatUniform("specScale", glassSpecScale(buttonStyle, darkTheme, quietPanel))
-        shader.setFloatUniform("rimFloor", glassRimFloor(buttonStyle, darkTheme, quietPanel))
-        shader.setFloatUniform("dimAmount", dimAmount.coerceIn(0f, 1f))
-        shader.setFloatUniform("satFactor", glassVibrancy(quietPanel))
+        shader.setFloatUniform("dispersion", if (reducedMotion) 0f else debug?.dispersion ?: .10f)
+        shader.setFloatUniform("innerStrength", if (reducedMotion) 0f else debug?.innerRefractionStrength ?: 0f)
+        shader.setFloatUniform("innerWidth", (debug?.innerRefractionWidthDp ?: 4f) * density)
+        shader.setFloatUniform("innerDispersion", if (reducedMotion) 0f else debug?.innerDispersion ?: 0f)
+        shader.setFloatUniform("pressMode", if (reducedMotion) 0f else glassPressEffectCode(debug))
+        shader.setFloatUniform("pressDarken", debug?.pressDarken ?: .12f)
+        shader.setFloatUniform("trackingWidth", debug?.let { it.trackingLightWidthDp * density }
+            ?: min(width, height) * .5f)
+        shader.setFloatUniform("trackingIntensity", debug?.trackingLightIntensity ?: 1f)
+        val tracking = debug?.trackingLightColor ?: Color.White
+        shader.setFloatUniform("trackingTint", tracking.red, tracking.green, tracking.blue, tracking.alpha)
+        shader.setFloatUniform("specScale", debug?.reflectionStrength ?: glassSpecScale(buttonStyle, darkTheme, quietPanel))
+        shader.setFloatUniform("rimFloor", debug?.rimStrength ?: glassRimFloor(buttonStyle, darkTheme, quietPanel))
+        shader.setFloatUniform("dimAmount", debug?.dimAmount ?: dimAmount.coerceIn(0f, 1f))
+        shader.setFloatUniform("satFactor", debug?.saturation ?: glassVibrancy(quietPanel))
         shader.setFloatUniform("accentScatter", glassAccentScatter(darkTheme))
+        shader.setFloatUniform("lightDir", light.x, light.y)
+        shader.setFloatUniform("highlightScale", debug?.highlightStrength ?: 1f)
+        shader.setFloatUniform("highlightTint", highlight.red, highlight.green, highlight.blue, highlight.alpha)
+        shader.setFloatUniform("borderWidth", (debug?.borderWidthDp ?: 0f) * density)
+        shader.setFloatUniform("borderTint", border.red, border.green, border.blue,
+            border.alpha * (debug?.borderOpacity ?: 0f))
         shader.setFloatUniform("tint", android.graphics.Color.red(tint) / 255f,
             android.graphics.Color.green(tint) / 255f, android.graphics.Color.blue(tint) / 255f,
             android.graphics.Color.alpha(tint) / 255f)
@@ -629,12 +807,25 @@ internal class LensShader {
             uniform float hairWidth;
             uniform float refractPx;
             uniform float dispersion;
+            uniform float innerStrength;
+            uniform float innerWidth;
+            uniform float innerDispersion;
+            uniform float pressMode;
+            uniform float pressDarken;
+            uniform float trackingWidth;
+            uniform float trackingIntensity;
+            uniform float4 trackingTint;
             uniform float interaction;
             uniform float specScale;
             uniform float rimFloor;
             uniform float dimAmount;
             uniform float satFactor;
             uniform float accentScatter;
+            uniform float2 lightDir;
+            uniform float highlightScale;
+            uniform float4 highlightTint;
+            uniform float borderWidth;
+            uniform float4 borderTint;
             uniform float2 touchPos;
             uniform float2 sampleLo;
             uniform float2 sampleHi;
@@ -680,19 +871,29 @@ internal class LensShader {
                 float dist = length(touchDelta);
                 float sigma = max(min(size.x, size.y) * 0.5, 1.0);
                 float bounded = 1.0 - smoothstep(sigma * 0.8, sigma * 1.4, dist);
-                float localPress = interaction * cov * bounded *
+                float localPress = (pressMode > 1.5 ? interaction : 0.0) * cov * bounded *
                     exp(-dot(touchDelta, touchDelta) / max(sigma * sigma * 0.30, 0.000001));
                 float refr = refractPx * (1.0 + 0.6 * localPress);
-                float2 offset = -n * slope * refr * normalStrength;
-                if (interaction > 0.001) {
+                float2 offset = -n * slope * refr * normalStrength * (bevel > 0.001 ? 1.0 : 0.0);
+                if (localPress > 0.001) {
                     offset -= touchDelta / max(dist, 1.0) * (localPress * refr * 0.5);
                 }
                 // Match the shared surface's total-displacement budget, including touch and colour taps.
                 float maxOffset = min(refractPx, max(bevel, 1.0) * 0.50) / 1.10;
                 offset *= min(1.0, maxOffset / max(length(offset), 0.0001));
-                float4 red = readContent(coord + offset * (1.0 - dispersion * slope));
-                float4 green = readContent(coord + offset);
-                float4 blue = readContent(coord + offset * (1.0 + dispersion * slope));
+                // QWEA0's inward fold profile produces a compressed image band, not a painted rim.
+                // The independently tunable inner wall folds at the thickness depth; each RGB
+                // channel reads a different real position when innerDispersion is nonzero.
+                float wallWidth = min(innerWidth, min(size.x, size.y) * 0.5);
+                float wallDepth = min(max(bevel, wallWidth * 0.5), min(size.x, size.y) * 0.45);
+                float wallBand = wallWidth > 0.001 ?
+                    1.0 - smoothstep(0.0, max(wallWidth, 0.001), abs(-d - wallDepth)) : 0.0;
+                float wallShift = min(innerStrength * wallWidth, min(size.x, size.y) * 0.45) *
+                    wallBand * normalStrength;
+                float2 wallOffset = -n * wallShift;
+                float4 red = readContent(coord + offset * (1.0 - dispersion * slope) + wallOffset * (1.0 - innerDispersion));
+                float4 green = readContent(coord + offset + wallOffset);
+                float4 blue = readContent(coord + offset * (1.0 + dispersion * slope) + wallOffset * (1.0 + innerDispersion));
                 float transmission = min(red.a, min(green.a, blue.a));
                 float3 col = float3(red.r, green.g, blue.b);
                 // QWEA0 vibrancy curve (GlassLensRenderer.kt:213-224 @16afe4d): boost low-chroma
@@ -708,7 +909,7 @@ internal class LensShader {
                 float materialAlpha = transmission + tint.a * (1.0 - transmission);
                 float3 rgb = col * transmission + tint.rgb * tint.a * (1.0 - transmission);
                 // The same normal gives two directional reflection lobes; the centre is transmitted page.
-                float facing = dot(n, normalize(float2(-0.6, -0.8)));
+                float facing = dot(n, normalize(lightDir));
                 float lobeF = pow(max(facing, 0.0), 4.5);
                 float lobeB = pow(max(-facing, 0.0), 4.5);
                 float hair = clamp(1.0 - abs(d + hairWidth * 0.5) / hairWidth, 0.0, 1.0);
@@ -717,11 +918,26 @@ internal class LensShader {
                     pow(clamp(1.0 + d / max(bevel * 0.5, 1.0), 0.0, 1.0), 1.5);
                 float spec = inside * normalStrength *
                     (hair * (rimFloor + 0.70 * (lobeF + lobeB) * specScale) +
-                        glow * 0.10 * lobeF * specScale) * (1.0 - localPress * 0.20);
-                float front = inside * localPress * 0.10;
-                float reflection = clamp(spec + front, 0.0, 0.90);
-                rgb = rgb * (1.0 - reflection) + float3(reflection);
+                        glow * 0.10 * lobeF * specScale * highlightScale) * (1.0 - localPress * 0.20);
+                float reflection = clamp(spec, 0.0, 0.90) * highlightTint.a;
+                rgb = rgb * (1.0 - reflection) + highlightTint.rgb * reflection;
                 materialAlpha += reflection * (1.0 - materialAlpha);
+                float trackingSigma = max(trackingWidth, 0.001);
+                float glowWeight = exp(-dot(touchDelta, touchDelta) / (trackingSigma * trackingSigma * 0.30));
+                float beamDistance = abs(dot(touchDelta, normalize(lightDir)));
+                float beamWeight = exp(-(beamDistance * beamDistance) / (trackingSigma * trackingSigma * 0.30)) *
+                    (1.0 - smoothstep(trackingSigma * 0.4, trackingSigma, -d));
+                float trackingWeight = pressMode > 2.5 ? beamWeight : glowWeight;
+                float trackingAlpha = pressMode > 1.5 ? clamp(inside * interaction * trackingWeight *
+                    0.10 * highlightScale * trackingIntensity * trackingTint.a, 0.0, 0.95) : 0.0;
+                rgb = rgb * (1.0 - trackingAlpha) + trackingTint.rgb * trackingAlpha;
+                materialAlpha += trackingAlpha * (1.0 - materialAlpha);
+                // Separate explicit border from the optical reflection; either can be fully disabled.
+                float borderCoverage = borderWidth > 0.0 ? clamp(borderWidth + d, 0.0, 1.0) : 0.0;
+                float borderAlpha = borderCoverage * borderTint.a;
+                rgb = rgb * (1.0 - borderAlpha) + borderTint.rgb * borderAlpha;
+                materialAlpha += borderAlpha * (1.0 - materialAlpha);
+                if (pressMode > 0.5 && pressMode < 1.5) rgb *= 1.0 - pressDarken * interaction;
                 rgb = clamp(rgb, float3(0.0), float3(materialAlpha)) * cov;
                 return half4(half3(rgb), half(clamp(materialAlpha * cov, 0.0, 1.0)));
             }

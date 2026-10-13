@@ -2423,8 +2423,11 @@ html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] [hidden] {
   display: none !important;
 }
 
-/* A true press marker survives pointer capture; release settles with overshoot. */
-html[data-dafeiyu-surface="mobile"] :is(button, [role="button"])[data-dafeiyu-mobile-control]:not([role="switch"]) {
+/* A true press marker survives pointer capture; release settles with overshoot.
+ * Imported theme nodes own their transition list and timing. Keep these legacy
+ * shorthands only for default presentation and unclassified controls. */
+html[data-dafeiyu-surface="mobile"]:not([data-dafeiyu-material-theme="1"]) :is(button, [role="button"])[data-dafeiyu-mobile-control]:not([role="switch"]),
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] :is(button, [role="button"])[data-dafeiyu-mobile-control]:not([role="switch"]):not([data-dafeiyu-theme-kind]) {
   scale: 1;
   transition:
     color var(--df-fast) var(--df-ease),
@@ -2435,7 +2438,8 @@ html[data-dafeiyu-surface="mobile"] :is(button, [role="button"])[data-dafeiyu-mo
     scale 480ms var(--df-bounce);
 }
 
-html[data-dafeiyu-surface="mobile"] :is(button, [role="button"])[data-dafeiyu-pressed="true"]:not(:disabled):not([aria-disabled="true"]):not([role="switch"]) {
+html[data-dafeiyu-surface="mobile"]:not([data-dafeiyu-material-theme="1"]) :is(button, [role="button"])[data-dafeiyu-pressed="true"]:not(:disabled):not([aria-disabled="true"]):not([role="switch"]),
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] :is(button, [role="button"])[data-dafeiyu-pressed="true"]:not(:disabled):not([aria-disabled="true"]):not([role="switch"]):not([data-dafeiyu-theme-kind]) {
   scale: var(--df-press-scale, 1.055);
   transition:
     background-color var(--df-fast) var(--df-ease),
@@ -2945,6 +2949,120 @@ html[data-dafeiyu-surface="mobile"][data-dafeiyu-motion="false"] :is(
 @supports not (backdrop-filter: blur(1px)) {
   html[data-dafeiyu-surface="mobile"] {
     --df-glass: var(--df-glass-panel);
+  }
+}
+
+/* Imported portable themes are display-only and require the same explicit
+ * mobile gate. Fixed variables are owned/restored by the context lifecycle.
+ * CSS gradients/blur are a real browser fallback, not native AGSL optics. */
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] [data-dafeiyu-theme-kind] {
+  color: var(--df-theme-text) !important;
+  background-color: var(--df-theme-fill) !important;
+  background-image: var(--df-theme-reflection) !important;
+  border-color: transparent !important;
+  border-radius: var(--df-theme-radius, 24px) !important;
+  corner-shape: round;
+  box-shadow: var(--df-theme-shadow) !important;
+  backdrop-filter: var(--df-theme-filter) !important;
+  -webkit-backdrop-filter: var(--df-theme-filter) !important;
+  transition:
+    color var(--df-theme-release-duration) var(--df-ease),
+    background-color var(--df-theme-release-duration) var(--df-ease),
+    border-radius var(--df-theme-release-duration) var(--df-ease),
+    box-shadow var(--df-theme-release-duration) var(--df-ease),
+    scale var(--df-theme-release-duration) var(--df-theme-spring-ease),
+    translate var(--df-theme-release-duration) var(--df-theme-spring-ease);
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] :is(button, [role="button"])[data-dafeiyu-theme-kind] {
+  scale: 1;
+  translate: 0 0;
+  /* Imported press effects replace the stock send-button brightness filter. */
+  filter: none;
+  touch-action: manipulation;
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] :is(button, [role="button"])[data-dafeiyu-theme-kind] :is(svg, img) {
+  color: var(--df-theme-icon) !important;
+  mix-blend-mode: var(--df-theme-icon-blend);
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] :is(button, [role="button"])[data-dafeiyu-theme-kind]:focus-visible {
+  outline: var(--df-theme-focus-width) solid var(--df-theme-focus-color);
+  outline-offset: 2px;
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] :is(button, [role="button"])[data-dafeiyu-theme-kind][data-dafeiyu-theme-pressed="true"] {
+  box-shadow: var(--df-theme-pressed-shadow) !important;
+  transition-duration: var(--df-theme-press-duration);
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] :is(button, [role="button"])[data-dafeiyu-theme-kind][data-dafeiyu-theme-pressed="true"][data-dafeiyu-theme-spring="true"] {
+  scale: calc(var(--df-theme-press-scale) * var(--df-theme-drag-scale-x, 1)) calc(var(--df-theme-press-scale) * var(--df-theme-drag-scale-y, 1)) !important;
+  translate: var(--df-theme-drag-x, 0px) var(--df-theme-drag-y, 0px);
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] [data-dafeiyu-theme-effect="darken"] {
+  --df-theme-press-layer: linear-gradient(var(--df-theme-darken), var(--df-theme-darken));
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] [data-dafeiyu-theme-effect="glow"] {
+  --df-theme-press-layer: radial-gradient(circle var(--df-theme-tracking-width) at var(--df-theme-touch-x, 50%) var(--df-theme-touch-y, 50%), var(--df-theme-tracking-color), transparent);
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] [data-dafeiyu-theme-effect="beam"] {
+  --df-theme-press-layer: linear-gradient(90deg, transparent calc(var(--df-theme-touch-x, 50%) - var(--df-theme-tracking-width)), var(--df-theme-tracking-color) var(--df-theme-touch-x, 50%), transparent calc(var(--df-theme-touch-x, 50%) + var(--df-theme-tracking-width)));
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] [data-dafeiyu-theme-pressed="true"][data-dafeiyu-theme-effect="lift"][data-dafeiyu-theme-spring="true"] {
+  translate: var(--df-theme-drag-x, 0px) calc(var(--df-theme-drag-y, 0px) - 3px);
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] :is(button, [role="button"])[data-dafeiyu-theme-kind]:is([data-dafeiyu-theme-motion="false"], [data-dafeiyu-theme-spring="false"]) {
+  scale: 1 !important;
+  translate: none !important;
+  transform: none !important;
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] [data-dafeiyu-theme-motion="false"] {
+  animation: none !important;
+  transition: none !important;
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] [data-dafeiyu-theme-glass="false"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background-image: none !important;
+}
+
+/* Individual scale creates this button's containing/stacking context, so the
+ * optical layer stays beneath sharp content and cannot intercept input. */
+@supports (scale: 1) {
+  html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] :is(button, [role="button"])[data-dafeiyu-theme-kind]::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    border-radius: inherit;
+    background-image: var(--df-theme-press-layer, linear-gradient(transparent, transparent));
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--df-theme-release-duration) var(--df-ease);
+  }
+
+  html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] :is(button, [role="button"])[data-dafeiyu-theme-kind][data-dafeiyu-theme-pressed="true"]::before {
+    opacity: 1;
+    transition-duration: var(--df-theme-press-duration);
+  }
+
+  html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] :is(button, [role="button"])[data-dafeiyu-theme-kind][data-dafeiyu-theme-glass="false"]::before {
+    background-image: none;
+  }
+}
+
+@supports not (scale: 1) {
+  html[data-dafeiyu-surface="mobile"][data-dafeiyu-material-theme="1"] :is(button, [role="button"])[data-dafeiyu-theme-kind][data-dafeiyu-theme-pressed="true"][data-dafeiyu-theme-glass="true"] {
+    background-image: var(--df-theme-press-layer, linear-gradient(transparent, transparent)), var(--df-theme-reflection) !important;
   }
 }
 

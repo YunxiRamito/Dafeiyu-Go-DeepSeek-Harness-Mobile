@@ -172,10 +172,11 @@ class Element extends Events {
       },
     };
     const properties = new Map();
-    this.style = { cssText: '', setProperty(name, value) { properties.set(name, String(value)); },
+    const priorities = new Map();
+    this.style = { cssText: '', setProperty(name, value, priority = '') { properties.set(name, String(value)); priorities.set(name, priority); },
       getPropertyValue(name) { return properties.get(name) || ''; },
-      getPropertyPriority() { return ''; },
-      removeProperty(name) { const previous = properties.get(name) || ''; properties.delete(name); return previous; } };
+      getPropertyPriority(name) { return priorities.get(name) || ''; },
+      removeProperty(name) { const previous = properties.get(name) || ''; properties.delete(name); priorities.delete(name); return previous; } };
   }
   get parentNode() { return this.parentElement; }
   get children() { return this.childNodes.filter(node => node.nodeType === 1); }
@@ -3172,5 +3173,254 @@ test('the actual built ModuleLoader resource stays lazy and applies the same exp
   for (const control of [rightbar, microphone, ordinaryAction, ordinaryActivity, tab]) {
     assert.equal(control.getAttribute('data-dafeiyu-mobile-control'), null);
   }
+  assert.equal(fixture.listenerCount(), 0);
+});
+
+function materialThemeFixture() {
+  const types = ['accent', 'circle', 'regular', 'panel'];
+  const mode = dark => Object.fromEntries(types.map((type, index) => [type, {
+    values: { blurDp: 3 + index, roundness: index / 3, tintAlpha: .2 + index / 10,
+      shadowOpacity: .08, shadowBlurDp: 5, pressScale: 1.04, trackingLightIntensity: .7 },
+    colors: { surface: dark ? '#FF19324B' : `#FF${['123456', '234567', '345678', '456789'][index]}`,
+      text: dark ? '#FFF1F2F3' : '#FF111213', icon: dark ? '#FFF8F9FA' : '#FF212223', trackingLight: '#FF55AAFF' },
+    iconBlend: 'multiply', pressEffect: ['none', 'darken', 'glow', 'beam'][index],
+    shape: 'circle', glassEnabled: true, motionEnabled: true, springEnabled: true,
+  }]));
+  return { schema: 1, renderer: 'dafeiyu-native-glass', light: mode(false), dark: mode(true) };
+}
+
+function materialThemeShell(fixture) {
+  const shell = nativeShell(fixture);
+  const seat = fixture.create('div', { 'data-composer-seat': 'conversation' }, shell.conversation);
+  const stack = fixture.create('div', {}, seat);
+  const bar = fixture.create('section', { 'data-slot': 'conversation.composer.bar' }, stack);
+  const card = fixture.create('div', {}, bar);
+  card.rectangle = { x: 12, y: 600, width: 300, height: 100 };
+  fixture.create('section', { 'data-slot': 'conversation.input.attachments' }, card);
+  const modelSlot = fixture.create('section', { 'data-slot': 'conversation.input.model' }, card);
+  const model = fixture.create('button', { 'aria-label': 'Model' }, modelSlot);
+  model.rectangle = { x: 20, y: 660, width: 120, height: 32 };
+  const send = fixture.create('button', { type: 'submit', 'aria-label': 'Send' }, card);
+  send.rectangle = { x: 250, y: 640, width: 44, height: 44 };
+  fixture.create('svg', { 'data-fixture-icon': 'send' }, send);
+  return { ...shell, seat, stack, bar, card, model, send };
+}
+
+test('portable material context accepts only the fixed eight-group appearance schema and owns its copies', () => {
+  const context = createDafeiyuMobileContext(browser().env);
+  const source = materialThemeFixture();
+  const normalized = context.normalizeMaterialTheme(source);
+  assert.ok(normalized);
+  assert.equal(Object.keys(normalized.light.circle.values).length, 76);
+  assert.equal(Object.keys(normalized.dark.panel.colors).length, 16);
+  source.light.circle.values.blurDp = 37;
+  source.light.circle.colors.icon = '#FF000000';
+  assert.equal(normalized.light.circle.values.blurDp, 4);
+  assert.equal(normalized.light.circle.colors.icon, '#FF212223');
+  assert.throws(() => { normalized.light.circle.values.blurDp = 9; }, TypeError);
+  const invalid = [];
+  for (const [key, value] of [['schema', 2], ['renderer', 'custom-css'], ['account', 'secret'],
+    ['previewBackgroundImageData', 'private-photo'], ['css', 'body{display:none}']]) {
+    const raw = materialThemeFixture(); raw[key] = value; invalid.push(raw);
+  }
+  const missing = materialThemeFixture(); delete missing.dark.panel; invalid.push(missing);
+  const numericCss = materialThemeFixture(); numericCss.light.circle.values.blurDp = 'url(https://invalid/)'; invalid.push(numericCss);
+  const badColor = materialThemeFixture(); badColor.light.circle.colors.surface = 'red;display:none'; invalid.push(badColor);
+  const badEnum = materialThemeFixture(); badEnum.light.circle.pressEffect = 'eval'; invalid.push(badEnum);
+  const nested = materialThemeFixture(); nested.light.circle.css = 'color:red'; invalid.push(nested);
+  const getter = materialThemeFixture(); Object.defineProperty(getter.light.circle.values, 'blurDp', { get() { throw Error('getter'); } }); invalid.push(getter);
+  for (const raw of [null, [], JSON.stringify(materialThemeFixture()), ...invalid]) assert.equal(context.normalizeMaterialTheme(raw), null);
+});
+
+test('browser theme numeric ranges match the actual Android portable schema including both endpoints', async () => {
+  const kotlin = await readFile(new URL('../../Dafeiyu-Go-DeepSeek-Harness-Mobile/glass-lab/src/main/java/com/dafeiyu/mobile/glasslab/LabPresets.kt', import.meta.url), 'utf8');
+  const specs = [...kotlin.matchAll(/LabParameterSpec\("([^"]+)",\s*"[^"]*",\s*([-\d.]+)f,\s*([-\d.]+)f,\s*([-\d.]+)f/g)];
+  const core = createDafeiyuMobileContext(browser().env);
+  assert.equal(specs.length, 76);
+  for (const [, key, min, max, fallback] of specs) {
+    const source = materialThemeFixture(); delete source.light.circle.values[key];
+    assert.equal(core.normalizeMaterialTheme(source).light.circle.values[key], Number(fallback), key);
+    for (const endpoint of [Number(min), Number(max)]) {
+      source.light.circle.values[key] = endpoint;
+      assert.equal(core.normalizeMaterialTheme(source).light.circle.values[key], endpoint, `${key} endpoint`);
+      source.light.circle.values[key] = Math.fround(endpoint);
+      assert.equal(core.normalizeMaterialTheme(source).light.circle.values[key], Math.fround(endpoint), `${key} Android Float32 endpoint`);
+    }
+    for (const bad of [Number(min) - .01, Number(max) + .01, NaN, Infinity]) {
+      source.light.circle.values[key] = bad;
+      assert.equal(core.normalizeMaterialTheme(source), null, `${key} invalid`);
+    }
+  }
+});
+
+test('a portable theme cannot activate desktop or leak from an invalid host into an explicit preview', () => {
+  for (const host of [undefined, validHost({ platform: 'windows', materialTheme: materialThemeFixture() })]) {
+    const fixture = browser({ width: 320, host });
+    const dispose = createDafeiyuMobileContext(fixture.env).install(cssText);
+    assert.equal(fixture.document.documentElement.style.getPropertyValue('--df-theme-circle-fill'), '');
+    assert.equal(fixture.listenerCount(), 5);
+    dispose(); assert.equal(fixture.listenerCount(), 0);
+  }
+  const preview = browser({ href: 'http://127.0.0.1:8787/?dafeiyu-preview=mobile',
+    host: validHost({ platform: 'windows', materialTheme: materialThemeFixture() }) });
+  const dispose = createDafeiyuMobileContext(preview.env).install(cssText);
+  assert.equal(preview.document.documentElement.getAttribute('data-dafeiyu-material-theme'), null);
+  dispose(); assert.equal(preview.listenerCount(), 0);
+});
+
+test('actual mobile DOM receives four material types and changes all groups when light becomes dark', () => {
+  const fixture = browser({ width: 390, host: validHost({ theme: 'light', materialTheme: materialThemeFixture() }) });
+  fixture.env.CSS = { supports: () => true };
+  const shell = materialThemeShell(fixture);
+  const dispose = createDafeiyuMobileContext(fixture.env).install(cssText);
+  const root = fixture.document.documentElement;
+  const circle = fixture.document.querySelector('[data-dafeiyu-mobile-control="new-session"]');
+  circle.rectangle = { x: 300, y: 12, width: 44, height: 44 };
+  fixture.mutation();
+  assert.equal(root.getAttribute('data-dafeiyu-material-capability'), 'css-backdrop');
+  assert.equal(shell.send.getAttribute('data-dafeiyu-theme-kind'), 'accent');
+  assert.equal(circle.getAttribute('data-dafeiyu-theme-kind'), 'circle');
+  assert.equal(shell.model.getAttribute('data-dafeiyu-theme-kind'), 'regular');
+  assert.equal(shell.card.getAttribute('data-dafeiyu-theme-kind'), 'panel');
+  assert.equal(shell.send.style.getPropertyValue('--df-theme-radius'), '0px');
+  assert.equal(circle.style.getPropertyValue('--df-theme-radius'), '7.33333px');
+  assert.equal(shell.card.style.getPropertyValue('--df-theme-radius'), '50px');
+  const fills = ['accent', 'circle', 'regular', 'panel'].map(type => root.style.getPropertyValue(`--df-theme-${type}-fill`));
+  assert.equal(new Set(fills).size, 4);
+  fixture.env.__DAFEIYU_DSH_CLIENT__ = validHost({ theme: 'dark', materialTheme: materialThemeFixture() });
+  fixture.env.dispatchEvent({ type: 'dafeiyu-dsh-client-change' });
+  assert.equal(root.getAttribute('data-dafeiyu-material-theme-appearance'), 'dark');
+  assert.match(root.style.getPropertyValue('--df-theme-circle-fill'), /25, 50, 75/);
+  assert.match(root.style.getPropertyValue('--df-theme-circle-icon'), /248, 249, 250/);
+  dispose(); assert.equal(fixture.listenerCount(), 0);
+  for (const node of [shell.send, shell.model, shell.card, circle]) assert.equal(node.getAttribute('data-dafeiyu-theme-kind'), null);
+});
+
+test('theme reset and gate exit restore prior CSS priorities and preserve later host writers and detached nodes', () => {
+  const fixture = browser({ host: validHost({ materialTheme: materialThemeFixture() }) });
+  const root = fixture.document.documentElement;
+  root.style.setProperty('--df-theme-circle-fill', 'host-before', 'important');
+  const shell = materialThemeShell(fixture);
+  shell.model.style.setProperty('--df-theme-radius', 'host-radius-before');
+  const dispose = createDafeiyuMobileContext(fixture.env).install(cssText);
+  const circle = fixture.document.querySelector('[data-dafeiyu-mobile-control="new-session"]');
+  root.style.setProperty('--df-theme-circle-icon', 'host-after', 'important');
+  shell.model.style.setProperty('--df-theme-radius', 'host-radius-after');
+  circle.remove();
+  fixture.env.__DAFEIYU_DSH_CLIENT__ = validHost();
+  fixture.env.dispatchEvent({ type: 'dafeiyu-dsh-client-change' });
+  assert.equal(root.getAttribute('data-dafeiyu-material-theme'), null);
+  assert.equal(root.style.getPropertyValue('--df-theme-circle-fill'), 'host-before');
+  assert.equal(root.style.getPropertyPriority('--df-theme-circle-fill'), 'important');
+  assert.equal(root.style.getPropertyValue('--df-theme-circle-icon'), 'host-after');
+  assert.equal(root.style.getPropertyPriority('--df-theme-circle-icon'), 'important');
+  assert.equal(shell.model.style.getPropertyValue('--df-theme-radius'), 'host-radius-after');
+  assert.equal(circle.getAttribute('data-dafeiyu-theme-kind'), null);
+  assert.equal(circle.style.getPropertyValue('--df-theme-fill'), '');
+  fixture.env.__DAFEIYU_DSH_CLIENT__ = undefined;
+  fixture.env.dispatchEvent({ type: 'dafeiyu-dsh-client-change' });
+  dispose(); assert.equal(fixture.listenerCount(), 0);
+});
+
+test('theme pressure and drag use bounded positions and release on cancellation, multitouch and context removal', () => {
+  const theme = materialThemeFixture(); theme.light.accent.pressEffect = 'beam';
+  const fixture = browser({ host: validHost({ materialTheme: theme }) });
+  const shell = materialThemeShell(fixture);
+  const dispose = createDafeiyuMobileContext(fixture.env).install(cssText);
+  const pointer = (type, values = {}) => shell.send.dispatchEvent(new fixture.env.PointerEvent(type,
+    { bubbles: true, pointerId: 17, isPrimary: true, clientX: 270, clientY: 660, ...values }));
+  pointer('pointerdown');
+  assert.equal(shell.send.getAttribute('data-dafeiyu-theme-pressed'), 'true');
+  assert.equal(shell.send.getAttribute('data-dafeiyu-theme-effect'), 'beam');
+  pointer('pointermove', { clientX: 10000, clientY: -900 });
+  assert.equal(shell.send.style.getPropertyValue('--df-theme-touch-x'), '100%');
+  assert.equal(shell.send.style.getPropertyValue('--df-theme-touch-y'), '0%');
+  assert.ok(Math.abs(parseFloat(shell.send.style.getPropertyValue('--df-theme-drag-x'))) <= 6);
+  pointer('pointercancel');
+  assert.equal(shell.send.getAttribute('data-dafeiyu-theme-pressed'), null);
+  assert.equal(shell.send.style.getPropertyValue('--df-theme-drag-x'), '0px');
+  pointer('pointerdown'); pointer('pointerdown', { pointerId: 18, isPrimary: false });
+  assert.equal(shell.send.getAttribute('data-dafeiyu-theme-pressed'), null);
+  pointer('pointerdown');
+  fixture.env.__DAFEIYU_DSH_CLIENT__ = undefined; fixture.env.dispatchEvent({ type: 'dafeiyu-dsh-client-change' });
+  assert.equal(shell.send.getAttribute('data-dafeiyu-theme-pressed'), null);
+  assert.equal(shell.send.style.getPropertyValue('--df-theme-drag-x'), '');
+  dispose(); assert.equal(fixture.listenerCount(), 0);
+});
+
+test('theme material and motion preferences disable real browser effects and restore independent saved values', () => {
+  const fixture = browser({ host: validHost({ materialTheme: materialThemeFixture() }), reducedMotion: true });
+  fixture.env.CSS = { supports: () => true };
+  const shell = materialThemeShell(fixture);
+  const dispose = createDafeiyuMobileContext(fixture.env).install(cssText);
+  const root = fixture.document.documentElement;
+  assert.equal(shell.send.getAttribute('data-dafeiyu-theme-motion'), 'false');
+  assert.equal(root.style.getPropertyValue('--df-theme-accent-press-duration'), '0ms');
+  for (const media of fixture.mediaQueries.filter(media => media.media === '(prefers-reduced-motion: reduce)')) {
+    media.matches = false; media.dispatchEvent({ type: 'change' });
+  }
+  fixture.flush();
+  assert.equal(shell.send.getAttribute('data-dafeiyu-theme-motion'), 'true');
+  fixture.env.__DAFEIYU_DSH_CLIENT__ = validHost({ material: false, motion: false, materialTheme: materialThemeFixture() });
+  fixture.env.dispatchEvent({ type: 'dafeiyu-dsh-client-change' });
+  assert.equal(shell.send.getAttribute('data-dafeiyu-theme-glass'), 'false');
+  assert.equal(root.style.getPropertyValue('--df-theme-accent-filter'), 'none');
+  assert.equal(root.style.getPropertyValue('--df-theme-accent-press-scale'), '1');
+  assert.equal(root.style.getPropertyValue('--df-theme-accent-press-duration'), '0ms');
+  assert.match(root.style.getPropertyValue('--df-theme-accent-tracking-color'), /, 0\)$/);
+  fixture.env.__DAFEIYU_DSH_CLIENT__ = validHost({ materialTheme: materialThemeFixture() });
+  fixture.env.dispatchEvent({ type: 'dafeiyu-dsh-client-change' });
+  assert.equal(root.style.getPropertyValue('--df-theme-accent-filter'), 'blur(3px) saturate(1.25)');
+  assert.equal(root.style.getPropertyValue('--df-theme-accent-press-scale'), '1.04');
+  dispose(); assert.equal(fixture.listenerCount(), 0);
+});
+
+test('unsupported backdrop and icon blend modes use explicit CSS tint and normal-blend fallback', () => {
+  const theme = materialThemeFixture(); theme.light.circle.iconBlend = 'plus'; theme.light.accent.iconBlend = 'srcIn';
+  const fixture = browser({ host: validHost({ materialTheme: theme }) });
+  fixture.env.CSS = { supports: () => false };
+  const dispose = createDafeiyuMobileContext(fixture.env).install(cssText);
+  const root = fixture.document.documentElement;
+  assert.equal(root.getAttribute('data-dafeiyu-material-capability'), 'css-tint');
+  assert.equal(root.style.getPropertyValue('--df-theme-circle-filter'), 'none');
+  assert.equal(root.style.getPropertyValue('--df-theme-circle-icon-blend'), 'normal');
+  assert.equal(root.style.getPropertyValue('--df-theme-accent-icon-blend'), 'normal');
+  assert.match(root.style.getPropertyValue('--df-theme-accent-fill'), /, 0\.36\)$/);
+  dispose(); assert.equal(fixture.listenerCount(), 0);
+});
+
+test('theme mutations settle without a frame loop and never disable native actions or style close controls', () => {
+  const theme = materialThemeFixture(); theme.light.accent.disabled = true;
+  const fixture = browser({ host: validHost({ materialTheme: theme }), autoMutations: true });
+  const shell = materialThemeShell(fixture);
+  const modal = fixture.create('div', { 'data-shortcut-modal': 'settings' });
+  const section = fixture.create('section', { 'data-slot': 'settings.section' }, modal);
+  const close = fixture.create('button', { 'aria-label': 'Close' }, section);
+  const dispose = createDafeiyuMobileContext(fixture.env).install(cssText);
+  fixture.flush();
+  assert.equal(shell.send.disabled, false);
+  assert.equal(close.getAttribute('data-dafeiyu-theme-kind'), null);
+  const before = fixture.mutationStats().deliveries;
+  fixture.mutation(); fixture.flush();
+  assert.equal(fixture.mutationStats().queuedTasks, 0);
+  assert.equal(fixture.pendingTimers(), 0);
+  assert.ok(fixture.mutationStats().deliveries - before < 3);
+  dispose(); fixture.flush(); assert.equal(fixture.listenerCount(), 0);
+});
+
+test('the real built bundle accepts validated material contexts and restores its imported theme on disposal', async () => {
+  const source = await readFile(new URL('../client/client.js', import.meta.url), 'utf8');
+  const fixture = browser({ host: validHost({ materialTheme: materialThemeFixture() }) });
+  materialThemeShell(fixture);
+  const rows = []; fixture.env.__ModuleLoader__ = { load(row) { rows.push(row); } };
+  new Script(source, { filename: 'client/client.js' }).runInContext(createContext(fixture.env), { timeout: 1000 });
+  const plugin = rows[0].factory(() => assert.fail('No runtime dependency is allowed'));
+  const effects = [];
+  (plugin.default ?? plugin).apply({ effect(callback) { const dispose = callback(); effects.push(dispose); return dispose; } });
+  assert.equal(fixture.document.documentElement.getAttribute('data-dafeiyu-material-theme'), '1');
+  assert.match(fixture.document.documentElement.style.getPropertyValue('--df-theme-circle-fill'), /35, 69, 103/);
+  for (const dispose of effects.reverse()) dispose();
+  assert.equal(fixture.document.documentElement.getAttribute('data-dafeiyu-material-theme'), null);
+  assert.equal(fixture.document.documentElement.style.getPropertyValue('--df-theme-circle-fill'), '');
   assert.equal(fixture.listenerCount(), 0);
 });

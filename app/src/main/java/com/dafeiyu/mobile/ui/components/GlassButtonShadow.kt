@@ -20,12 +20,23 @@ internal data class GlassButtonShadowGeometry(
     val spread: Float,
     val blurSize: Float,
     val opacity: Float = .08f,
+    val offsetX: Float = 0f,
 ) {
     val extent: Float get() = spread + blurSize
 }
 
-internal fun glassButtonShadowGeometry(shortEdge: Float, density: Float): GlassButtonShadowGeometry {
+internal fun glassButtonShadowGeometry(shortEdge: Float, density: Float, tuning: GlassDebugTuning? = null): GlassButtonShadowGeometry {
     val safeDensity = if (density.isFinite()) density.coerceIn(.1f, 16f) else 1f
+    if (tuning != null) {
+        val safe = tuning.sanitized()
+        return GlassButtonShadowGeometry(
+            offsetY = safe.shadowOffsetYDp * safeDensity,
+            spread = safe.shadowSpreadDp * safeDensity,
+            blurSize = safe.shadowBlurDp * safeDensity,
+            opacity = safe.shadowOpacity,
+            offsetX = safe.shadowOffsetXDp * safeDensity,
+        )
+    }
     val diameter = if (shortEdge.isFinite()) shortEdge.coerceIn(1f, 48f * safeDensity) else 48f * safeDensity
     return GlassButtonShadowGeometry(
         offsetY = diameter * .025f,
@@ -50,20 +61,34 @@ internal fun glassButtonShadowMargin(density: Float): Int {
     return ceil(geometry.extent + geometry.offsetY + safeDensity).toInt().coerceAtLeast(1)
 }
 
-private data class GlassShadowBand(val path: Path, val alpha: Float, val stroke: Stroke? = null)
+private data class GlassShadowBand(
+    val path: Path,
+    val alpha: Float,
+    val stroke: Stroke? = null,
+    val target: Float = 0f,
+    val previous: Float = 0f,
+)
 
 /**
  * Finite cached contour bands approximate the shared shader's continuous soft shadow on every API.
  * Drawing can overflow the layout, but adds neither padding nor a pointer/semantic target.
  */
-internal fun Modifier.glassButtonShadow(shape: Shape): Modifier = drawWithCache {
-    val geometry = glassButtonShadowGeometry(min(size.width, size.height), density)
+internal fun Modifier.glassButtonShadow(
+    shape: Shape,
+    tuning: GlassDebugTuning? = null,
+    pressProgress: () -> Float = { 0f },
+): Modifier = drawWithCache {
+    val shadowColor = tuning?.sanitized()?.shadowColor ?: Color.Black
+    val baseGeometry = glassButtonShadowGeometry(min(size.width, size.height), density, tuning)
+    val geometry = if (tuning == null) baseGeometry else baseGeometry.copy(opacity = baseGeometry.opacity * shadowColor.alpha)
+    val color = shadowColor.copy(alpha = 1f)
     val outline = shape.createOutline(size, layoutDirection, this)
     val bands = ArrayList<GlassShadowBand>(33)
     var accumulated = 0f
     for (index in 0..32) {
         val expansion = geometry.spread + geometry.blurSize * (1f - index / 32f)
         val target = glassButtonShadowOpacity(expansion, geometry)
+        val previous = accumulated
         val alpha = ((target - accumulated) / (1f - accumulated).coerceAtLeast(.001f)).coerceIn(0f, 1f)
         accumulated = target
         if (alpha <= 0f) continue
@@ -74,9 +99,9 @@ internal fun Modifier.glassButtonShadow(shape: Shape): Modifier = drawWithCache 
                 val round = outline.roundRect
                 fun expanded(corner: CornerRadius) = CornerRadius(corner.x + expansion, corner.y + expansion)
                 path.addRoundRect(RoundRect(
-                    left = round.left - expansion,
+                    left = round.left - expansion + geometry.offsetX,
                     top = round.top - expansion + geometry.offsetY,
-                    right = round.right + expansion,
+                    right = round.right + expansion + geometry.offsetX,
                     bottom = round.bottom + expansion + geometry.offsetY,
                     topLeftCornerRadius = expanded(round.topLeftCornerRadius),
                     topRightCornerRadius = expanded(round.topRightCornerRadius),
@@ -85,21 +110,30 @@ internal fun Modifier.glassButtonShadow(shape: Shape): Modifier = drawWithCache 
                 ))
             }
             is Outline.Rectangle -> path.addRect(androidx.compose.ui.geometry.Rect(
-                outline.rect.left - expansion, outline.rect.top - expansion + geometry.offsetY,
-                outline.rect.right + expansion, outline.rect.bottom + expansion + geometry.offsetY,
+                outline.rect.left - expansion + geometry.offsetX, outline.rect.top - expansion + geometry.offsetY,
+                outline.rect.right + expansion + geometry.offsetX, outline.rect.bottom + expansion + geometry.offsetY,
             ))
             is Outline.Generic -> {
-                path.addPath(outline.path, Offset(0f, geometry.offsetY))
+                path.addPath(outline.path, Offset(geometry.offsetX, geometry.offsetY))
                 stroke = Stroke(expansion * 2f)
             }
         }
-        bands.add(GlassShadowBand(path, alpha, stroke))
+        bands.add(GlassShadowBand(path, alpha, stroke, target, previous))
     }
     onDrawBehind {
+        val press = pressProgress().let { if (it.isFinite()) it.coerceIn(0f, 1f) else 0f }
+        val pressure = 1f + ((tuning?.shadowPressScale ?: 1f) - 1f) * press
         for (band in bands) {
             val stroke = band.stroke
-            if (stroke == null) drawPath(band.path, Color.Black, alpha = band.alpha)
-            else drawPath(band.path, Color.Black, alpha = band.alpha, style = stroke)
+            // Bands overlap. Recompute their compositing alpha from the cumulative target so a
+            // pressure change adjusts total opacity, rather than multiplying every overlapping coat.
+            val alpha = if (pressure == 1f) band.alpha else {
+                val target = (band.target * pressure).coerceIn(0f, 1f)
+                val previous = (band.previous * pressure).coerceIn(0f, 1f)
+                ((target - previous) / (1f - previous).coerceAtLeast(.001f)).coerceIn(0f, 1f)
+            }
+            if (stroke == null) drawPath(band.path, color, alpha = alpha)
+            else drawPath(band.path, color, alpha = alpha, style = stroke)
         }
     }
 }

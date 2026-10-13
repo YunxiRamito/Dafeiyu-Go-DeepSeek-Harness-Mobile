@@ -190,8 +190,8 @@ class NotificationSettingsStore(context: Context) {
     private fun channelDefinitions(): List<ChannelDefinition> = listOf(
         ChannelDefinition(
             id = NotificationChannelIds.GENERAL,
-            name = "大肥鱼通知",
-            description = "大肥鱼的一般提醒",
+            name = "Dafeiyu-GO 通知",
+            description = "Dafeiyu-GO 的一般提醒",
             importance = NotificationManager.IMPORTANCE_DEFAULT,
         ),
         ChannelDefinition(

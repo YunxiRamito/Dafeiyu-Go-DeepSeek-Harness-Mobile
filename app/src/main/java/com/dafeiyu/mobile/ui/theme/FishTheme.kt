@@ -10,6 +10,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -18,6 +19,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dafeiyu.mobile.glasslab.LabDocument
+import com.dafeiyu.mobile.ui.nativeThemeStyles
+import com.dafeiyu.mobile.ui.themeColor
+import com.dafeiyu.mobile.ui.components.LocalGlassThemeStyles
 
 private val LightColors = lightColorScheme(
     primary = Color(0xFF007AFF),
@@ -146,6 +151,7 @@ fun FishTheme(
     fontWeightMode: String = "标准",
     fontFamilyKey: String = DEFAULT_APP_FONT_FAMILY,
     interfaceScale: Float = 1f,
+    materialTheme: LabDocument? = null,
     content: @Composable () -> Unit,
 ) {
     val dark = when (themeMode.lowercase()) {
@@ -154,7 +160,10 @@ fun FishTheme(
         else -> isSystemInDarkTheme()
     }
     val safeInterfaceScale = interfaceScale.coerceIn(0.75f, 1.5f)
-    val accent = when (accentColorKey) {
+    val selectedStyles = if (dark) materialTheme?.dark else materialTheme?.light
+    // The material adapter owns button transparency; semantic links and selection labels still need a color.
+    val customAccent = selectedStyles?.get("accent")?.themeColor("surface")?.copy(alpha = 1f)
+    val accent = customAccent ?: when (accentColorKey) {
         "purple" -> if (dark) Color(0xFFB69CFF) else Color(0xFF6D3BFF)
         "green" -> if (dark) Color(0xFF62D79A) else Color(0xFF168A4A)
         "orange" -> if (dark) Color(0xFFFFB65C) else Color(0xFFE26D00)
@@ -177,6 +186,7 @@ fun FishTheme(
     CompositionLocalProvider(
         LocalInterfaceScale provides safeInterfaceScale,
         LocalDensity provides contentDensity,
+        LocalGlassThemeStyles provides remember(materialTheme) { materialTheme?.nativeThemeStyles() },
     ) {
         MaterialTheme(
             colorScheme = themedColors,

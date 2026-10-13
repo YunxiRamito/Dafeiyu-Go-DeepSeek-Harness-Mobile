@@ -1,5 +1,7 @@
 package com.dafeiyu.mobile.data
 
+import com.dafeiyu.mobile.ui.providerCredential
+import com.dafeiyu.mobile.ui.providerEditedConfiguration
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -120,6 +122,39 @@ private fun fixtureController(backend: RuntimeFixture): Pair<ModelRuntimeControl
 }
 
 fun main() {
+    val imported = ModelProviderConfig("dsh-pi-deepseek", "Imported", builtinProvider = "deepseek", api = "openai-completions",
+        baseUrl = "https://fixture.invalid/v1", modelsJson = "[{\"id\":\"fixture-model\",\"contextWindow\":123456,\"reasoning\":true}]",
+        enabled = false, dshRoute = "deepseek")
+    checkCase("name-only edit preserves imported builtin overrides, route and enabled state") {
+        val edited = providerEditedConfiguration(imported, imported.id, " Renamed ", true, "deepseek",
+            "openai-completions", imported.baseUrl.orEmpty(), imported.modelsJson)
+        check(edited == imported.copy(name = "Renamed"))
+        check(!edited.protected && edited.dshRoute == "deepseek")
+    }
+    checkCase("hidden catalog fields and route are not cleared by unchanged catalog choice") {
+        val edited = providerEditedConfiguration(imported, imported.id, imported.name, true, "deepseek",
+            "openai-responses", "", "[]")
+        check(edited == imported)
+    }
+    checkCase("explicit custom fields change without losing imported route or enabled flag") {
+        val edited = providerEditedConfiguration(imported, imported.id, "Custom", false, "",
+            "openai-responses", "https://changed.invalid/v1", "[{\"id\":\"changed\"}]")
+        check(edited == imported.copy(name = "Custom", builtinProvider = null, api = "openai-responses",
+            baseUrl = "https://changed.invalid/v1", modelsJson = "[{\"id\":\"changed\"}]"))
+    }
+    checkCase("unchanged authentication remains null and cannot replace existing OAuth or cloud credentials") {
+        check(providerCredential("", " ", "", "", "") == null)
+        val cloud = JSONObject().put("type", "api_key").put("env", JSONObject().put("AWS_REGION", "fixture"))
+        val edited = providerEditedConfiguration(imported, imported.id, "Renamed", true, "deepseek", "", "", "")
+        val saved = JSONObject().put(imported.id, cloud)
+        providerCredential("", "", "", "", "")?.let { saved.put(edited.id, it) }
+        check(saved.getJSONObject(imported.id).getJSONObject("env").getString("AWS_REGION") == "fixture")
+    }
+    checkCase("new builtin has no guessed overrides and edit cannot change provider identity") {
+        val fresh = providerEditedConfiguration(null, " new-provider ", " New ", true, "openai", "openai-responses", "", "invalid")
+        check(fresh == ModelProviderConfig("new-provider", "New", builtinProvider = "openai"))
+        check(runCatching { providerEditedConfiguration(imported, "other-id", "Changed", true, "deepseek", "", "", "") }.isFailure)
+    }
     checkCase("catalog preserves protocol, levels and default") {
         val provider = ModelRuntimeController.parseCatalog(catalog()).single()
         val model = provider.models.single()

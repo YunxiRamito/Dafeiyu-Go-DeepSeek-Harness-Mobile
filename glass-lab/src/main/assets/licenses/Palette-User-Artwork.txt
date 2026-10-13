@@ -1,0 +1,6 @@
+Dafeiyu Palette launcher artwork
+
+The user supplied this image and explicitly selected it as the Dafeiyu Palette
+launcher icon on 2026-10-14. The application's MIT license applies to source
+code; it does not grant a separate license to this artwork. Original author
+and distribution license were not specified. Do not relicense it as MIT.

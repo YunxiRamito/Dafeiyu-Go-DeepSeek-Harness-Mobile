@@ -13,6 +13,14 @@ val releaseProperties = Properties().apply {
     if (source.isFile) source.inputStream().use { load(it) }
 }
 
+// The palette and the main application validate exactly the same portable schema.
+// Only this data/persistence file is shared; no palette Activity or renderer is bundled here.
+val themeSchemaDirectory = rootProject.layout.projectDirectory.dir("../Temp_Android/build/app/generated/theme-schema")
+val syncThemeSchema by tasks.registering(Copy::class) {
+    from(rootProject.file("glass-lab/src/main/java/com/dafeiyu/mobile/glasslab/LabPresets.kt"))
+    into(themeSchemaDirectory.dir("com/dafeiyu/mobile/glasslab"))
+}
+
 android {
     namespace = "com.dafeiyu.mobile"
     compileSdk = 35
@@ -20,8 +28,8 @@ android {
         applicationId = "com.dafeiyu.mobile"
         minSdk = 30
         targetSdk = 35
-        versionCode = 28
-        versionName = "0.1.27"
+        versionCode = 29
+        versionName = "0.1.28"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // Release validation covers the real PKB110 arm64 device and the
@@ -59,10 +67,13 @@ android {
         resources.excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
     }
     sourceSets.getByName("main") {
+        java.srcDir(themeSchemaDirectory)
         jniLibs.srcDir(rootProject.file("../Temp_Android/runtime/jniLibs"))
         assets.srcDir(rootProject.file("../Temp_Android/runtime/assets"))
     }
 }
+
+tasks.named("preBuild").configure { dependsOn(syncThemeSchema) }
 
 dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

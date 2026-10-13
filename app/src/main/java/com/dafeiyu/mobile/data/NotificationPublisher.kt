@@ -28,7 +28,7 @@ class NotificationPublisher(context: Context) {
     fun postRunning(enabled: Boolean, detail: String = "任务正在运行") {
         if (!enabled || !canPost()) { clearRunning(); return }
         ensureChannels()
-        val notification = base(NotificationChannelIds.LIVE_STATUS, "大肥鱼 GO", detail)
+        val notification = base(NotificationChannelIds.LIVE_STATUS, "Dafeiyu-GO", detail)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
@@ -46,7 +46,7 @@ class NotificationPublisher(context: Context) {
         ensureChannels()
         notifyGuarded(
             COMPLETED_ID,
-            base(NotificationChannelIds.TASKS, "大肥鱼 GO", detail)
+            base(NotificationChannelIds.TASKS, "Dafeiyu-GO", detail)
                 .setAutoCancel(true)
                 .build(),
         )
@@ -87,7 +87,7 @@ class NotificationPublisher(context: Context) {
         val delivered = app.getSharedPreferences("android_update_notifications", Context.MODE_PRIVATE)
         if (delivered.getString("last_delivered", null) == deliveryKey) return
         ensureChannels()
-        val posted = notifyGuarded(UPDATE_ID, base(NotificationChannelIds.TASKS, "大肥鱼 GO 有新版本 $version",
+        val posted = notifyGuarded(UPDATE_ID, base(NotificationChannelIds.TASKS, "Dafeiyu-GO 有新版本 $version",
             if (downloaded) "已下载并通过校验，打开更新页确认安装。" else "打开更新页查看更新内容和下载。").setAutoCancel(true).build())
         if (posted) delivered.edit().putString("last_delivered", deliveryKey).apply()
     }

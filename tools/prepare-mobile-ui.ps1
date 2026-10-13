@@ -9,8 +9,8 @@ if (-not (Test-Path -LiteralPath $manifestFile -PathType Leaf) -or (Get-Item -Li
     throw 'Frozen mobile UI manifest missing or oversized; no assets were changed.'
 }
 $manifest = [IO.File]::ReadAllText($manifestFile) | ConvertFrom-Json
-if ($manifest.schema -ne 1 -or $manifest.name -cne 'dafeiyu-mobile-ui' -or $manifest.version -cne '0.1.5' -or
-    $manifest.file_name -cne 'dafeiyu-mobile-ui-0.1.5.tgz' -or $manifest.sha256 -cnotmatch '^[a-f0-9]{64}$' -or
+if ($manifest.schema -ne 1 -or $manifest.name -cne 'dafeiyu-mobile-ui' -or $manifest.version -cne '0.1.6' -or
+    $manifest.file_name -cne 'dafeiyu-mobile-ui-0.1.6.tgz' -or $manifest.sha256 -cnotmatch '^[a-f0-9]{64}$' -or
     $manifest.size_bytes -le 0 -or $manifest.size_bytes -gt 1048576 -or $manifest.files.Count -lt 3 -or $manifest.files.Count -gt 32) {
     throw 'Frozen mobile UI manifest does not match the reviewed package.'
 }

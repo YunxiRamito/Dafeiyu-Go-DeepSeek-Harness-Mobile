@@ -64,9 +64,13 @@ internal fun DshWebContent(repository: DemoRepository, onSettings: () -> Unit,
     val effects = PowerSavingPolicy.resolve(repository.powerSavingMode, repository.glassMaterial,
         repository.pageTransitions, repository.springButtons, reduceTransparency = repository.reduceTransparency,
         reduceMotion = repository.reduceMotion)
-    val mobileClient = DshWebClientContext(if (online) "online" else "local", repository.themeMode,
-        effects.glassMaterial, !effects.reduceMotion && ValueAnimator.areAnimatorsEnabled() &&
-            effects.pageTransitions && effects.springButtons)
+    val customMaterial = LocalAppThemeState.current?.webMaterialTheme
+    val motionEnabled = !effects.reduceMotion && ValueAnimator.areAnimatorsEnabled() &&
+        effects.pageTransitions && effects.springButtons
+    val mobileClient = remember(online, repository.themeMode, effects.glassMaterial, motionEnabled, customMaterial) {
+        DshWebClientContext(if (online) "online" else "local", repository.themeMode,
+            effects.glassMaterial, motionEnabled, materialTheme = customMaterial)
+    }
     DshWebSurface(access, selectedSession, placeholderTitle, placeholderDetail, onSettings,
         mobileClient = mobileClient, hostActions = hostActions, modifier = modifier.testTag("dsh-home-direct"),
         startupFailure = startupFailure, online = online, interactive = interactive,

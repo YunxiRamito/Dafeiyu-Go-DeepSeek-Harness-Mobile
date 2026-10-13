@@ -12,6 +12,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** A storage-only Node process using the exact installed DSH persistence code.
@@ -53,6 +54,21 @@ class DshSharedPersistenceBridge(
     suspend fun writeCredentialDocument(updates: JSONObject, exclusiveRuntimeUse: Boolean = false): JSONObject = request(File(app.filesDir, "dsh-home"),
         JSONObject().put("operation", "credentials-write").put("home", "/dafeiyu-shared-data")
             .put("guestHome", "/dafeiyu-dsh-home").put("updates", updates), exclusiveRuntimeUse = exclusiveRuntimeUse)
+
+    /** Staging must never overwrite a live or orphaned reference. The pinned
+     * writer rechecks expectedRevision while holding its real cross-process
+     * credential lock; even a partial helper failure touches only fresh refs. */
+    internal suspend fun stageCredentialReferences(candidates: JSONArray, expectedRevision: String): JSONObject {
+        val before = readCredentialDocument()
+        val result = writeCredentialDocument(DshCandidateCredentialStaging.prepare(before, candidates, expectedRevision))
+        val checked = readCredentialDocument()
+        check(result.getInt("applied") == candidates.length() && result.getString("revision") == checked.getString("revision") &&
+            (0 until candidates.length()).all { index -> val item = candidates.getJSONObject(index)
+                checked.getJSONObject("refs").optString(item.getString("ref")) == item.getString("value") }) {
+            "DSH 候选凭据尚未确认，未提交提供商设置；原凭据保留"
+        }
+        return result
+    }
 
     suspend fun convertProviderConfiguration(frame: JSONObject): JSONObject = request(File(app.filesDir, "dsh-home"),
         frame, scriptName = "shared-configuration.mjs")
@@ -166,5 +182,23 @@ class DshSharedPersistenceBridge(
                 }
             } finally { withContext(NonCancellable) { process.stop() } }
         }
+    }
+}
+
+/** Preflight shared by the real process-backed staging path and offline tests. */
+internal object DshCandidateCredentialStaging {
+    fun prepare(before: JSONObject, candidates: JSONArray, expectedRevision: String): JSONObject {
+        check(before.getString("revision") == expectedRevision) { "DSH 凭据已变化，未暂存新凭据；原凭据保留" }
+        require(candidates.length() in 1..128)
+        val names = mutableSetOf<String>()
+        for (index in 0 until candidates.length()) {
+            val item = candidates.getJSONObject(index)
+            val reference = item.getString("ref")
+            require(reference.matches(Regex("DAFEIYU_PROVIDER_[A-Za-z0-9_]+")) && names.add(reference) &&
+                !before.getJSONObject("refs").has(reference) && !item.isNull("value")) { "候选凭据名称已占用；原凭据保留" }
+            ModelProviderCredential.validate(JSONObject().put("type", "api_key").put("key", item.getString("value")))
+            require(item.getString("value").isNotEmpty())
+        }
+        return JSONObject().put("expectedRevision", expectedRevision).put("refs", JSONArray(candidates.toString())).put("records", JSONArray())
     }
 }

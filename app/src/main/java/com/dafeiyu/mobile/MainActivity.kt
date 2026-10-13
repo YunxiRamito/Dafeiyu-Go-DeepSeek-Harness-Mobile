@@ -1,6 +1,7 @@
 package com.dafeiyu.mobile
 
 import android.animation.ValueAnimator
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
@@ -66,6 +68,8 @@ import com.dafeiyu.mobile.data.NotificationPublisher
 import com.dafeiyu.mobile.data.AndroidUpdateScheduler
 import com.dafeiyu.mobile.data.AndroidAppVisibility
 import com.dafeiyu.mobile.data.AssistantRunStatus
+import com.dafeiyu.mobile.data.ThemeState
+import com.dafeiyu.mobile.data.ThemeDocuments
 import com.dafeiyu.mobile.ui.*
 import com.dafeiyu.mobile.ui.components.*
 import com.dafeiyu.mobile.ui.theme.FishTheme
@@ -77,13 +81,29 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (savedInstanceState == null) receiveTheme(intent)
         setContent { DafeiyuApp() }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        receiveTheme(intent)
+    }
+
+    private fun receiveTheme(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_VIEW) {
+            val state = ViewModelProvider(this)[ThemeState::class.java]
+            if (intent.type !in setOf(ThemeDocuments.MIME_TYPE, "application/json") || intent.data?.scheme != "content") {
+                state.requestOpenWithMessage("主题导入失败，当前主题保留：请使用调色盘或系统文件入口提供 JSON 主题。")
+            } else state.importTheme(intent.data)
+        }
     }
 }
 
 @Composable
 @OptIn(ExperimentalComposeUiApi::class)
-fun DafeiyuApp(repository: DemoRepository = viewModel()) {
+fun DafeiyuApp(repository: DemoRepository = viewModel(), themeState: ThemeState = viewModel()) {
     var route by rememberSaveable { mutableStateOf("home") }
     var scanReturnToPair by rememberSaveable { mutableStateOf(false) }
     var scannedPairingPayload by rememberSaveable { mutableStateOf<String?>(null) }
@@ -107,6 +127,7 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
     var navigationJob by remember { mutableStateOf<Job?>(null) }
     var menuButtonBounds by remember { mutableStateOf<Rect?>(null) }
     var dshHomeBounds by remember { mutableStateOf<Rect?>(null) }
+    var handledThemeRequest by remember(themeState) { mutableStateOf(0L) }
     var dshPageReady by remember { mutableStateOf(false) }
     var homeBackdropCapture by remember { mutableStateOf<PageBackdropCapture?>(null) }
     var chatOverlay by remember { mutableFloatStateOf(0f) }
@@ -219,7 +240,17 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
     }
     fun openSettings(target: String? = null): Boolean {
         focus.clearFocus(); keyboard?.hide()
-        if (settingsHome.isActive) return true
+        if (settingsHome.isActive) {
+            if (target != null) {
+                val existingOrigin = settingsHome.sourceBoundsInWindow ?: menuButtonBounds ?: return false
+                navigate {
+                    if (settingsDetail.isActive) settingsDetail.close(pageMotionReduced)
+                    settingsDetail.recordSource(target, existingOrigin, existingOrigin)
+                    settingsDetail.open(pageMotionReduced)
+                }
+            }
+            return true
+        }
         // A webpage bridge has no native toolbar to measure. Use an in-window
         // presentation anchor without mounting a second navigation button.
         val origin = if (repository.engineMode == "dsh") dshHomeBounds?.let { bounds ->
@@ -293,6 +324,14 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
             if (repository.lastNotice == notice) repository.updateNotice("")
         }
     }
+    LaunchedEffect(themeState.openRequest, themeState.isLoading, dshHomeBounds, menuButtonBounds) {
+        if (themeState.openRequest > handledThemeRequest && !themeState.isLoading) {
+            route = "home"
+            awaitingDshHome = false
+            menuOpen = false
+            if (openSettings("themes")) handledThemeRequest = themeState.openRequest
+        }
+    }
     FishTheme(
         themeMode = repository.themeMode,
         accentColorKey = repository.accentColorKey,
@@ -300,6 +339,7 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
         fontWeightMode = repository.fontWeight,
         fontFamilyKey = repository.fontFamily,
         interfaceScale = repository.interfaceScale,
+        materialTheme = themeState.document,
     ) {
         ApplicationPermissionHost(permissionBridge)
         OfficialToolApprovalHost()
@@ -325,6 +365,7 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
             }
         }
         CompositionLocalProvider(
+            LocalAppThemeState provides themeState,
             LocalGlassBackdrop provides backdrop,
             LocalFloatingGlassBackdrop provides floatingBackdrop,
             // 「液态玻璃材质」关闭时复用减少透明度的实色降级路径（不透明 surface + onSurface 文字）。
