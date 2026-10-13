@@ -1,6 +1,6 @@
 #!/bin/sh
-# Review candidate only. The author has not uploaded or run this helper.
-# Invocation: sh android-release-helper-candidate.sh MODE [SOURCE_PARENT APK_SHA256 APK_BYTES]
+# Fixed Android release helper; previous deployed releases stay immutable.
+# Invocation: sh android-release-helper.sh MODE [SOURCE_PARENT APK_SHA256 APK_BYTES]
 # MODE defaults to review; other modes are separate explicit administrator actions.
 set -eu
 
@@ -15,8 +15,8 @@ image='sha256:a921a9554045dec628db752d18ca82a9e69bb590aa588ba353d75e0fe7230fe3'
 api='developer-center-api-1'
 release_root='/home/dafeiyu/developer-center/android-apks'
 public_key='/home/dafeiyu/developer-center/tls/android-manifest-public.pem'
-version='0.1.25'
-code='26'
+version='0.1.26'
+code='27'
 channel='stable'
 package='com.dafeiyu.mobile'
 certificate='d4341e66075d1e35909796cb5962b22f8aaed378ca50e057a1b25ed97fe0c64b'

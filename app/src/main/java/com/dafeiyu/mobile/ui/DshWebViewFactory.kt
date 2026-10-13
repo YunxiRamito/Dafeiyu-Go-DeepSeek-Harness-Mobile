@@ -22,7 +22,8 @@ internal object DshWebViewFactory {
     fun create(context: Context, access: String, selectedSession: String?,
         onPageStarted: (WebView) -> Unit = {}, onPageFinished: (WebView) -> Unit = {},
         onMainFrameError: () -> Unit = {},
-        onMainFrameFailureCode: (Int, Boolean) -> Unit = { _, _ -> }): WebView {
+        onMainFrameFailureCode: (Int, Boolean) -> Unit = { _, _ -> },
+        onViewCreated: (WebView) -> Unit = {}): WebView {
         val expected = Uri.parse(access)
         require(expected.scheme == "http" && expected.host == "127.0.0.1" &&
             expected.port in 1024..65535 && expected.userInfo == null) { "DSH 网页入口必须是本机已认证地址" }
@@ -61,6 +62,9 @@ internal object DshWebViewFactory {
                 }
             }
             tag = access
+            // Establish ownership before bootstrap can synchronously report an
+            // unavailable feature, and before native navigation emits callbacks.
+            onViewCreated(this)
             if (selectedSession != null) {
                 if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
                     onMainFrameError()

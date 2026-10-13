@@ -42,4 +42,26 @@ if ($LASTEXITCODE -ne 0) { Get-Content -LiteralPath (Join-Path $runRoot 'compile
     *> (Join-Path $runRoot 'checks.log')
 Get-Content -LiteralPath (Join-Path $runRoot 'checks.log')
 if ($LASTEXITCODE -ne 0) { throw 'Notification focused checks failed' }
+
+# Run the actual publisher/settings sources against memory-only platform substitutes.
+# The compilation above remains the real Android SDK/AndroidX Werror check; these
+# substitutes exercise the permission race and retry boundary, not system delivery.
+$publisherSources = @('NotificationPublisher.kt', 'NotificationSettingsStore.kt') |
+    ForEach-Object { Join-Path $projectRoot "app/src/main/java/com/dafeiyu/mobile/data/$_" }
+$publisherSources += @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'publisher-fixture') -Filter '*.kt' -File |
+    Sort-Object FullName | Select-Object -ExpandProperty FullName)
+$publisherSources += Join-Path $PSScriptRoot 'NotificationPublisherChecks.kt'
+$publisherJar = Join-Path $runRoot 'notification-publisher-checks.jar'
+$publisherClasspath = @($jar, $stdlib, $annotations) -join ';'
+& $java "-Djava.io.tmpdir=$runRoot" -Xmx256m -cp $compilerClasspath org.jetbrains.kotlin.cli.jvm.K2JVMCompiler `
+    -Werror -no-stdlib -no-reflect -jvm-target 17 -classpath $publisherClasspath -d $publisherJar @publisherSources `
+    *> (Join-Path $runRoot 'publisher-compile.log')
+if ($LASTEXITCODE -ne 0) {
+    Get-Content -LiteralPath (Join-Path $runRoot 'publisher-compile.log')
+    throw 'Notification publisher fixture compilation failed'
+}
+& $java "-Djava.io.tmpdir=$runRoot" -Xmx128m -cp "$publisherJar;$publisherClasspath" `
+    com.dafeiyu.mobile.data.NotificationPublisherChecksKt *> (Join-Path $runRoot 'publisher-checks.log')
+Get-Content -LiteralPath (Join-Path $runRoot 'publisher-checks.log')
+if ($LASTEXITCODE -ne 0) { throw 'Notification publisher failure/retry checks failed' }
 Write-Output "Focused production Werror and offline evidence: $runRoot"

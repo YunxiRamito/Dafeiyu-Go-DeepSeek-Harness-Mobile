@@ -1,4 +1,30 @@
-# 当前批次 · 0.1.25 / code26 · 2026-10-12
+# 当前批次 · 0.1.26 / code27 · 2026-10-13
+
+## 0.1.26 已交付：本机 DSH 网页白屏修复，待用户验收
+
+用户确认 QA 模拟器白屏发生在 **DSH 引擎本地模式**，截图表现为原生顶栏可见、网页区为空且进度条未结束。已修正 `DshWebContent` 的 WebView 释放生命周期：移除读取共享 mutable WebView 的旧 `DisposableEffect(access)`，改由每个 `AndroidView.onRelease` 精确释放自身；旧实例迟到的页面和错误回调不再改写新实例。生产直接使用提取的 `DshWebSurface`，同一 composable 提供真实设备生命周期专项，调试测试 Activity 不进入正式 APK。编译证据 `../Temp_Android/build-webview-lifecycle-0.1.26-r1.log` **BUILD SUCCESSFUL，3m4s，66 tasks/26 executed**，debug 与 androidTest 均覆盖安装 QA Success。
+
+用户确认模拟器空闲后，真实 **Compose + WebView 生命周期 7/7 PASS，OK(1)，4.884s**，覆盖 null→URL、地址替换、旧 view 迟到错误隔离、同地址切会话、URL→null→URL 和退出释放。随后真实 **本机 DSH bundle/双引擎回归 8/8 PASS，OK(1)，72.05s**：认证导航、首方 JS、root 渲染、会话选择、共享历史及永久删除冷重建均通过。两项 `paidModelRequests=0`，测试自有 store 与 loopback 服务已清理。证据为 `../Temp_Android/qa/web-lifecycle-0.1.26-r1/report.json`、`native-engine-report.json`；这些结果是实际专项验证，最终用户页面视觉仍待验收。先前 r17c 公网归档专项在第三个删除准备阶段超时，未开 gate；精确临时关系的 Android cleanup 已 **2/2 PASS，0.573s**，原设备身份和 QA 关系保留。
+
+正式 `assembleRelease + lintRelease` 已通过：`../Temp_Android/build-release-0.1.26-final-r1.log` **BUILD SUCCESSFUL，5m10s，55 tasks / 24 executed**。正式 APK 为 `../Temp_Android/Dist/Dafeiyu-Go-Mobile-0.1.26.apk`，**93,868,233 bytes**，SHA-256 `9051b5ce1e87061f5c5738c2bee9f00071c9a603cb2c1ccd27b4d083959a7bfa`；包名 `com.dafeiyu.mobile`、code27、min30/target35、arm64-v8a/x86_64、非 debuggable、v2 签名。固定发行证书 SHA-256 为 `d4341e66075d1e35909796cb5962b22f8aaed378ca50e057a1b25ed97fe0c64b`，正式 manifest 不含调试生命周期 Activity，检查保存于 `qa/source-release-audit-0.1.26-final/release-manifest-tree.txt`。
+
+不可变 `0.1.26` 正式目录和签名 manifest 已部署并选择 stable：`../Temp_Android/qa/android-release-0-1-26-r1/receipt.json` 的 review、上传、verify-source、deploy、verify-deployed、publish 均 exit0/completed。真实 Android 公网更新专项 `qa/android-release-smoke-0-1-26-r1/report.json` **5/5 PASS，OK(1)，93.994s**：生产 CA/hostname/SPKI、原始签名 manifest、真实 ApkVerifier/PackageManager、正式 APK 完整字节均匹配；实际 **8 路重叠 TLS1.3/206 Range** 全部分片及摘要正确。测试自有目录已清理，未发起付费模型请求、安装界面或权限申请。
+
+QA `emulator-5558` 和 PKB110 `adb-3B15AP01NZT00000-0X4cpb._adb-tls-connect._tcp` 均已 `install --no-streaming -r` **Success / exit0**，设备 PackageManager 核验 **0.1.26/code27、非 debuggable**。安装证据为 `../Temp_Android/qa/install-release-0.1.26/qa-result.json`、`phone-result.json` 及对应日志；保留数据，未授予权限、未启动真机应用或操作其 UI。真机由 mDNS 发现当前端口 `192.168.5.201:39639` 后连接，后续仍须重新查 serial。实现、正式编译、离线检查和上述设备专项均有证据；**用户本地主页视觉与操作验收待进行，不能把本机回归扩展为 Aries 远程链路已完成**。
+
+通知权限竞争窄修已纳入正式包：四个 notify 入口统一仅捕获 `SecurityException`；更新提醒只有 notify 成功返回才写 `last_delivered`，拒绝后可重试。`../Temp_Android/qa-notifications-permission-race-0.1.26-r2.log` 的实际 Android35/AndroidX 生产源码 Werror 编译通过，原策略/协程 **24/24 PASS**，实际 Publisher 加内存平台替身 **15/15 PASS**。这些是离线边界验证，未冒称真实系统通知、Live Update 或 OEM/FCM 投递。
+
+0.1.25 的源码快照已提交并推送 Android `main`：`c0e0b3027b359078491bb19f6e442d3e0356883d`，旧正式 APK/manifest 保持不可变；所有新生产变更进入 0.1.26/code27，本节随本次源码提交。AriesClient 新增每客户端固定 CA TLS 上下文的同步 lazy 复用，只缓存不可变信任对象，不缓存节点、成员、presence、授权或撤销结果；节点和权限校验、nonce/签名、超时保持原实际流程。该优化已纳正式编译，**没有新的公网 Web/Files/Archive 成功证据，三个生产 capability gate 继续 false**。
+
+本机白屏热修之后的只读性能审计发现，Android 每次 scoped list 执行 `6 + E_pre + E_post` 次串行 HTTP，两遍空事件下限8次、有历史通常至少10次；全链持有单一 Mutex，IPC 截止包含排队。r15 完成 list 中位数3560ms/最高30236ms，不能据此量化网络和锁等待各占多少。现有 Aries `/events` 虽有 wait_ms，但不返回同一快照中的 generation、公钥、精确持久终态和密钥确认，**不能删除 fresh post membership-status 或 post-events 来换速度**。真实 dirty tracking、同次准入 raw page 复用和 fresh node 的同次心跳复用仅为后续候选，尚未实现或验收；完整 VM 仍保留用户确认点，推送平台未注册的离线通道仍待前置条件。
+
+### 跨仓库改动（0.1.26）
+
+Connect 公开仓库 [YunxiRamito/Dafeiyu-GO-Connect-Plugin](https://github.com/YunxiRamito/Dafeiyu-GO-Connect-Plugin) 已按授权创建并推送 `main` 提交 `e196eabe54cf17bc2fbaf47d72a2c419503098f7`，112 个审查源码文件、MIT，工作树干净；Node v26.7.0 下受审 build/check 均 exit 0，**142/142 tests PASS**。未创建发布 tag、Release 或在线 feed，所有公网新 capability gate 仍 false。孤立 legal/docs 候选 tgz 为 202,484 bytes / `97c58bbe1fd6581ced1663763785ef6b2371789427812ea88579b2627f7c22bf`，增加完整 LICENSE，运行源码不变；本轮白屏修复仍保留双端原 200,430 bytes / `4f3657730459197835a014b7f7433b44cc652e5b32480cdb37c061b160e75bf2` 固定包，未静默改 pin。
+
+PC `.dym` 选择性源码提交已推送 `main`：`17360ce2b606f7d2f79b9d60a75c645bb40a4cc1`，仅 11 个授权路径。实际提交快照完整 Release win-x64 WinUI/XAML Build **0 errors / 40 既有 warnings**；真实 ExportDymAsync/ImportDymAsync/Apply 调用边界 Roslyn AST **24 PASS**，这属于静态入口核对，未冒称 WinUI 按钮设备执行。58 个原工作文件的字节在 commit/push 期间完全保留，其他 50 项 status 未纳入。证据 `../Temp_Android/qa/pc-dym-selective-commit-20261013/commit-push-result.json`。Setup `.dym` 提交 `8f51c85` 已在前轮推送；DeveloperCenter 不新建源码仓库，生产后端仍用本文件记录的实际部署镜像。
+
+DeveloperCenter 本轮仅在既有 APK 发布根增加不可变 `0.1.26` 并切换 stable 指针，实际 API 镜像仍为 `sha256:a921a9554045dec628db752d18ca82a9e69bb590aa588ba353d75e0fe7230fe3`、UID1654/healthy；旧 `0.1.25` 目录未覆盖，API 只读挂载及元数据公钥不变。发布和生产用户读权限验证均见 `qa/android-release-0-1-26-r1/receipt.json`。
 
 ## 2026-10-13 r17 接续与交付证据
 

@@ -17,7 +17,6 @@ import com.dafeiyu.mobile.MainActivity
  * pretend to be FCM or an OEM push channel; server events can use the same
  * channels once a registered transport delivers them.
  */
-@SuppressLint("MissingPermission")
 class NotificationPublisher(context: Context) {
     private val app = context.applicationContext
     private val manager = NotificationManagerCompat.from(app)
@@ -35,7 +34,7 @@ class NotificationPublisher(context: Context) {
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setProgress(0, 0, true)
             .build()
-        manager.notify(
+        notifyGuarded(
             RUNNING_ID,
             requestLiveUpdate(notification),
         )
@@ -45,7 +44,7 @@ class NotificationPublisher(context: Context) {
         manager.cancel(RUNNING_ID)
         if (!enabled || !canPost()) return
         ensureChannels()
-        manager.notify(
+        notifyGuarded(
             COMPLETED_ID,
             base(NotificationChannelIds.TASKS, "大肥鱼 GO", detail)
                 .setAutoCancel(true)
@@ -63,8 +62,9 @@ class NotificationPublisher(context: Context) {
         if (!preferences.getBoolean("notifications_enabled", true) ||
             !preferences.getBoolean(event.category.preference, true) || !canPost()) return
         ensureChannels()
-        manager.notify("event-${event.id}", EVENT_ID,
-            base(event.category.channel, event.title.take(160), event.detail.take(320)).setAutoCancel(true).build())
+        notifyGuarded(EVENT_ID,
+            base(event.category.channel, event.title.take(160), event.detail.take(320)).setAutoCancel(true).build(),
+            "event-${event.id}")
     }
 
     private fun requestLiveUpdate(notification: Notification): Notification {
@@ -87,9 +87,19 @@ class NotificationPublisher(context: Context) {
         val delivered = app.getSharedPreferences("android_update_notifications", Context.MODE_PRIVATE)
         if (delivered.getString("last_delivered", null) == deliveryKey) return
         ensureChannels()
-        manager.notify(UPDATE_ID, base(NotificationChannelIds.TASKS, "大肥鱼 GO 有新版本 $version",
+        val posted = notifyGuarded(UPDATE_ID, base(NotificationChannelIds.TASKS, "大肥鱼 GO 有新版本 $version",
             if (downloaded) "已下载并通过校验，打开更新页确认安装。" else "打开更新页查看更新内容和下载。").setAutoCancel(true).build())
-        delivered.edit().putString("last_delivered", deliveryKey).apply()
+        if (posted) delivered.edit().putString("last_delivered", deliveryKey).apply()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun notifyGuarded(id: Int, notification: Notification, tag: String? = null): Boolean = try {
+        // Permission may be revoked after canPost(). A rejected post must not
+        // consume the update reminder, so it can be retried after permission returns.
+        if (tag == null) manager.notify(id, notification) else manager.notify(tag, id, notification)
+        true
+    } catch (_: SecurityException) {
+        false
     }
 
     private fun canPost(): Boolean = NotificationManagerCompat.from(app).areNotificationsEnabled() &&

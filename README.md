@@ -2,7 +2,7 @@
 
 Kotlin / Jetpack Compose Android 客户端，面向手机本机模型任务及通过 Aries 连接电脑 DSH。视觉采用 Liquid Glass 方向；电脑和手机共享 Connect 插件协议。
 
-当前源码版本为 **0.1.25 / code26**，正式包名 **com.dafeiyu.mobile**，调试包为 **com.dafeiyu.mobile.dev**。本批仍在分阶段实现、验证和交付。版本历史、真实构建日志、APK 摘要及安装结果以 [HANDOVER.md](HANDOVER.md) 为准；编译、离线检查、设备验证和用户验收分别记录。
+当前源码版本为 **0.1.26 / code27**，正式包名 **com.dafeiyu.mobile**，调试包为 **com.dafeiyu.mobile.dev**。正式 0.1.26 已发布并安装 QA 模拟器与 PKB110，修复本机 DSH 网页生命周期问题，真实网页与更新专项通过，用户视觉待验收。整体功能对齐仍在分阶段实现和验证。版本历史、真实构建日志、APK 摘要及安装结果以 [HANDOVER.md](HANDOVER.md) 为准；编译、离线检查、设备验证和用户验收分别记录。
 
 ## 开发基线
 
@@ -27,7 +27,7 @@ pwsh -NoProfile -File tools/build.ps1 -MaxWorkers 2 *> ../Temp_Android/build.log
 默认构建 `assembleRelease` 和 `lintRelease`。正式签名读取 `DAFEIYU_SIGNING_PROPERTIES` 指向的本机私有配置，或 `../Temp_Android/signing/release.properties`。发行私钥与密码不进入源码仓。未配置签名的开发者可使用调试任务：
 
 ```powershell
-pwsh -NoProfile -File tools/build.ps1 -Tasks :app:assembleDebug,:app:lintDebug -MaxWorkers 2 *> ../Temp_Android/build-dev.log
+& ./tools/build.ps1 -Tasks @(':app:assembleDebug', ':app:lintDebug') -MaxWorkers 2 *> ../Temp_Android/build-dev.log
 ```
 
 同一时间只运行一个整仓构建。APK 及 `.sha256` 交付到 `../Temp_Android/Dist/`；具体版本和证据由 HANDOVER 绑定。专项检查脚本在 `tools/test-*.ps1`，采用离线数据、合成模型响应或隔离本地服务，不调用付费模型。

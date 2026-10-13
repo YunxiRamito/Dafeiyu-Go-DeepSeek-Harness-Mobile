@@ -509,7 +509,11 @@ class AriesClient(private val context: Context) {
         currentCoroutineContext().ensureActive()
     }
 
-    private fun ariesSslSocketFactory(): javax.net.ssl.SSLSocketFactory {
+    // Reuse the immutable bundled-CA TLS context across this client's requests.
+    // Creating a new factory for every poll prevents TLS session reuse and
+    // separates HTTPS connection pools. Authorization and node checks still
+    // run for each request in the provider; no remote state is cached here.
+    private val ariesSocketFactory: javax.net.ssl.SSLSocketFactory by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         val factory = java.security.cert.CertificateFactory.getInstance("X.509")
         val root = context.resources.openRawResource(R.raw.dafeiyu_download_ca).use {
             factory.generateCertificate(it)
@@ -521,10 +525,12 @@ class AriesClient(private val context: Context) {
         val trustManager = javax.net.ssl.TrustManagerFactory.getInstance(
             javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm(),
         ).apply { init(store) }.trustManagers.filterIsInstance<X509TrustManager>().single()
-        return SSLContext.getInstance("TLS").apply {
+        SSLContext.getInstance("TLS").apply {
             init(null, arrayOf(trustManager), null)
         }.socketFactory
     }
+
+    private fun ariesSslSocketFactory(): javax.net.ssl.SSLSocketFactory = ariesSocketFactory
 
     private fun parseHttpError(status: Int, body: String, responseRequestId: String?): AriesException {
         val error = runCatching {

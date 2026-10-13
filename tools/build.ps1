@@ -37,7 +37,7 @@ try {
         $delivery = Join-Path $TempRoot 'Dist'
         New-Item -ItemType Directory -Force -Path $delivery | Out-Null
         $isRelease = $Tasks -contains ':app:assembleRelease'
-        $apk = Join-Path $delivery ('Dafeiyu-Go-Mobile-0.1.25' + $(if ($isRelease) { '' } else { '-dev' }) + '.apk')
+        $apk = Join-Path $delivery ('Dafeiyu-Go-Mobile-0.1.26' + $(if ($isRelease) { '' } else { '-dev' }) + '.apk')
         $variant = if ($isRelease) { 'release' } else { 'debug' }
         Copy-Item -LiteralPath (Join-Path $TempRoot "build\app\outputs\apk\$variant\app-$variant.apk") -Destination $apk -Force
         ((Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + (Split-Path $apk -Leaf)) |
