@@ -86,17 +86,37 @@ class AriesIdentityStore(context: Context) {
 
 class AriesClient(context: Context) {
     data class Config(val baseUrl: String = "https://aries.test")
-    data class Node(val nodeId: String?)
+    data class Node(val nodeId: String?, val capabilities: Set<String> = emptySet())
+    data class Heartbeat(
+        val deviceId: String,
+        val online: Boolean,
+        val lastSeenAt: String? = null,
+        val expiresAt: String? = null,
+        val clientVersion: String? = null,
+        val deviceName: String? = null,
+    )
     class AriesException(val httpStatus: Int? = null) : Exception()
     suspend fun node(config: Config): Result<Node> = ProviderFixture.network("node") {
         Result.success(Node("node_test"))
     }
+    suspend fun heartbeat(
+        config: Config,
+        clientVersion: String? = null,
+        expectedNodeId: String? = null,
+    ): Result<Heartbeat> = Result.success(
+        Heartbeat(ProviderFixture.localId, online = true, clientVersion = clientVersion)
+    )
     suspend fun <T> signedGet(config: Config, path: String, parse: (JSONObject) -> T): Result<T> =
         ProviderFixture.network(path) {
             Result.success(parse(when {
-                path.contains("/events?") -> JSONObject().put("items", JSONArray().also {
-                    if (ProviderFixture.rotation) it.put(JSONObject().put("required_epoch", 2).put("completed_at", ""))
-                })
+                path.contains("/events?") -> {
+                    val after = path.substringAfter("after=").substringBefore('&')
+                    JSONObject().put("items", JSONArray().also {
+                        if (ProviderFixture.rotation && after == "0") it.put(JSONObject().put("sequence", 1)
+                            .put("type", "control").put("event", JSONObject().put("sequence", 1)
+                                .put("required_epoch", 2).put("completed_at", "")))
+                    }).put("next_cursor", if (ProviderFixture.rotation && after == "0") "1" else after)
+                }
                 path.endsWith("/key-deliveries") -> JSONObject().put("items", JSONArray().put(ProviderFixture.delivery))
                 path.endsWith("/file-transfers/cache") -> JSONObject().put("group_id", "grp_test")
                 path.contains("/messages?") -> JSONObject().put("items", JSONArray()).put("next_cursor", "0")

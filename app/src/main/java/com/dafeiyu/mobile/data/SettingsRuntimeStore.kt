@@ -37,6 +37,11 @@ class SettingsRuntimeStore(private val preferences: SharedPreferences) {
             dshUpdatePolicy = SettingsContract.updatePolicy(
                 preferences.getString(KEY_DSH_UPDATE_POLICY, DEFAULT_UPDATE_POLICY).orEmpty(),
             ),
+            tokenSavingMode = preferences.getBoolean(KEY_TOKEN_SAVING_MODE, DEFAULT_TOKEN_SAVING_MODE),
+            powerSavingMode = preferences.getBoolean(KEY_POWER_SAVING_MODE, DEFAULT_POWER_SAVING_MODE),
+            officialEngineExpandActivities = preferences.getBoolean(
+                KEY_OFFICIAL_ENGINE_EXPAND_ACTIVITIES, DEFAULT_OFFICIAL_ENGINE_EXPAND_ACTIVITIES,
+            ),
         )
     }
 
@@ -138,6 +143,22 @@ class SettingsRuntimeStore(private val preferences: SharedPreferences) {
         return normalized
     }
 
+    fun setTokenSavingMode(enabled: Boolean): Boolean {
+        preferences.edit().putBoolean(KEY_TOKEN_SAVING_MODE, enabled).apply()
+        return enabled
+    }
+
+    /** Visual choices are never overwritten by this flag, so disabling it restores them. */
+    fun setPowerSavingMode(enabled: Boolean): Boolean {
+        preferences.edit().putBoolean(KEY_POWER_SAVING_MODE, enabled).apply()
+        return enabled
+    }
+
+    fun setOfficialEngineExpandActivities(enabled: Boolean): Boolean {
+        preferences.edit().putBoolean(KEY_OFFICIAL_ENGINE_EXPAND_ACTIVITIES, enabled).apply()
+        return enabled
+    }
+
     private fun readStringArray(key: String): List<String> {
         val raw = preferences.getString(key, null).orEmpty()
         if (raw.isBlank()) return emptyList()
@@ -175,6 +196,9 @@ class SettingsRuntimeStore(private val preferences: SharedPreferences) {
         const val KEY_DOWNLOAD_SOURCE = "download_source"
         const val KEY_UPDATE_POLICY = "update_policy"
         const val KEY_DSH_UPDATE_POLICY = "dsh_update_policy"
+        const val KEY_TOKEN_SAVING_MODE = "token_saving_mode"
+        const val KEY_POWER_SAVING_MODE = "power_saving_mode"
+        const val KEY_OFFICIAL_ENGINE_EXPAND_ACTIVITIES = "official_engine_expand_activities"
 
         const val DEFAULT_VM_PROFILE = "balanced"
         const val DEFAULT_VM_HARDWARE_ACCELERATION = true
@@ -182,11 +206,12 @@ class SettingsRuntimeStore(private val preferences: SharedPreferences) {
         const val DEFAULT_DOWNLOAD_SOURCE = "cdn"
         const val DEFAULT_UPDATE_POLICY = "remind"
         const val DEFAULT_MODEL_PROVIDER_ENABLED = true
+        const val DEFAULT_TOKEN_SAVING_MODE = false
+        const val DEFAULT_POWER_SAVING_MODE = false
+        const val DEFAULT_OFFICIAL_ENGINE_EXPAND_ACTIVITIES = false
 
         val DEFAULT_MODEL_PROVIDER_ORDER: List<String> = listOf(
             "deepseek",
-            "dsh",
-            "lite",
         )
         val VIRTUAL_MACHINE_PROFILES: Set<String> = setOf("battery", "balanced", "performance")
 
@@ -196,7 +221,9 @@ class SettingsRuntimeStore(private val preferences: SharedPreferences) {
 
         fun normalizeModelProviderOrder(order: List<String>): List<String> {
             val normalized = LinkedHashSet<String>()
-            order.forEach { normalizeProviderId(it)?.let(normalized::add) }
+            order.forEach { value ->
+                normalizeProviderId(value)?.takeUnless { it == "dsh" || it == "lite" }?.let(normalized::add)
+            }
             if (normalized.isEmpty()) normalized.addAll(DEFAULT_MODEL_PROVIDER_ORDER)
             DEFAULT_MODEL_PROVIDER_ORDER.forEach { normalized.add(it) }
             return normalized.toList()
@@ -238,4 +265,7 @@ data class SettingsRuntimeSnapshot(
     val downloadSource: String,
     val updatePolicy: String,
     val dshUpdatePolicy: String,
+    val tokenSavingMode: Boolean = SettingsRuntimeStore.DEFAULT_TOKEN_SAVING_MODE,
+    val powerSavingMode: Boolean = SettingsRuntimeStore.DEFAULT_POWER_SAVING_MODE,
+    val officialEngineExpandActivities: Boolean = SettingsRuntimeStore.DEFAULT_OFFICIAL_ENGINE_EXPAND_ACTIVITIES,
 )

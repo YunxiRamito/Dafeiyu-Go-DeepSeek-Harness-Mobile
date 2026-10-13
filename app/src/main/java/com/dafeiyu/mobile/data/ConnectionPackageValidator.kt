@@ -150,7 +150,7 @@ internal object ConnectionPackageValidator {
             val bounded = LimitedInputStream(gzip, MAX_TAR_STREAM)
             TarArchiveInputStream(bounded).use { tar ->
                 while (true) {
-                    val entry = tar.nextTarEntry ?: break
+                    val entry = tar.nextEntry ?: break
                     val directory = entry.linkFlag == TarConstants.LF_DIR
                     val regular = entry.linkFlag == TarConstants.LF_NORMAL || entry.linkFlag == TarConstants.LF_OLDNORM
                     val name = if (directory) entry.name.removeSuffix("/") else entry.name

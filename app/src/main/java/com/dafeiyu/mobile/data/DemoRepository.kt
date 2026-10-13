@@ -20,12 +20,14 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -44,6 +46,8 @@ data class ModelChoice(
     val defaultReasoningIndex: Int,
     val isExample: Boolean = true,
     val inputModalities: List<String> = emptyList(),
+    val officialCapabilities: DeepSeekChatClient.Model? = null,
+    val runtimeModel: RuntimeModel? = null,
 )
 
 /** Imported files use private copies; validated text is prepared away from the UI thread. */
@@ -68,7 +72,7 @@ data class ExtensionItem(
     val enabled: Boolean = true,
 )
 
-/** Local workspace state, official text chat, and the DSH runtime preview. */
+/** Local workspaces, native model tasks, and the application-owned DSH service. */
 class DemoRepository : ViewModel() {
     var workspaceMode by mutableStateOf(WorkspaceMode.Lite)
         private set
@@ -113,6 +117,17 @@ class DemoRepository : ViewModel() {
     var deepSeekModelError by mutableStateOf<String?>(null)
         private set
     private var deepSeekBalanceStore: BalanceStore? = null
+    private var modelProviderStore: ModelProviderStore? = null
+    private var nativeTranscriptStore: NativeTranscriptStore? = null
+    private var notificationMonitor: NativeNotificationMonitor? = null
+    private var pushSettings: PushSettingsController? = null
+    var pushSettingsState by mutableStateOf(PushSettingsController.State())
+        private set
+    private var connectPluginHost: ConnectPluginHost? = null
+    private var connectVisibilityJob: Job? = null
+    var modelRuntime by mutableStateOf<ModelRuntimeController?>(null)
+        private set
+    private var modelRuntimeSnapshotJob: Job? = null
     private var catalogClient: DeepSeekChatClient? = null
     var backgroundTasks by mutableStateOf<BackgroundTaskEngine?>(null)
         private set
@@ -133,7 +148,17 @@ class DemoRepository : ViewModel() {
         private set
     var runtimeProgress by mutableIntStateOf(0)
         private set
-    var runtimeStep by mutableStateOf("演示环境尚未启动")
+    var runtimeStep by mutableStateOf("DSH 服务已停止")
+        private set
+    var runtimePort by mutableStateOf<Int?>(null)
+        private set
+    var runtimeAccessUrl by mutableStateOf<String?>(null)
+        private set
+    var runtimeVersion by mutableStateOf<String?>(null)
+        private set
+    var runtimeLastError by mutableStateOf<String?>(null)
+        private set
+    var runtimeAutostartSuppressed by mutableStateOf(false)
         private set
     var themeMode by mutableStateOf("system")
     var accentColorKey by mutableStateOf("blue")
@@ -143,6 +168,26 @@ class DemoRepository : ViewModel() {
     var keepRunning by mutableStateOf(true)
     var downloadSource by mutableStateOf("cdn")
     var engineMode by mutableStateOf("official")
+    var developerMode by mutableStateOf(false)
+        private set
+    var localEngineSwitchBusy by mutableStateOf(false)
+        private set
+    var localEngineSwitchError by mutableStateOf<String?>(null)
+        private set
+    var localDshSessionId by mutableStateOf<String?>(null)
+        private set
+    var localEngineSharingWarnings by mutableStateOf<List<String>>(emptyList())
+        private set
+    var dshSharedConfigurationError by mutableStateOf<String?>(null)
+        private set
+    var localSandboxMode by mutableStateOf(LinuxSandboxContract.WORKSPACE_WRITE)
+        private set
+    var localSandboxVerified by mutableStateOf(false)
+        private set
+    var localSandboxVerifying by mutableStateOf(false)
+        private set
+    var localSandboxDetail by mutableStateOf("请验证本机执行器的实际文件约束")
+        private set
     var connectionMode by mutableStateOf("local")
     var autoStartDsh by mutableStateOf(false)
     var syncWorkspace by mutableStateOf(false)
@@ -150,6 +195,14 @@ class DemoRepository : ViewModel() {
     var liveIslandNotifications by mutableStateOf(true)
     var announcementNotifications by mutableStateOf(true)
     var deviceNotifications by mutableStateOf(true)
+    var messageNotifications by mutableStateOf(true)
+        private set
+    var backendStatusNotifications by mutableStateOf(true)
+        private set
+    var tokenSavingMode by mutableStateOf(false)
+        private set
+    var powerSavingMode by mutableStateOf(false)
+        private set
     var glassMaterial by mutableStateOf(true)
     var pageTransitions by mutableStateOf(true)
     var springButtons by mutableStateOf(true)
@@ -164,7 +217,7 @@ class DemoRepository : ViewModel() {
     var officialEngineStreaming by mutableStateOf(true)
     var officialEngineShowReasoning by mutableStateOf(true)
         private set
-    var officialEngineExpandActivities by mutableStateOf(true)
+    var officialEngineExpandActivities by mutableStateOf(false)
         private set
     var dshVersionChannel by mutableStateOf("stable")
     var dshUpdatePolicy by mutableStateOf("remind")
@@ -207,6 +260,80 @@ class DemoRepository : ViewModel() {
     var selectedReasoningIndex by mutableIntStateOf(selectedModel.defaultReasoningIndex)
         private set
     val selectedReasoningOption get() = selectedModel.reasoningOptions.getOrNull(selectedReasoningIndex)
+
+    var remoteDsh by mutableStateOf<RemoteDshApplicationController?>(null)
+        private set
+    var remoteDshState by mutableStateOf(RemoteDshApplicationController.State())
+        private set
+    var remoteArtifactDownloads by mutableStateOf<RemoteArtifactDownloadController?>(null)
+        private set
+    private var remoteAttachmentComposer: RemoteAttachmentComposer? = null
+    var remoteAttachmentProgress by mutableStateOf(RemoteAttachmentComposer.State())
+        private set
+    private var remoteWorkspaceRemovalConfirmation by mutableStateOf<RemoteWorkspaceRemovalConfirmation?>(null)
+    val remoteWorkspaceScope: RemoteDshScope?
+        get() = remoteDshState.projection?.workspace?.scope?.takeIf { binding ->
+            remoteDshState.connection?.let { runCatching { binding.requireCurrent(it) }.isSuccess } == true
+        }
+    val remoteWorkspaceLifecycleReady: Boolean
+        get() = connectionMode == "online" && remoteWorkspaceLifecycleAvailable(
+            remoteDshState.connection, remoteDshState.projection?.workspace)
+    val displayArchiveGroups: List<ConversationArchiveGroup>
+        get() = if (connectionMode == "online") {
+            remoteDshState.projection?.let { projection ->
+                remoteConversationArchiveGroups(projection.workspace, projection.sessions.mapValues { (_, view) ->
+                    view.messages.firstOrNull { it.role == "user" }?.text?.replace('\n', ' ')?.take(60).orEmpty()
+                })
+            }.orEmpty()
+        } else conversationArchiveGroups(workspaces.toList(), conversations.toList())
+    val displayArchivedConversations: List<Conversation>
+        get() = displayArchiveGroups.flatMap { it.conversations }
+    val remoteArchiveDeletionAvailable: Boolean get() = remoteWorkspaceLifecycleReady &&
+        remoteDshState.connection?.optJSONObject("capabilities")?.optBoolean("remote_archive_delete") == true
+    val archiveOperationBusy: Boolean get() = workspaceDeletionBusy || remoteDshState.busy
+    var localArchiveDeletionDetail by mutableStateOf<String?>(null)
+        private set
+    private val localArchivePendingIds = mutableStateListOf<String>()
+    private var localArchiveRecoveryFailed = false
+    val displayWorkspaces: List<Workspace> get() = if (connectionMode == "online")
+        remoteDshState.projection?.workspace?.workspaces.orEmpty().map { Workspace(it.id, it.title, it.path) } else workspaces
+    val displayWorkspaceId: String get() = if (connectionMode == "online") remoteDshState.selectedWorkspaceId.orEmpty() else selectedWorkspaceId
+    val displayConversationId: String get() = if (connectionMode == "online") remoteDshState.selectedSessionId.orEmpty() else selectedConversationId
+    val displayConversations: List<Conversation> get() = if (connectionMode == "online") {
+        val remote = remoteDshState.projection
+        remote?.workspace?.workspaces.orEmpty().flatMap { workspace -> workspace.sessionIds.map { id ->
+            val title = remote?.sessions?.get(id)?.messages?.firstOrNull { it.role == "user" }?.text
+                ?.replace('\n', ' ')?.take(30)?.takeIf { it.isNotBlank() } ?: "电脑会话"
+            Conversation(id, title, workspace.id)
+        } }
+    } else conversations
+    val displayMessages: List<ChatMessage> get() = if (connectionMode == "online") remoteDshState.selectedView?.messages.orEmpty() else messages
+    val displayResponding: Boolean get() = if (connectionMode == "online") remoteDshState.running else isResponding
+    val displayModelChoices: List<ModelChoice> get() = if (connectionMode == "online")
+        remoteDshState.projection?.workspace?.catalog?.providers.orEmpty().flatMap { provider -> provider.models.map { model ->
+            ModelChoice("${provider.id}::${model.id}", provider.name, model.name,
+                model.efforts.map { ReasoningOption(it.id, it.name) },
+                model.efforts.indexOfFirst { it.id == model.defaultEffort }, false)
+        } } else modelChoices
+    val displaySelectedModel: ModelChoice get() {
+        if (connectionMode != "online") return selectedModel
+        val metadata = remoteDshState.projection?.workspace
+        val selection = metadata?.settings?.selection ?: metadata?.catalog?.selection
+        return displayModelChoices.firstOrNull { it.id == "${selection?.provider}::${selection?.model}" }
+            ?: ModelChoice("remote-unconfigured", "电脑", "选择电脑模型", emptyList(), -1, false)
+    }
+    val displayReasoningIndex: Int get() {
+        if (connectionMode != "online") return selectedReasoningIndex
+        val metadata = remoteDshState.projection?.workspace
+        val effort = (metadata?.settings?.selection ?: metadata?.catalog?.selection)?.reasoningEffort
+        return displaySelectedModel.reasoningOptions.indexOfFirst { it.id == effort }
+    }
+    val displayReasoningOption: ReasoningOption? get() = displaySelectedModel.reasoningOptions.getOrNull(displayReasoningIndex)
+    val remoteProviderCatalog: List<RuntimeProvider> get() = remoteDshState.projection?.workspace?.catalog?.let { catalog ->
+        catalog.providers.map { provider -> RuntimeProvider(provider.id, provider.name, provider.id in catalog.routable,
+            emptyList(), provider.models.map { model -> RuntimeModel(provider.id, model.id, model.name, "电脑 DSH",
+                model.efforts.map { it.id }, model.defaultEffort) }) }
+    }.orEmpty()
 
     val attachmentChoices = listOf(
         AttachmentPreview("preview-image", "示例图片.png"),
@@ -275,6 +402,17 @@ class DemoRepository : ViewModel() {
     )
 
     private var runtimeJob: Job? = null
+    private var dshRuntimeManager: DshRuntimeManager? = null
+    private var localDshHistory: LocalDshHistoryController? = null
+    private var sharedDshConfiguration: DshSharedConfigurationAdapter? = null
+    private val localEngineGate = Mutex()
+    private var dshProviderSyncJob: Job? = null
+    private var lastDshProviderRevision = -1L
+    var dshInstallation by mutableStateOf<DshInstallationController?>(null)
+        private set
+    private var dshInstallJob: Job? = null
+    private var dshCheckJob: Job? = null
+    private var dshSnapshotJob: Job? = null
     private var responseJob: Job? = null
     private var responseGeneration = 0L
     private var nextMessageId = 1L
@@ -285,9 +423,14 @@ class DemoRepository : ViewModel() {
     private fun loadSettings(context: Context) {
         val prefs = context.applicationContext.getSharedPreferences("dafeiyu_settings", Context.MODE_PRIVATE)
         settingsPreferences = prefs
+        developerMode = prefs.getBoolean("developer_mode", false)
+        localSandboxMode = prefs.getString("local_sandbox_mode", LinuxSandboxContract.WORKSPACE_WRITE)
+            ?.takeIf { it in LinuxSandboxContract.modes } ?: LinuxSandboxContract.WORKSPACE_WRITE
         val runtimeStore = SettingsRuntimeStore(prefs)
         settingsRuntimeStore = runtimeStore
         val runtimeSnapshot = runtimeStore.read()
+        tokenSavingMode = runtimeSnapshot.tokenSavingMode
+        powerSavingMode = runtimeSnapshot.powerSavingMode
         modelProviderOrder = runtimeSnapshot.modelProviders.order
         modelProviderEnabled = runtimeSnapshot.modelProviders.enabledById
         virtualMachineProfile = runtimeSnapshot.virtualMachine.profile
@@ -308,6 +451,8 @@ class DemoRepository : ViewModel() {
         liveIslandNotifications = prefs.getBoolean("live_island_notifications", liveIslandNotifications)
         announcementNotifications = prefs.getBoolean("announcement_notifications", announcementNotifications)
         deviceNotifications = prefs.getBoolean("device_notifications", deviceNotifications)
+        messageNotifications = prefs.getBoolean("message_notifications", true)
+        backendStatusNotifications = prefs.getBoolean("backend_status_notifications", true)
         glassMaterial = prefs.getBoolean("glass_material", glassMaterial)
         pageTransitions = prefs.getBoolean("page_transitions", pageTransitions)
         springButtons = prefs.getBoolean("spring_buttons", springButtons)
@@ -321,7 +466,7 @@ class DemoRepository : ViewModel() {
         officialEngineStrategy = prefs.getString("official_engine_strategy", officialEngineStrategy) ?: officialEngineStrategy
         officialEngineStreaming = prefs.getBoolean("official_engine_streaming", officialEngineStreaming)
         officialEngineShowReasoning = prefs.getBoolean("official_engine_show_reasoning", true)
-        officialEngineExpandActivities = prefs.getBoolean("official_engine_expand_activities", true)
+        officialEngineExpandActivities = runtimeSnapshot.officialEngineExpandActivities
         dshVersionChannel = SettingsContract.dshVersionChannel(prefs.getString("dsh_version_channel", dshVersionChannel) ?: dshVersionChannel)
         dshUpdatePolicy = runtimeSnapshot.dshUpdatePolicy
         ariesEndpoint = SettingsContract.normalizeAriesEndpoint(prefs.getString("aries_endpoint", "").orEmpty()).orEmpty()
@@ -334,32 +479,138 @@ class DemoRepository : ViewModel() {
     }
 
     fun updateThemeMode(value: String) { themeMode = value; settingsPreferences?.edit()?.putString("theme_mode", value)?.apply() }
+    fun updateDeveloperMode(enabled: Boolean) {
+        val saved = settingsPreferences?.edit()?.putBoolean("developer_mode", enabled)?.commit() == true
+        if (saved) { developerMode = enabled; updateNotice(if (enabled) "开发者页面已开启" else "开发者页面已关闭") }
+        else updateNotice("开发者偏好保存失败，请重试")
+    }
+    fun updateLocalSandboxMode(value: String) {
+        require(value in LinuxSandboxContract.modes)
+        if (connectionMode != "local" || engineMode != "official") { updateNotice("请在本机轻引擎选择沙箱档位"); return }
+        if (hasNativeRunningTasks()) { updateNotice("请等待本机任务停止后再更改执行档位"); return }
+        if (!restoreLocalSandboxPreference(value)) updateNotice("沙箱偏好保存失败，请重试")
+    }
+    /** Restore a preference for later local use; never restore executor evidence or approval grants. */
+    internal fun restoreLocalSandboxPreference(value: String): Boolean {
+        require(value in LinuxSandboxContract.modes)
+        if (localEngineSwitchBusy || localSandboxVerifying || hasNativeRunningTasks()) return false
+        val saved = settingsPreferences?.edit()?.putString("local_sandbox_mode", value)?.commit() == true
+        if (saved) localSandboxMode = value
+        return saved
+    }
+    fun verifyLocalSandbox() {
+        if (localSandboxVerifying || connectionMode != "local" || engineMode != "official") return
+        if (hasNativeRunningTasks()) { updateNotice("请等待本机任务结束后验证执行约束"); return }
+        val app = applicationContext ?: return
+        localSandboxVerifying = true; localSandboxVerified = false; localSandboxDetail = "正在验证真实文件效果…"
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { LinuxSandboxVerifier(app, LinuxRuntimeManager(app)).verify(force = true) }
+                localSandboxVerified = true; localSandboxDetail = "本机只读与工作区内修改约束已验证；受限任务按此执行"
+            } catch (cancelled: CancellationException) { localSandboxDetail = "验证已取消"; throw cancelled }
+            catch (failure: Exception) { localSandboxDetail = "验证未通过：${failure.message.orEmpty().take(400)}" }
+            finally { localSandboxVerifying = false }
+        }
+    }
     fun updateAccentColor(value: String) {
         accentColorKey = value
         settingsPreferences?.edit()?.putString("accent_color", value)?.apply()
     }
     fun updateReduceTransparency(value: Boolean) { reduceTransparency = value; settingsPreferences?.edit()?.putBoolean("reduce_transparency", value)?.apply() }
     fun updateReduceMotion(value: Boolean) { reduceMotion = value; settingsPreferences?.edit()?.putBoolean("reduce_motion", value)?.apply() }
-    fun updateNotificationsEnabled(value: Boolean) { notificationsEnabled = value; settingsPreferences?.edit()?.putBoolean("notifications_enabled", value)?.apply() }
+    fun updateNotificationsEnabled(value: Boolean) {
+        notificationsEnabled = value
+        settingsPreferences?.edit()?.putBoolean("notifications_enabled", value)?.apply()
+        notificationMonitor?.reconcile(AndroidAppVisibility.isForeground, powerSavingMode)
+        synchronizePushNotificationPreferences()
+        if (!value) applicationContext?.let { NotificationPublisher(it).clearRunning() }
+    }
+    fun updateKeepRunning(value: Boolean) { keepRunning = value; settingsPreferences?.edit()?.putBoolean("keep_running", value)?.apply() }
     fun updateDownloadSource(value: String) {
         downloadSource = SettingsContract.downloadSource(value)
         settingsRuntimeStore?.setDownloadSource(downloadSource)
             ?: settingsPreferences?.edit()?.putString(SettingsRuntimeStore.KEY_DOWNLOAD_SOURCE, downloadSource)?.apply()
     }
     fun updateEngineMode(value: String) {
-        engineMode = SettingsContract.engineMode(value)
-        settingsPreferences?.edit()?.putString("engine_mode", engineMode)?.apply()
+        val target = SettingsContract.engineMode(value)
+        if (target == engineMode) return
+        if (workspaceDeletionBusy || connectionMode == "local" &&
+            (localArchiveRecoveryFailed || localArchivePendingIds.isNotEmpty())) {
+            updateNotice("归档永久删除尚未完成，请先完成或重试删除")
+            return
+        }
+        if (localEngineSwitchBusy) { updateNotice("正在同步引擎配置与历史，请稍候"); return }
+        if (connectionMode == "local" && hasNativeRunningTasks()) {
+            updateNotice("请先停止本机任务并等待结束，再切换引擎")
+            return
+        }
+        runtimeAutostartSuppressed = false
+        if (connectionMode == "online") {
+            engineMode = target
+            settingsPreferences?.edit()?.putString("engine_mode", target)?.apply()
+            return
+        }
+        localEngineSwitchBusy = true
+        localEngineSwitchError = null
+        localEngineSharingWarnings = emptyList()
+        runtimeJob = viewModelScope.launch {
+            try {
+                localEngineGate.withLock {
+                    if (target == "official") synchronizeFromLocalDsh()
+                    else startLocalDsh(sharedHistory = true)
+                    engineMode = target
+                    settingsPreferences?.edit()?.putString("engine_mode", target)?.apply()
+                    composerGeneration++
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                localEngineSwitchError = failure.message ?: "引擎切换未完成，原历史保留"
+                updateNotice(requireNotNull(localEngineSwitchError))
+            } finally { localEngineSwitchBusy = false }
+        }
     }
     fun updateConnectionMode(value: String) {
+        if (localEngineSwitchBusy) { updateNotice("正在同步引擎配置与历史，请稍候"); return }
+        if (workspaceDeletionBusy) { updateNotice("正在提交工作区或归档操作，请稍候"); return }
+        if (connectionMode != SettingsContract.connectionMode(value) && connectionMode == "local") cancelResponse()
+        remoteWorkspaceRemovalConfirmation = null
         connectionMode = SettingsContract.connectionMode(value)
         settingsPreferences?.edit()?.putString("connection_mode", connectionMode)?.apply()
+        remoteDsh?.setActive(connectionMode == "online")
+        if (connectionMode == "online") remoteOperation {
+            remoteDsh?.connect()
+            remoteDsh?.refresh()
+            val receipt = remoteDsh?.resolveWorkspace(selectedWorkspace.name)
+            if (receipt?.optString("status") == "needs_directory") updateNotice("请在电脑目录中选择此工作区的实际位置")
+            else if (receipt?.optString("status") == "choose_workspace") updateNotice("电脑有多个同名工作区，请在工作目录中选择")
+        }
     }
     fun updateAutoStartDsh(value: Boolean) { autoStartDsh = value; settingsPreferences?.edit()?.putBoolean("auto_start_dsh", value)?.apply() }
     fun updateSyncWorkspace(value: Boolean) { syncWorkspace = value; settingsPreferences?.edit()?.putBoolean("sync_workspace", value)?.apply() }
     fun updateWebBroadcast(value: Boolean) { webBroadcast = value; settingsPreferences?.edit()?.putBoolean("web_broadcast", value)?.apply() }
-    fun updateLiveIslandNotifications(value: Boolean) { liveIslandNotifications = value; settingsPreferences?.edit()?.putBoolean("live_island_notifications", value)?.apply() }
-    fun updateAnnouncementNotifications(value: Boolean) { announcementNotifications = value; settingsPreferences?.edit()?.putBoolean("announcement_notifications", value)?.apply() }
-    fun updateDeviceNotifications(value: Boolean) { deviceNotifications = value; settingsPreferences?.edit()?.putBoolean("device_notifications", value)?.apply() }
+    fun updateLiveIslandNotifications(value: Boolean) { liveIslandNotifications = value; settingsPreferences?.edit()?.putBoolean("live_island_notifications", value)?.apply(); synchronizePushNotificationPreferences() }
+    fun updateAnnouncementNotifications(value: Boolean) { announcementNotifications = value; settingsPreferences?.edit()?.putBoolean("announcement_notifications", value)?.apply(); synchronizePushNotificationPreferences() }
+    fun updateDeviceNotifications(value: Boolean) { deviceNotifications = value; settingsPreferences?.edit()?.putBoolean("device_notifications", value)?.apply(); synchronizePushNotificationPreferences() }
+    fun updateMessageNotifications(value: Boolean) {
+        messageNotifications = value
+        settingsPreferences?.edit()?.putBoolean("message_notifications", value)?.apply()
+        notificationMonitor?.onNotificationPreferencesChanged()
+        synchronizePushNotificationPreferences()
+    }
+    fun updateBackendStatusNotifications(value: Boolean) { backendStatusNotifications = value; settingsPreferences?.edit()?.putBoolean("backend_status_notifications", value)?.apply(); synchronizePushNotificationPreferences() }
+    private fun pushNotificationPreferences() = PushPreferences(notificationsEnabled, liveIslandNotifications,
+        deviceNotifications, announcementNotifications, messageNotifications, backendStatusNotifications)
+    private fun synchronizePushNotificationPreferences() { pushSettings?.updatePreferences(pushNotificationPreferences()) }
+    fun refreshPushNotificationStatus() { pushSettings?.refresh(pushNotificationPreferences()) }
+    fun updateTokenSavingMode(value: Boolean) {
+        tokenSavingMode = value
+        settingsRuntimeStore?.setTokenSavingMode(value)
+    }
+    fun updatePowerSavingMode(value: Boolean) {
+        powerSavingMode = value
+        settingsRuntimeStore?.setPowerSavingMode(value)
+        updateRemoteForeground(AndroidAppVisibility.isForeground)
+    }
     fun updateGlassMaterial(value: Boolean) { glassMaterial = value; settingsPreferences?.edit()?.putBoolean("glass_material", value)?.apply() }
     fun updatePageTransitions(value: Boolean) { pageTransitions = value; settingsPreferences?.edit()?.putBoolean("page_transitions", value)?.apply() }
     fun updateSpringButtons(value: Boolean) { springButtons = value; settingsPreferences?.edit()?.putBoolean("spring_buttons", value)?.apply() }
@@ -377,8 +628,13 @@ class DemoRepository : ViewModel() {
         updatePolicy = SettingsContract.updatePolicy(value)
         settingsRuntimeStore?.setUpdatePolicy(updatePolicy)
             ?: settingsPreferences?.edit()?.putString(SettingsRuntimeStore.KEY_UPDATE_POLICY, updatePolicy)?.apply()
+        applicationContext?.let { AndroidUpdateScheduler.reconcile(it, updatePolicy, updateWifiOnly) }
     }
-    fun updateUpdateWifiOnly(value: Boolean) { updateWifiOnly = value; settingsPreferences?.edit()?.putBoolean("update_wifi_only", value)?.apply() }
+    fun updateUpdateWifiOnly(value: Boolean) {
+        updateWifiOnly = value
+        settingsPreferences?.edit()?.putBoolean("update_wifi_only", value)?.apply()
+        applicationContext?.let { AndroidUpdateScheduler.reconcile(it, updatePolicy, updateWifiOnly) }
+    }
     fun updateAutoCleanupCache(value: Boolean) { autoCleanupCache = value; settingsPreferences?.edit()?.putBoolean("auto_cleanup_cache", value)?.apply() }
 
     /** Persist a complete provider ordering while retaining each provider's enabled state. */
@@ -510,8 +766,8 @@ class DemoRepository : ViewModel() {
     fun recordAriesConnection(snapshot: AriesClient.ConnectionSnapshot) {
         val endpoint = SettingsContract.normalizeAriesEndpoint(snapshot.endpoint).orEmpty()
         val changed = endpoint != ariesEndpoint ||
-            (ariesNodeId != null && ariesNodeId != snapshot.node?.nodeId) ||
-            (ariesDeviceId != null && ariesDeviceId != snapshot.deviceId)
+            (snapshot.node != null && ariesNodeId != null && ariesNodeId != snapshot.node.nodeId) ||
+            (snapshot.deviceId != null && ariesDeviceId != null && ariesDeviceId != snapshot.deviceId)
         if (changed) ariesGroupId = null
         ariesEndpoint = endpoint
         ariesConnectionState = when (snapshot.state) {
@@ -521,9 +777,10 @@ class DemoRepository : ViewModel() {
             AriesClient.ConnectionState.UNREGISTERED -> OnlineConnectionState.UNREGISTERED
             AriesClient.ConnectionState.REGISTERED -> OnlineConnectionState.REGISTERED
         }
-        ariesNodeId = snapshot.node?.nodeId
-        ariesServerCode = snapshot.node?.serverCode
-        ariesDeviceId = snapshot.deviceId
+        // A failed observation has no new identity; retain the confirmed relationship offline.
+        if (changed) { ariesNodeId = null; ariesServerCode = null; ariesDeviceId = null }
+        snapshot.node?.let { ariesNodeId = it.nodeId; ariesServerCode = it.serverCode }
+        snapshot.deviceId?.let { ariesDeviceId = it }
         ariesLastCheckedAtEpochMillis = snapshot.checkedAtEpochMillis
         settingsPreferences?.edit()?.apply {
             if (changed) remove("aries_group_id")
@@ -566,6 +823,9 @@ class DemoRepository : ViewModel() {
         updateWifiOnly = updateWifiOnly,
         dshVersionChannel = SettingsContract.dshVersionChannel(dshVersionChannel),
         dshUpdatePolicy = SettingsContract.updatePolicy(dshUpdatePolicy),
+        tokenSavingMode = tokenSavingMode,
+        powerSavingMode = powerSavingMode,
+        officialEngineExpandActivities = officialEngineExpandActivities,
         aries = AriesConnectionSettings(
             endpoint = ariesEndpoint,
             nodeId = ariesNodeId,
@@ -575,7 +835,11 @@ class DemoRepository : ViewModel() {
             lastCheckedAtEpochMillis = ariesLastCheckedAtEpochMillis,
         ),
     )
-    fun initializeWorkspaces(context: Context) {
+    fun initializeWorkspaces(context: Context) = initializeWorkspaces(context, LinuxRuntimeManager(context))
+
+    /** Shared runtime ownership also permits isolated profiles to exercise the real lifecycle. */
+    internal fun initializeWorkspaces(context: Context, runtime: LinuxRuntimeManager,
+        installer: DshRuntimeInstaller = DshRuntimeInstaller(context, runtime)) {
         if (initializationStarted) return
         loadSettings(context)
         applicationContext = context.applicationContext
@@ -583,8 +847,100 @@ class DemoRepository : ViewModel() {
         officialOutputStore = OfficialToolOutputStore(context.noBackupFilesDir)
         val balanceStore = BalanceStore(context.applicationContext)
         deepSeekBalanceStore = balanceStore
+        modelProviderStore = ModelProviderStore(context.applicationContext)
+        val sharedBridge = DshSharedPersistenceBridge(context.applicationContext, runtime, installer)
+        sharedDshConfiguration = DshSharedConfigurationAdapter(context.applicationContext, requireNotNull(modelProviderStore), sharedBridge)
+        localDshHistory = LocalDshHistoryController(context.applicationContext, sharedBridge)
+        nativeTranscriptStore = NativeTranscriptStore(context.applicationContext)
+        modelRuntime = ModelRuntimeController.get(context.applicationContext)
+        notificationMonitor = runCatching { NativeNotificationMonitor(context.applicationContext, viewModelScope) }
+            .onFailure { updateNotice("通知记录无法读取，已保留原文件，请在设置中检查") }.getOrNull()
+        notificationMonitor?.reconcile(AndroidAppVisibility.isForeground, powerSavingMode)
+        connectPluginHost = ConnectPluginHost.get(context.applicationContext)
+        remoteDsh = RemoteDshApplicationController(context.applicationContext, requireNotNull(connectPluginHost))
+        remoteArtifactDownloads = RemoteArtifactDownloadController(context.applicationContext, requireNotNull(remoteDsh))
+        remoteAttachmentComposer = RemoteAttachmentComposer(context.applicationContext, requireNotNull(remoteDsh), requireNotNull(connectPluginHost))
+        viewModelScope.launch { remoteAttachmentComposer?.state?.collect { remoteAttachmentProgress = it } }
+        viewModelScope.launch {
+            remoteDsh?.state?.collect { state ->
+                remoteDshState = state
+                remoteArtifactDownloads?.onRelationship(state.projection?.binding?.takeIf { binding ->
+                    state.connection?.let { runCatching { binding.requireCurrent(it) }.isSuccess } == true
+                })
+                remoteAttachmentComposer?.onRelationship(state.projection?.binding?.takeIf { binding ->
+                    state.connection?.let { runCatching { binding.requireCurrent(it) }.isSuccess } == true
+                })
+                remoteWorkspaceRemovalConfirmation?.let { confirmation ->
+                    val connection = state.connection
+                    if (connection == null || state.projection?.workspace?.scope != confirmation.binding ||
+                        runCatching { confirmation.binding.requireCurrent(connection) }.isFailure)
+                        remoteWorkspaceRemovalConfirmation = null
+                }
+            }
+        }
+        remoteDsh?.setActive(connectionMode == "online")
+        modelRuntimeSnapshotJob = viewModelScope.launch {
+            modelRuntime?.state?.collect { state ->
+                if (connectionMode == "local") {
+                    modelProviderOrder = state.providers.providers.map { it.id }
+                    modelProviderEnabled = state.providers.providers.associate { it.id to it.enabled }
+                    val previous = selectedModel
+                    modelChoices.removeAll { it.runtimeModel != null }
+                    val providers = state.catalog.associateBy { it.id }
+                    state.providers.providers.filter { it.enabled && !it.protected }.forEach { config ->
+                        providers[config.id]?.models?.forEach { model ->
+                            modelChoices += ModelChoice("${config.id}::${model.id}", config.name, model.name,
+                                model.reasoningOptions.map { ReasoningOption(it, it) },
+                                model.reasoningOptions.indexOf(model.defaultReasoning), isExample = false,
+                                inputModalities = model.input, runtimeModel = model)
+                        }
+                    }
+                    if (previous.runtimeModel != null) {
+                        val current = modelChoices.firstOrNull { it.id == previous.id }
+                        if (current != null) {
+                            val reasoning = selectedReasoningOption?.id
+                            selectedModel = current
+                            selectedReasoningIndex = current.reasoningOptions.indexOfFirst { it.id == reasoning }
+                                .takeIf { it >= 0 } ?: current.defaultReasoningIndex
+                        } else if (!isResponding) {
+                            selectedModel = unconfiguredModel
+                            selectedReasoningIndex = -1
+                        }
+                    } else if (previous.id == "unconfigured") {
+                        val remembered = settingsPreferences?.getString("selected_model", null)
+                        modelChoices.firstOrNull { it.id == remembered && it.runtimeModel != null }?.let { selectModel(it.id) }
+                    }
+                    scheduleLocalProviderSynchronization(state.providers.revision)
+                }
+            }
+        }
         deepSeekClient = DeepSeekChatClient(balanceStore)
         catalogClient = DeepSeekChatClient(balanceStore)
+        pushSettings = PushSettingsController(context.applicationContext)
+        viewModelScope.launch { pushSettings?.state?.collect { pushSettingsState = it } }
+        dshRuntimeManager = DshRuntimeManager(context.applicationContext, runtime, installer)
+        dshInstallation = DshInstallationController(context.applicationContext)
+        dshSnapshotJob = viewModelScope.launch {
+            dshRuntimeManager?.snapshot?.collect { snapshot ->
+                runtimeStatus = when (snapshot.status) {
+                    DshServiceStatus.STARTING -> RuntimeStatus.Starting
+                    DshServiceStatus.RUNNING -> RuntimeStatus.Running
+                    DshServiceStatus.STOPPING -> RuntimeStatus.Stopping
+                    DshServiceStatus.STOPPED, DshServiceStatus.ERROR -> RuntimeStatus.Stopped
+                }
+                runtimeProgress = when (snapshot.status) {
+                    DshServiceStatus.RUNNING -> 100
+                    DshServiceStatus.STARTING -> 0
+                    DshServiceStatus.STOPPING, DshServiceStatus.STOPPED, DshServiceStatus.ERROR -> 0
+                }
+                runtimeStep = snapshot.detail
+                runtimePort = snapshot.port
+                runtimeAccessUrl = snapshot.accessUrl
+                runtimeVersion = snapshot.version
+                runtimeLastError = snapshot.lastError
+            }
+        }
+        viewModelScope.launch { runCatching { dshRuntimeManager?.refresh() } }
         initializationStarted = true
         val store = WorkspaceStore(context.applicationContext)
         workspaceStore = store
@@ -594,6 +950,9 @@ class DemoRepository : ViewModel() {
                 backgroundTasks = BackgroundTaskEngine.open(
                     BackgroundTaskAndroidStore(context.applicationContext),
                     runner = BackgroundTaskRunner { request, emit ->
+                        val selected = modelChoices.firstOrNull { it.id == request.model && !it.isExample }
+                            ?: error("model_unavailable")
+                        if (selected.runtimeModel != null) return@BackgroundTaskRunner runMultiProviderBackgroundTask(request, selected, emit)
                         val generation = credentialGeneration
                         check(!taskCredentialBoundary.blocked && !deepSeekConfigurationBusy && deepSeekConfigured) { "configuration_changed" }
                         val client = DeepSeekChatClient(balanceStore)
@@ -605,17 +964,18 @@ class DemoRepository : ViewModel() {
                                     !deepSeekConfigurationBusy && deepSeekConfigured) { "configuration_changed" }
                                 taskClients.add(client)
                             }
-                            client.generate(DeepSeekChatClient.Request(
+                            val taskModel = modelChoices.first { it.id == request.model && !it.isExample }
+                            val taskReasoning = officialReasoning(taskModel,
+                                if (selectedModel.id == taskModel.id) selectedReasoningOption else null)
+                            val dispatcher = delegatedTaskDispatcher(request, request.model)
+                            OfficialToolSession.generate(client, DeepSeekChatClient.Request(
                                 request.model, listOf(
-                                    DeepSeekChatClient.HistoryMessage("system",
-                                        "You are an independent text task in Dafeiyu Go. " +
-                                            "Current device date: ${java.time.LocalDate.now()} " +
-                                            "(${java.time.ZoneId.systemDefault()}). " +
-                                            "No tools, web search or live external data are available in this task. " +
-                                            "Do not claim to have queried current external information."),
+                                    delegatedTaskSystemMessage(),
                                     DeepSeekChatClient.HistoryMessage("user", request.prompt)),
-                                thinking = null, streaming = true,
-                            )) { event ->
+                                thinking = taskReasoning.thinking, streaming = officialEngineStreaming,
+                                reasoningEffort = taskReasoning.reasoningEffort,
+                                modelCapabilities = taskModel.officialCapabilities,
+                            ), dispatcher, onOutput = {}, onEvent = { event ->
                                 check(generation == credentialGeneration) { "configuration_changed" }
                                 val snapshot = reducer.apply(event).snapshot
                                 val now = android.os.SystemClock.elapsedRealtime()
@@ -629,10 +989,10 @@ class DemoRepository : ViewModel() {
                                         emit(progress)
                                     }
                                 }
-                            }
+                            })
                             val snapshot = reducer.finish()
                             check(generation == credentialGeneration) { "configuration_changed" }
-                            check(snapshot.toolCalls.isEmpty() && snapshot.messages.isNotEmpty() &&
+                            check(snapshot.messages.isNotEmpty() &&
                                 snapshot.messages.all { it.status == AssistantMessageStatus.COMPLETED }) { "task_incomplete" }
                             val result = snapshot.messages.flatMap { it.blocks }
                                 .filterIsInstance<AssistantContentBlockSnapshot.Text>().joinToString("") { it.text }
@@ -647,7 +1007,15 @@ class DemoRepository : ViewModel() {
                         }
                     },
                     availability = { model ->
+                        val choice = modelChoices.firstOrNull { it.id == model && !it.isExample }
+                        val providerId = choice?.runtimeModel?.providerId
                         when {
+                            connectionMode == "online" -> BackgroundTaskAvailability(false, "在线任务由电脑 DSH 调度，请在电脑会话中创建")
+                            choice == null -> BackgroundTaskAvailability(false, "请先获取可用模型")
+                            providerId != null && !isModelProviderEnabled(providerId) -> BackgroundTaskAvailability(false, "请启用该模型提供商")
+                            providerId != null && modelRuntime?.state?.value?.catalog?.firstOrNull { it.id == providerId }?.configured != true ->
+                                BackgroundTaskAvailability(false, "请完成该提供商的认证")
+                            providerId != null -> BackgroundTaskAvailability(true)
                             taskCredentialBoundary.blocked -> BackgroundTaskAvailability(false, "任务停止未完成，请重新保存或清除 API Key")
                             !deepSeekConfigured || deepSeekConfigurationBusy -> BackgroundTaskAvailability(false, "请先配置 DeepSeek API Key")
                             !isModelProviderEnabled("deepseek") -> BackgroundTaskAvailability(false, "请启用 DeepSeek 提供商")
@@ -716,6 +1084,18 @@ class DemoRepository : ViewModel() {
                 }?.id.orEmpty()
                 nextMessageId = (restored.messages.values.flatten().maxOfOrNull { it.id } ?: 0L) + 1L
             }
+            try {
+                val pending = withContext(Dispatchers.IO) { localDshHistory?.pendingPermanentDeletions().orEmpty() }
+                localArchivePendingIds.clear()
+                localArchivePendingIds.addAll(pending.filter { it.phase in setOf("deleting", "native_deleted") }
+                    .map { it.conversationId }.distinct())
+                localArchiveRecoveryFailed = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                localArchiveRecoveryFailed = true
+                localArchiveDeletionDetail = "永久删除记录读取失败；已保留原历史，请在归档页刷新后重试"
+            }
             workspaceInitialized = true
             if (selectedConversationId.isBlank() || conversations.none {
                     it.id == selectedConversationId && it.archivedAtMillis == null
@@ -726,6 +1106,7 @@ class DemoRepository : ViewModel() {
             }
             persistWorkspaces()
             deletionProtectionLoadError?.let { updateNotice(it) }
+            purgeExpiredArchives()
         }
     }
 
@@ -758,10 +1139,15 @@ class DemoRepository : ViewModel() {
                     conversation.title,
                     conversation.workspaceId,
                     conversation.archivedAtMillis,
+                    conversation.archiveOrigin?.let { origin ->
+                        val restoredOrigin = Workspace(origin.workspaceId, origin.workspaceName)
+                        ConversationArchiveOrigin(restoredOrigin, origin.workspaceOrder, origin.conversationOrder,
+                            store.workspaceDirectoryPaths(restoredOrigin))
+                    },
                 )
             }
             val restoredMessages = backup.messages.mapValues { (_, messages) ->
-                messages.map { message -> ChatMessage(message.id, message.role, message.text) }
+                messages.map { message -> ChatMessage(message.id, message.role, message.text, message.streamSnapshot, message.modelInput) }
             }
             val nextId = backup.messages.values.asSequence()
                 .flatMap { it.asSequence() }
@@ -904,7 +1290,8 @@ class DemoRepository : ViewModel() {
         val conversationIds = backup.conversations.map { it.id }
         check(conversationIds.size == conversationIds.toSet().size) { "备份会话 id 重复" }
         backup.conversations.forEach { conversation ->
-            check(conversation.workspaceId in workspaceIdSet) { "备份会话引用了不存在的工作区" }
+            check(conversation.workspaceId in workspaceIdSet || (conversation.archivedAtMillis != null &&
+                conversation.archiveOrigin?.workspaceId == conversation.workspaceId)) { "备份会话引用了不存在的工作区" }
             check(conversation.archivedAtMillis == null || conversation.archivedAtMillis >= 0L) {
                 "备份归档时间无效"
             }
@@ -931,7 +1318,12 @@ class DemoRepository : ViewModel() {
         }
     }
     fun selectWorkspace(id: String) {
-        if (!workspaceInitialized || workspaces.none { it.id == id } || id == selectedWorkspaceId) return
+        if (connectionMode == "online") {
+            clearAttachments()
+            remoteOperation { remoteDsh?.selectWorkspace(id); composerGeneration++ }
+            return
+        }
+        if (!workspaceInitialized || workspaceDeletionBusy || workspaces.none { it.id == id } || id == selectedWorkspaceId) return
         val conversation = conversations.firstOrNull { it.workspaceId == id && it.archivedAtMillis == null }
         if (conversation == null && conversations.size >= MAX_WORKSPACE_CONVERSATIONS) {
             updateNotice("本地会话（含归档）已达到上限，暂时无法打开空工作目录")
@@ -960,6 +1352,165 @@ class DemoRepository : ViewModel() {
     /** Compose query: reads memory only, with no disk access and no notice mutation. */
     fun canDeleteWorkspace(id: String): Boolean {
         return !workspaceDeletionBusy && canDeleteWorkspaceState(id)
+    }
+
+    fun canRemoveWorkspace(id: String): Boolean {
+        if (connectionMode == "online") return remoteWorkspaceLifecycleReady && !workspaceDeletionBusy &&
+            !remoteDshState.busy && !sendPending && attachmentImportCount == 0 &&
+            remoteDshState.projection?.workspace?.workspaces?.any { it.id == id } == true
+        return canRemoveWorkspaceRecord(
+            id, workspaces, workspaceInitialized, workspaceDeletionBusy || sendPending || attachmentImportCount > 0,
+            workspaceStore != null && workspaceSaveError == null && deletionProtectionLoadError == null &&
+                backgroundTasks != null && backgroundTasks?.storageIssue?.value == null,
+        )
+    }
+
+    private fun activeWorkspaceTasks(id: String): List<BackgroundTask> {
+        val conversationIds = conversations.filter { it.workspaceId == id }.mapTo(HashSet()) { it.id }
+        return backgroundTasks?.tasks?.value.orEmpty().filter {
+            it.parentConversationId in conversationIds && it.status in setOf(
+                BackgroundTaskStatus.QUEUED, BackgroundTaskStatus.RUNNING, BackgroundTaskStatus.STOPPING,
+            )
+        }
+    }
+
+    private fun hasWorkspaceResponse(id: String): Boolean = responseJob?.isCompleted == false &&
+        conversations.any { it.workspaceId == id && it.id == activeResponseConversationId }
+
+    fun workspaceRemovalDetails(id: String): WorkspaceRemovalDetails? {
+        if (connectionMode == "online") {
+            val confirmation = remoteWorkspaceRemovalConfirmation ?: return null
+            val connection = remoteDshState.connection ?: return null
+            val snapshot = remoteDshState.projection?.workspace ?: return null
+            if (runCatching { confirmation.requireCurrent(connection, snapshot, id) }.isFailure) return null
+            return confirmation.details(remoteExecutionDeviceLabel())
+        }
+        val workspace = workspaces.firstOrNull { it.id == id } ?: return null
+        val store = workspaceStore ?: return null
+        return WorkspaceRemovalDetails(workspace, "本机 · ${android.os.Build.MODEL}",
+            store.workspaceDirectoryPaths(workspace), hasRunningTasks = hasWorkspaceResponse(id) ||
+                activeWorkspaceTasks(id).isNotEmpty(), canDeleteOwnedFiles = connectionMode == "local")
+    }
+
+    /** Fetch task state and the computer's file identity before enabling a destructive confirmation. */
+    suspend fun prepareWorkspaceRemovalDetails(id: String): WorkspaceRemovalDetails? {
+        remoteWorkspaceRemovalConfirmation = null
+        if (connectionMode != "online") return workspaceRemovalDetails(id)
+        check(canRemoveWorkspace(id)) { "电脑工作区尚未就绪，请稍后重试" }
+        val binding = remoteWorkspaceScope ?: error("电脑配对关系尚未确认")
+        val removal = requireNotNull(remoteDsh).prepareWorkspaceRemoval(id, expectedScope = binding)
+        check(connectionMode == "online") { "执行模式已改变，请重新确认" }
+        val confirmation = RemoteWorkspaceRemovalConfirmation(binding, removal)
+        confirmation.requireCurrent(requireNotNull(remoteDshState.connection),
+            requireNotNull(remoteDshState.projection?.workspace), id)
+        remoteWorkspaceRemovalConfirmation = confirmation
+        return confirmation.details(remoteExecutionDeviceLabel())
+    }
+
+    fun clearWorkspaceRemovalConfirmation() { remoteWorkspaceRemovalConfirmation = null }
+
+    private fun remoteExecutionDeviceLabel(): String {
+        val device = remoteDshState.connection?.optJSONObject("remote_device")
+        val name = device?.optString("name")?.trim()?.takeIf { it.isNotEmpty() && it != "null" }
+            ?: device?.optString("device_name")?.trim()?.takeIf { it.isNotEmpty() && it != "null" }
+        return name?.let { "电脑 · $it" } ?: "电脑 · 对方尚未共享设备名称"
+    }
+
+    /** Acceptance is asynchronous; only a committed archive snapshot permits file removal. */
+    fun requestRemoveWorkspace(id: String, deleteFiles: Boolean = false, stopRunningTasks: Boolean = false): Boolean {
+        if (!canRemoveWorkspace(id)) {
+            updateNotice("工作区正在保存或执行设备尚未就绪，请稍后重试")
+            return false
+        }
+        if (connectionMode == "online") {
+            val confirmation = remoteWorkspaceRemovalConfirmation ?: return false.also {
+                updateNotice("请先重新读取电脑工作区状态")
+            }
+            val details = workspaceRemovalDetails(id) ?: return false.also {
+                updateNotice("电脑工作区或配对关系已改变，请重新确认")
+            }
+            if (details.hasRunningTasks && !stopRunningTasks) {
+                updateNotice("此电脑工作区有运行任务，请先确认停止任务")
+                return false
+            }
+            if (deleteFiles && !details.canDeleteOwnedFiles) {
+                updateNotice("电脑未确认目录身份，磁盘文件保留")
+                return false
+            }
+            return requestRemoteLifecycleMutation(confirmation.binding) { controller, binding ->
+                val removed = controller.removeWorkspace(confirmation.removal.ticket,
+                    stopRunning = stopRunningTasks, expectedScope = binding)
+                check(removed.workspace.path == confirmation.removal.workspace.path && removed.phase in REMOVED_PHASES) {
+                    "电脑未返回匹配的工作区移除回执"
+                }
+                remoteWorkspaceRemovalConfirmation = null
+                if (deleteFiles) {
+                    val deleted = controller.deleteWorkspaceFiles(removed.ticket, confirmation.removal.workspace.path,
+                        expectedScope = binding)
+                    check(deleted.filesDeleted && deleted.phase == "files_deleted") { "电脑文件删除尚未确认" }
+                    updateNotice("已移除电脑工作区并归档对话，已删除确认路径中的电脑文件")
+                } else updateNotice("已移除电脑工作区并归档对话，电脑文件保留")
+            }
+        }
+        val workspace = workspaces.first { it.id == id }
+        val store = requireNotNull(workspaceStore)
+        val active = activeWorkspaceTasks(id)
+        if ((hasWorkspaceResponse(id) || active.isNotEmpty()) && !stopRunningTasks) {
+            updateNotice("此工作区有运行任务，请先确认停止任务")
+            return false
+        }
+        workspaceDeletionBusy = true
+        viewModelScope.launch {
+            try {
+                updateNotice("正在停止任务并归档：${workspace.name}")
+                withTimeout(30_000L) {
+                    if (hasWorkspaceResponse(id)) {
+                        val runningJob = responseJob
+                        cancelResponse()
+                        runningJob?.join()
+                    }
+                    val engine = requireNotNull(backgroundTasks)
+                    active.forEach { engine.stop(it.id) }
+                    active.forEach { engine.awaitTerminal(it.id) }
+                }
+                check(!hasWorkspaceResponse(id) && activeWorkspaceTasks(id).isEmpty()) { "任务未完全停止，文件已保留" }
+                check(backgroundTasks?.storageIssue?.value == null) { "任务状态保存失败，文件已保留" }
+                saveJob?.cancelAndJoin()
+                saveJob = null
+                check(workspaces.firstOrNull { it.id == id } == workspace) { "工作区已改变，请重新确认" }
+                var prepared = prepareWorkspaceRemovalSnapshot(workspaceSnapshot(), id,
+                    store.workspaceDirectoryPaths(workspace),
+                    if (workspaces.size == 1) Workspace(UUID.randomUUID().toString(), "默认工作区") else null)
+                if (prepared.selectedConversationId.isBlank()) {
+                    check(prepared.conversations.size < MAX_WORKSPACE_CONVERSATIONS) { "对话存储已满，请先清理归档" }
+                    val replacement = Conversation(UUID.randomUUID().toString(), "新对话", prepared.selectedWorkspaceId)
+                    prepared = prepared.copy(conversations = prepared.conversations + replacement,
+                        messages = prepared.messages + (replacement.id to emptyList()), selectedConversationId = replacement.id)
+                }
+                if (!commitWorkspace(prepared)) return@launch
+                val removedWasSelected = selectedWorkspaceId == id
+                workspaces.clear(); workspaces.addAll(prepared.workspaces)
+                conversations.clear(); conversations.addAll(prepared.conversations)
+                selectedWorkspaceId = prepared.selectedWorkspaceId
+                selectedConversationId = prepared.selectedConversationId
+                if (removedWasSelected) { clearAttachments(); composerDraftText = ""; composerGeneration++ }
+                persistenceRevision++
+                if (deleteFiles) {
+                    check(activeWorkspaceTasks(id).isEmpty()) { "出现新运行任务，文件已保留" }
+                    val result = withContext(Dispatchers.IO) {
+                        persistenceMutex.withLock { store.deleteRemovedWorkspaceFiles(workspace) }
+                    }
+                    updateNotice(if (result.completed) "已移除工作区并归档对话；已删除应用内文件" +
+                        if (result.preservedExternalUri != null) "，所选外部目录保留" else ""
+                    else "工作区已归档；${result.error}")
+                } else updateNotice("已移除工作区并归档对话，磁盘文件保留")
+            } catch (cancelled: CancellationException) {
+                if (cancelled is kotlinx.coroutines.TimeoutCancellationException) updateNotice("任务停止超时，未删除工作区或文件")
+                else throw cancelled
+            } catch (error: Exception) { updateNotice(error.message ?: "工作区移除失败，文件已保留") }
+            finally { workspaceDeletionBusy = false; persistWorkspaces() }
+        }
+        return true
     }
 
     private fun canDeleteWorkspaceState(id: String): Boolean {
@@ -1079,7 +1630,12 @@ class DemoRepository : ViewModel() {
     }
 
     fun selectConversation(id: String) {
-        if (!workspaceInitialized || id == selectedConversationId) return
+        if (connectionMode == "online") {
+            clearAttachments()
+            remoteOperation { remoteDsh?.selectSession(id); composerGeneration++ }
+            return
+        }
+        if (!workspaceInitialized || workspaceDeletionBusy || id == selectedConversationId) return
         val conversation = conversations.firstOrNull { it.id == id && it.archivedAtMillis == null } ?: return
         cancelResponse()
         clearAttachments()
@@ -1089,36 +1645,26 @@ class DemoRepository : ViewModel() {
         persistWorkspaces()
     }
 
-    /**
-     * Explicit conversation deletion removes its messages, while managed attachment/output
-     * files and independent tasks remain available through their existing stores.
-     */
+    /** Permanent deletion is confirmed separately from archive and commits only
+     * after every linked DSH history has an actual durable deletion receipt. */
     fun deleteConversation(id: String): Boolean {
-        if (!workspaceInitialized || workspaceStore == null || sendPending || workspaceDeletionBusy) {
-            updateNotice("本地存储尚不可用或正在发送，未删除对话")
+        if (connectionMode != "local" || !workspaceInitialized || workspaceStore == null ||
+            localDshHistory == null || sendPending || workspaceDeletionBusy || localEngineSwitchBusy ||
+            hasNativeRunningTasks()) {
+            updateNotice("请等待本机任务和引擎操作结束后再永久删除归档")
             return false
         }
-        val index = conversations.indexOfFirst { it.id == id }
-        if (index < 0) return false
-        val conversation = conversations[index]
-        val wasSelected = selectedConversationId == id
-        if (activeResponseConversationId == id) cancelResponse()
-        conversations.removeAt(index)
-        conversationMessages.remove(id)
-        if (wasSelected) {
-            clearAttachments()
-            val next = firstValidConversation(conversations.toList(), workspaces.mapTo(HashSet()) { it.id })
-                ?: createEmptyConversation(conversation.workspaceId, enforceActiveLimit = false)
-            if (next != null) activateConversation(next) else selectedConversationId = ""
+        if (conversations.none { it.id == id && it.archivedAtMillis != null }) {
+            updateNotice("请先归档此对话，再确认永久删除")
+            return false
         }
-        persistWorkspaces()
-        updateNotice("对话已移除，正在保存：${conversation.title}")
-        return true
+        return requestLocalArchiveDeletion(setOf(id), includePending = false)
     }
 
     /** Archive a conversation without dropping its messages. The active session is switched first. */
     fun archiveConversation(id: String): Boolean {
-        if (!workspaceInitialized) return false
+        if (connectionMode == "online") return requestArchiveRemoteConversation(id)
+        if (!workspaceInitialized || workspaceDeletionBusy || sendPending) return false
         var index = conversations.indexOfFirst { it.id == id }
         if (index < 0) return false
         var conversation = conversations[index]
@@ -1141,7 +1687,10 @@ class DemoRepository : ViewModel() {
             }
         }
         if (isSelected) cancelResponse()
-        conversations[index] = conversation.copy(archivedAtMillis = System.currentTimeMillis())
+        val sourceWorkspace = workspaces.first { it.id == conversation.workspaceId }
+        conversations[index] = conversation.copy(archivedAtMillis = System.currentTimeMillis(),
+            archiveOrigin = ConversationArchiveOrigin(sourceWorkspace, workspaces.indexOf(sourceWorkspace), index,
+                workspaceStore?.workspaceDirectoryPaths(sourceWorkspace).orEmpty()))
         if (isSelected) {
             val next = replacement ?: createEmptyConversation(conversation.workspaceId)
             if (next == null) {
@@ -1158,14 +1707,100 @@ class DemoRepository : ViewModel() {
         return true
     }
 
+    fun canArchiveConversation(id: String): Boolean {
+        if (connectionMode != "online") return workspaceInitialized && !workspaceDeletionBusy && !sendPending &&
+            conversations.any { it.id == id && it.archivedAtMillis == null }
+        return remoteWorkspaceLifecycleReady && !workspaceDeletionBusy && !remoteDshState.busy &&
+            !remoteDshState.pendingPrompt && displayConversations.any { it.id == id }
+    }
+
+    fun remoteConversationArchiveRequiresStop(id: String): Boolean {
+        if (connectionMode != "online") return false
+        val projection = remoteDshState.projection ?: return true
+        return projection.workspace.sessions.any { it.id == id && it.running } ||
+            projection.sessions[id]?.activity?.runStatus == AssistantRunStatus.RUNNING ||
+            projection.sessions[id]?.activity?.subagents?.any { it.status in setOf(
+                AssistantStreamEvent.SubagentStatus.PENDING, AssistantStreamEvent.SubagentStatus.STARTING,
+                AssistantStreamEvent.SubagentStatus.RUNNING) } == true
+    }
+
+    fun requestArchiveRemoteConversation(id: String, stopRunningTasks: Boolean = false,
+        expectedScope: RemoteDshScope? = remoteWorkspaceScope): Boolean {
+        if (!canArchiveConversation(id) || connectionMode != "online" || expectedScope == null ||
+            expectedScope != remoteWorkspaceScope) return false
+        if (remoteConversationArchiveRequiresStop(id) && !stopRunningTasks) {
+            updateNotice("此电脑会话仍有运行任务，请先确认停止任务后归档")
+            return false
+        }
+        return requestRemoteLifecycleMutation(expectedScope) { controller, binding ->
+            controller.archiveSession(id, stopRunning = stopRunningTasks, expectedScope = binding)
+            updateNotice("电脑会话已归档")
+        }
+    }
+
+    fun remoteRemovedWorkspace(id: String): RemoteWorkspaceStore.Removal? =
+        remoteDshState.projection?.workspace?.removals?.firstOrNull { it.workspace.id == id && it.phase in REMOVED_PHASES }
+
+    fun canRestoreArchivedConversation(id: String): Boolean {
+        if (connectionMode != "online") return workspaceInitialized && !workspaceDeletionBusy && !sendPending &&
+            id !in localArchivePendingIds && archivedConversations.any { it.id == id }
+        if (!remoteWorkspaceLifecycleReady || workspaceDeletionBusy || remoteDshState.busy) return false
+        val snapshot = remoteDshState.projection?.workspace ?: return false
+        val archive = snapshot.archives.firstOrNull { it.sessionId == id } ?: return false
+        return archive.workspace == null || snapshot.workspaces.any { it.id == archive.workspace.id }
+    }
+
+    fun requestRestoreRemoteWorkspace(ticket: String, expectedScope: RemoteDshScope?): Boolean {
+        if (expectedScope == null || expectedScope != remoteWorkspaceScope || !remoteWorkspaceLifecycleReady ||
+            remoteDshState.projection?.workspace?.removals?.none { it.ticket == ticket && it.phase in REMOVED_PHASES } != false)
+            return false
+        return requestRemoteLifecycleMutation(expectedScope) { controller, binding ->
+            val result = controller.restoreRemovedWorkspace(ticket, expectedScope = binding)
+            updateNotice(if (result.optString("status") == "needs_directory")
+                "原电脑目录已不存在，请先在电脑准备原路径，再还原工作区；已删除的文件不会自动恢复"
+            else {
+                check(result.optString("status") == "restored") { "电脑工作区还原尚未确认" }
+                "已还原电脑工作区及其会话"
+            })
+        }
+    }
+
+    fun requestDeleteRemoteWorkspaceFiles(ticket: String, confirmedPath: String, expectedScope: RemoteDshScope?): Boolean {
+        if (expectedScope == null || expectedScope != remoteWorkspaceScope || !remoteWorkspaceLifecycleReady) return false
+        val removal = remoteDshState.projection?.workspace?.removals?.firstOrNull { it.ticket == ticket } ?: return false
+        if (removal.workspace.path != confirmedPath || !removal.filesIdentityVerified || removal.filesDeleted ||
+            removal.phase !in setOf("removed", "files_moving", "files_deleting")) return false
+        return requestRemoteLifecycleMutation(expectedScope) { controller, binding ->
+            val result = controller.deleteWorkspaceFiles(ticket, confirmedPath, expectedScope = binding)
+            check(result.filesDeleted && result.phase == "files_deleted") { "电脑文件删除尚未确认" }
+            updateNotice("已删除确认路径中的电脑文件，归档会话仍保留")
+        }
+    }
+
     /** Restore an archived conversation in place; its messages and workspace are preserved. */
     fun restoreConversation(id: String): Boolean {
-        if (!workspaceInitialized) return false
+        if (connectionMode == "online") {
+            if (!canRestoreArchivedConversation(id)) {
+                updateNotice("请先还原所属电脑工作区，或等待电脑连接恢复")
+                return false
+            }
+            val binding = remoteWorkspaceScope ?: return false
+            return requestRemoteLifecycleMutation(binding) { controller, expected ->
+                controller.restoreArchivedSession(id, expectedScope = expected)
+                updateNotice("电脑会话已还原")
+            }
+        }
+        if (!workspaceInitialized || workspaceDeletionBusy || sendPending || id in localArchivePendingIds) return false
         val index = conversations.indexOfFirst { it.id == id }
         if (index < 0) return false
         val conversation = conversations[index]
         if (conversation.archivedAtMillis == null) return false
-        conversations[index] = conversation.copy(archivedAtMillis = null)
+        val restored = runCatching { prepareConversationRestoreSnapshot(workspaceSnapshot(), id) }.getOrElse {
+            updateNotice(it.message ?: "缺少原工作区信息，无法还原")
+            return false
+        }
+        workspaces.clear(); workspaces.addAll(restored.workspaces)
+        conversations.clear(); conversations.addAll(restored.conversations)
         persistWorkspaces()
         updateNotice("已还原对话：${conversation.title}")
         return true
@@ -1173,31 +1808,147 @@ class DemoRepository : ViewModel() {
 
     /** Permanently remove only an archived conversation and its associated messages. */
     fun deleteArchivedConversation(id: String): Boolean {
+        if (connectionMode == "online") {
+            updateNotice("请先读取电脑的删除确认，再确认永久删除")
+            return false
+        }
         if (conversations.none { it.id == id && it.archivedAtMillis != null }) return false
         return deleteConversation(id)
     }
 
-    /** Remove archives whose retention period has elapsed, including their persisted messages. */
-    fun purgeExpiredArchives(nowMillis: Long = System.currentTimeMillis()): Int {
-        if (!workspaceInitialized) return 0
-        val expiredIds = conversations.filter { isArchiveExpired(it, nowMillis) }.mapTo(HashSet()) { it.id }
-        if (expiredIds.isEmpty()) return 0
-        val selectedExpired = selectedConversationId in expiredIds
-        val previousWorkspaceId = selectedWorkspaceId
-        if (selectedExpired) cancelResponse()
-        conversations.removeAll { it.id in expiredIds }
-        expiredIds.forEach { conversationMessages.remove(it) }
-        if (selectedExpired) {
-            val next = findUnarchivedConversation(preferredWorkspaceId = previousWorkspaceId)
-                ?: createEmptyConversation(previousWorkspaceId, enforceActiveLimit = false)
-            if (next != null) activateConversation(next) else selectedConversationId = ""
+    /** Read a durable computer ticket before showing the independent destructive confirmation. */
+    suspend fun prepareRemoteArchivedConversationDeletion(id: String, expectedScope: RemoteDshScope?): RemoteWorkspaceStore.ArchiveDeletion {
+        require(expectedScope != null && remoteWorkspaceScope == expectedScope && remoteArchiveDeletionAvailable &&
+            !archiveOperationBusy && displayArchivedConversations.any { it.id == id }) { "remote_archive_confirmation_scope_changed" }
+        val controller = remoteDsh ?: error("电脑连接尚未准备好")
+        workspaceDeletionBusy = true
+        return try {
+            val prepared = controller.prepareArchivedSessionDeletion(id, expectedScope = expectedScope)
+            require(connectionMode == "online" && remoteWorkspaceScope == expectedScope && prepared.scope == expectedScope &&
+                prepared.sessionId == id && prepared.status == "prepared" && !prepared.deleted &&
+                prepared.executionDevice == "remote_computer") { "remote_archive_confirmation_changed" }
+            prepared
+        } finally { workspaceDeletionBusy = false }
+    }
+
+    fun requestDeleteRemoteArchivedConversation(prepared: RemoteWorkspaceStore.ArchiveDeletion): Boolean {
+        if (!remoteArchiveDeletionAvailable || remoteWorkspaceScope != prepared.scope ||
+            prepared.status != "prepared" || prepared.deleted || prepared.executionDevice != "remote_computer") return false
+        val archive = remoteDshState.projection?.workspace?.archives?.firstOrNull { it.sessionId == prepared.sessionId }
+            ?: return false
+        if (archive.archiveVersion != null && archive.archiveVersion != prepared.archiveVersion) return false
+        return requestRemoteLifecycleMutation(prepared.scope) { controller, expected ->
+            val committed = controller.deleteArchivedSession(prepared, expectedScope = expected)
+            check(committed.scope == expected && committed.ticket == prepared.ticket && committed.sessionId == prepared.sessionId &&
+                committed.archiveVersion == prepared.archiveVersion && committed.status == "deleted" && committed.deleted &&
+                committed.executionDevice == "remote_computer" && committed.deletedAt != null) { "remote_archive_delete_not_confirmed" }
+            updateNotice("电脑归档对话已永久删除；工作区文件保留")
         }
-        persistWorkspaces()
-        return expiredIds.size
+    }
+
+    /** Queue expired archives for the same physical deletion transaction. The
+     * return value stays zero until a durable receipt is actually committed. */
+    fun purgeExpiredArchives(nowMillis: Long = System.currentTimeMillis()): Int {
+        if (connectionMode == "online") return 0
+        if (!workspaceInitialized || workspaceDeletionBusy || sendPending || localEngineSwitchBusy || hasNativeRunningTasks()) return 0
+        val expiredIds = conversations.filter { isArchiveExpired(it, nowMillis) }.mapTo(HashSet()) { it.id }
+        requestLocalArchiveDeletion(expiredIds, includePending = true)
+        return 0
+    }
+
+    private fun requestLocalArchiveDeletion(ids: Set<String>, includePending: Boolean): Boolean {
+        if (connectionMode != "local" || workspaceDeletionBusy || localEngineSwitchBusy || hasNativeRunningTasks()) return false
+        val history = localDshHistory ?: return false
+        val store = workspaceStore ?: return false
+        if (ids.isEmpty() && (!includePending || localArchivePendingIds.isEmpty() && !localArchiveRecoveryFailed)) return false
+        workspaceDeletionBusy = true
+        localArchiveDeletionDetail = "正在核对本机归档与共享历史…"
+        viewModelScope.launch {
+            val failures = mutableListOf<String>()
+            var completed = 0
+            try {
+                localEngineGate.withLock {
+                    saveJob?.cancelAndJoin()
+                    saveJob = null
+                    check(commitWorkspace(workspaceSnapshot())) { "归档索引尚未保存，未开始永久删除" }
+                    val pending = history.pendingPermanentDeletions()
+                    localArchivePendingIds.clear()
+                    localArchivePendingIds.addAll(pending.filter { it.phase in setOf("deleting", "native_deleted") }
+                        .map { it.conversationId }.distinct())
+                    localArchiveRecoveryFailed = false
+                    val requested = ids + if (includePending) pending.filter {
+                        it.phase in setOf("deleting", "native_deleted")
+                    }.map { it.conversationId } else emptyList()
+                    var runtimeStopped = false
+                    for (id in requested) {
+                        try {
+                            val conversation = conversations.firstOrNull { it.id == id }
+                            val previous = pending.firstOrNull { it.conversationId == id }
+                            val intent = if (previous != null) previous else {
+                                requireNotNull(conversation) { "本机归档已变化，请刷新" }
+                                check(conversation.archivedAtMillis != null) { "对话已还原，未永久删除" }
+                                history.preparePermanentDeletion(conversation)
+                            }
+                            if (conversation != null) check(intent.conversationSha256 ==
+                                LocalDshHistoryController.deletionFingerprint(conversation, conversationMessages[id].orEmpty())) {
+                                "归档内容已变化，原删除确认不能继续"
+                            }
+                            if (id !in localArchivePendingIds) localArchivePendingIds += id
+                            if (intent.requiresDsh && !runtimeStopped) {
+                                // Stop only an idle service. Running tasks retain
+                                // their history until the user stops them.
+                                dshRuntimeManager?.snapshot?.value?.accessUrl?.let { requireLocalDshIdle(it) }
+                                dshRuntimeManager?.stop()
+                                modelRuntime?.shutdown()
+                                connectPluginHost?.stop()
+                                runtimeStopped = true
+                            }
+                            localArchiveDeletionDetail = if (intent.requiresDsh)
+                                "正在永久删除本机与 DSH 中的共享对话…" else "正在永久删除本机归档…"
+                            val receipt = history.deletePermanentHistory(intent)
+                            val committed = withContext(NonCancellable + Dispatchers.IO) {
+                                persistenceMutex.withLock { store.commitPermanentDeletion(receipt) }
+                            }
+                            // The durable fence protects this snapshot from any
+                            // delayed save or a reconstructed repository writer.
+                            workspaces.clear(); workspaces.addAll(committed.workspaces)
+                            conversations.clear(); conversations.addAll(committed.conversations)
+                            conversationMessages.clear()
+                            committed.messages.forEach { (key, values) ->
+                                conversationMessages[key] = mutableStateListOf<ChatMessage>().apply { addAll(values) }
+                            }
+                            selectedWorkspaceId = committed.selectedWorkspaceId
+                            selectedConversationId = committed.selectedConversationId
+                            nextMessageId = (committed.messages.values.flatten().maxOfOrNull { it.id } ?: 0L) + 1L
+                            persistenceRevision++
+                            history.acknowledgePermanentDeletion(receipt)
+                            localArchivePendingIds.remove(id)
+                            completed++
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (failure: Exception) {
+                            failures += failure.message?.take(400) ?: "共享历史删除未确认，请重试"
+                        }
+                    }
+                }
+                localArchiveDeletionDetail = if (failures.isEmpty()) {
+                    if (completed == 0) null else "已永久删除 $completed 个归档；工作区文件保留"
+                } else "部分删除步骤尚未完成，请刷新后重试；已完成的删除无法撤销。${failures.first()}"
+                localArchiveDeletionDetail?.let(::updateNotice)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                localArchiveDeletionDetail = failure.message?.take(400) ?: "永久删除未完成，请重试"
+                updateNotice(requireNotNull(localArchiveDeletionDetail))
+            } finally {
+                workspaceDeletionBusy = false
+                persistWorkspaces()
+            }
+        }
+        return true
     }
 
     /** Sidebar visibility excludes drafts and archived conversations. */
     fun isConversationVisibleInWorkspace(conversation: Conversation): Boolean {
+        if (connectionMode == "online") return conversation.archivedAtMillis == null
         val current = conversations.firstOrNull { it.id == conversation.id } ?: return false
         if (current.workspaceId != conversation.workspaceId || current.archivedAtMillis != null) return false
         return conversationMessages[current.id]?.any {
@@ -1259,7 +2010,7 @@ class DemoRepository : ViewModel() {
     }
 
     fun createWorkspace(name: String) {
-        if (!workspaceInitialized) return
+        if (!workspaceInitialized || workspaceDeletionBusy) return
         val title = name.trim().take(80)
         if (title.isEmpty()) return
         if (workspaces.size >= 200) {
@@ -1271,6 +2022,7 @@ class DemoRepository : ViewModel() {
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) { persistenceMutex.withLock { store.createInternalWorkspace(id) } }
+                check(!workspaceDeletionBusy) { "工作区正在移除，请完成后重新创建" }
                 workspaces.add(Workspace(id, title))
                 selectWorkspace(id)
                 updateNotice("已新建本地工作目录：$title")
@@ -1284,7 +2036,7 @@ class DemoRepository : ViewModel() {
     }
 
     fun addExternalWorkspace(context: Context, treeUri: Uri) {
-        if (!workspaceInitialized) return
+        if (!workspaceInitialized || workspaceDeletionBusy) return
         val existing = workspaces.firstOrNull { it.uri == treeUri.toString() }
         if (existing != null) {
             selectWorkspace(existing.id)
@@ -1348,7 +2100,7 @@ class DemoRepository : ViewModel() {
     }
 
     suspend fun retryWorkspaceSave(): Boolean = withContext(NonCancellable + Dispatchers.Main.immediate) {
-        if (sendPending || isResponding) {
+        if (sendPending || isResponding || workspaceDeletionBusy) {
             updateNotice("请等待当前发送或回复完成后重试保存")
             return@withContext false
         }
@@ -1369,7 +2121,7 @@ class DemoRepository : ViewModel() {
         persistenceRevision++
         if (workspaceStore == null) return
         if (!workspaceInitialized) return
-        if (sendPending) return
+        if (sendPending || workspaceDeletionBusy) return
         // Keep one writer; replacing a cancelled noncancellable commit could leave an
         // older IO task untracked and allow it to overwrite the precommitted turn.
         if (saveJob?.isCompleted == false) return
@@ -1384,32 +2136,55 @@ class DemoRepository : ViewModel() {
     }
 
     fun selectModel(id: String) {
+        if (connectionMode == "online") {
+            val provider = remoteDshState.projection?.workspace?.catalog?.providers.orEmpty()
+                .firstOrNull { it.models.any { model -> "${it.id}::${model.id}" == id } }
+            val model = provider?.models?.firstOrNull { "${provider.id}::${it.id}" == id }
+            if (provider != null && model != null) selectProviderModel(provider.id, model.id, model.defaultEffort)
+            else updateNotice("请先刷新电脑的模型目录")
+            return
+        }
         val model = modelChoices.firstOrNull { it.id == id }
         if (model == null) {
             updateNotice("找不到该模型")
             return
         }
-        if (model.id == selectedModel.id) return
+        if (model == selectedModel) return
+        val previousReasoning = selectedReasoningOption?.id
         selectedModel = model
-        selectedReasoningIndex = if (model.reasoningOptions.isEmpty()) {
-            -1
-        } else {
-            model.defaultReasoningIndex.coerceIn(model.reasoningOptions.indices)
-        }
+        val rememberedReasoning = settingsPreferences?.getString("deepseek_reasoning_${model.id}", null)
+        val validId = model.officialCapabilities?.let {
+            DeepSeekThinkingPolicy.normalizeOptionId(it, rememberedReasoning ?: previousReasoning)
+        } ?: (rememberedReasoning ?: previousReasoning)?.takeIf { id -> model.reasoningOptions.any { it.id == id } }
+        selectedReasoningIndex = model.reasoningOptions.indexOfFirst { it.id == validId }
+            .takeIf { it >= 0 } ?: model.defaultReasoningIndex
         settingsPreferences?.edit()?.putString("deepseek_selected_model", if (model.isExample) "" else model.id)?.apply()
+        settingsPreferences?.edit()?.putString("selected_model", if (model.isExample) "" else model.id)?.apply()
         updateNotice("已选择${model.name}${if (model.isExample) " · 仅本地预览" else ""}")
     }
 
+    fun selectProviderModel(providerId: String, modelId: String, reasoning: String?) {
+        if (connectionMode == "online") {
+            remoteOperation { remoteDsh?.selectModel(providerId, modelId, reasoning) }
+            return
+        }
+        val choice = if (providerId == "deepseek") modelChoices.firstOrNull { it.id == modelId && it.runtimeModel == null }
+            else modelChoices.firstOrNull { it.runtimeModel?.providerId == providerId && it.runtimeModel.id == modelId }
+        if (choice == null) { updateNotice("请先刷新该提供商的真实模型目录"); return }
+        selectModel(choice.id)
+        setReasoningId(reasoning)
+    }
+
     fun saveDeepSeekKey(value: String) {
-        val store = deepSeekBalanceStore ?: return
-        if (deepSeekConfigurationBusy || isResponding) return
+        if (deepSeekBalanceStore == null || modelProviderStore == null) return
+        if (connectionMode != "local" || deepSeekConfigurationBusy || isResponding || localEngineSwitchBusy) return
         val generation = ++credentialGeneration
         deepSeekConfigurationBusy = true
         deepSeekModelError = null
         viewModelScope.launch {
             try {
                 stopTasksForCredentialChange()
-                withContext(Dispatchers.IO) { store.setApiKey(value) }
+                persistOfficialCredential(value)
                 if (generation == credentialGeneration) {
                     deepSeekConfigured = true
                     invalidateRemoteModels()
@@ -1422,16 +2197,18 @@ class DemoRepository : ViewModel() {
     }
 
     fun clearDeepSeekKey() {
-        val store = deepSeekBalanceStore ?: return
-        if (deepSeekConfigurationBusy) return
+        if (deepSeekBalanceStore == null || modelProviderStore == null) return
+        if (connectionMode != "local" || deepSeekConfigurationBusy || localEngineSwitchBusy) return
+        val runningResponse = responseJob
         cancelResponse()
         ++credentialGeneration
         catalogClient?.cancel()
         deepSeekConfigurationBusy = true
         viewModelScope.launch {
             try {
+                withTimeout(30_000L) { runningResponse?.join() }
                 stopTasksForCredentialChange()
-                withContext(Dispatchers.IO) { store.clearApiKey() }
+                persistOfficialCredential(null)
                 deepSeekConfigured = false
                 invalidateRemoteModels()
                 deepSeekModelError = null
@@ -1440,6 +2217,111 @@ class DemoRepository : ViewModel() {
             catch (_: Exception) { deepSeekModelError = "无法清除 API Key，请重试" }
             finally { deepSeekConfigurationBusy = false; notifyTaskConfiguration() }
         }
+    }
+
+    /** A failed native write rolls back only our revision, never another provider edit. */
+    private suspend fun persistOfficialCredential(value: String?) = localEngineGate.withLock {
+        dshRuntimeManager?.snapshot?.value?.accessUrl?.let { requireLocalDshIdle(it) }
+        try {
+            withContext(NonCancellable + Dispatchers.IO) {
+                val providers = requireNotNull(modelProviderStore)
+                val balance = requireNotNull(deepSeekBalanceStore)
+                val key = value?.trim()?.also {
+                    require(it.isNotEmpty() && it.length <= 512 && it.none { c -> c.isWhitespace() || c.isISOControl() })
+                }
+                val credential = key?.let { JSONObject().put("type", "api_key").put("key", it) }
+                val before = providers.workerConfiguration()
+                val previousCredential = before.getJSONObject("credentials").optJSONObject("deepseek")
+                val previousKey = balance.readApiKeyForRequest()
+                val committed = providers.persistWorkerCredential("deepseek", credential, before.getLong("revision"))
+                try {
+                    if (key == null) balance.clearApiKey() else balance.setApiKey(key)
+                } catch (failure: Exception) {
+                    try {
+                        val current = balance.readApiKeyForRequest()
+                        check(current == key || current == previousKey) { "官方凭据在保存期间已变化" }
+                        if (current != previousKey) {
+                            if (previousKey == null) balance.clearApiKey() else balance.setApiKey(previousKey)
+                        }
+                        providers.persistWorkerCredential("deepseek", previousCredential, committed)
+                    } catch (rollback: Exception) {
+                        throw IllegalStateException("官方凭据回退未完成，请在模型页重新保存 API Key", rollback)
+                    }
+                    throw failure
+                }
+            }
+        } finally {
+            if (modelRuntime?.state?.value?.busy != true) modelRuntime?.refresh()
+        }
+    }
+
+    /** Explicit .dym export only. The UI explains that this object contains portable credentials. */
+    fun exportDymProviderConfiguration(): JSONObject {
+        val portable = requireNotNull(modelProviderStore) { "提供商存储尚未就绪" }.exportPortable()
+        deepSeekBalanceStore?.readApiKeyForRequest()?.let { key ->
+            portable.getJSONObject("credentials").put("deepseek", JSONObject().put("type", "api_key").put("key", key))
+        }
+        return portable
+    }
+
+    /** Pause real execution before replacing credentials; keep both vaults consistent on a write failure. */
+    suspend fun restoreDymProviderConfiguration(configuration: JSONObject): Result<Unit> = withContext(Dispatchers.Main.immediate) {
+        if (deepSeekConfigurationBusy || workspaceDeletionBusy || localEngineSwitchBusy || connectionMode != "local") {
+            return@withContext Result.failure(IllegalStateException("请在本地模式等待当前配置保存后重试"))
+        }
+        val providers = modelProviderStore ?: return@withContext Result.failure(IllegalStateException("提供商存储尚未就绪"))
+        val balance = deepSeekBalanceStore ?: return@withContext Result.failure(IllegalStateException("凭据存储尚未就绪"))
+        deepSeekConfigurationBusy = true
+        ++credentialGeneration
+        val runningJob = responseJob
+        cancelResponse()
+        catalogClient?.cancel()
+        try {
+            withTimeout(30_000L) { runningJob?.join(); stopTasksForCredentialChange() }
+            localEngineGate.withLock { withContext(NonCancellable + Dispatchers.IO) {
+                val incoming = JSONObject(configuration.toString())
+                val deepseek = incoming.getJSONObject("credentials").optJSONObject("deepseek")
+                val key = deepseek?.let {
+                    require(it.getString("type") == "api_key") { "DeepSeek 官方仅接受 API Key" }
+                    it.getString("key").trim().also { value ->
+                        require(value.isNotEmpty() && value.length <= 512 && value.none { c -> c.isWhitespace() || c.isISOControl() }) {
+                            "备份中的 DeepSeek API Key 无效"
+                        }
+                    }
+                }
+                val previous = providers.exportPortable()
+                val previousKey = balance.readApiKeyForRequest()
+                var writtenRevision: Long? = null
+                try {
+                    val imported = providers.importPortableIfRevision(incoming, previous.getLong("revision"))
+                    writtenRevision = imported.revision
+                    if (key == null) balance.clearApiKey() else balance.setApiKey(key)
+                    withContext(Dispatchers.Main.immediate) {
+                        modelProviderOrder = imported.providers.map { it.id }
+                        modelProviderEnabled = imported.providers.associate { it.id to it.enabled }
+                    }
+                } catch (error: Exception) {
+                    try {
+                        writtenRevision?.let { revision ->
+                            providers.importPortableIfRevision(previous, revision)
+                            val current = balance.readApiKeyForRequest()
+                            check(current == key || current == previousKey) { "官方凭据已变化，不能回退覆盖" }
+                            if (current != previousKey) {
+                                if (previousKey == null) balance.clearApiKey() else balance.setApiKey(previousKey)
+                            }
+                        }
+                    } catch (rollback: Exception) {
+                        throw IllegalStateException("凭据恢复失败且回退未完成，请重新检查提供商配置", rollback)
+                    }
+                    throw error
+                }
+            } }
+            deepSeekConfigured = withContext(Dispatchers.IO) { balance.hasKey() }
+            invalidateRemoteModels()
+            Result.success(Unit)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (error: Exception) { Result.failure(error) }
+        finally { deepSeekConfigurationBusy = false; notifyTaskConfiguration() }
     }
 
     private suspend fun stopTasksForCredentialChange() = withContext(Dispatchers.Main.immediate) {
@@ -1470,9 +2352,9 @@ class DemoRepository : ViewModel() {
     }
 
     private fun invalidateRemoteModels() {
-        modelChoices.removeAll { !it.isExample }
+        modelChoices.removeAll { !it.isExample && it.runtimeModel == null }
         settingsPreferences?.edit()?.remove("deepseek_model_catalog")?.apply()
-        if (!selectedModel.isExample) {
+        if (!selectedModel.isExample && selectedModel.runtimeModel == null) {
             selectedModel = unconfiguredModel
             selectedReasoningIndex = -1
         }
@@ -1480,36 +2362,27 @@ class DemoRepository : ViewModel() {
 
     private fun restoreModelCatalog() {
         val cached = settingsPreferences?.getString("deepseek_model_catalog", null) ?: return
-        val models = runCatching {
-            require(cached.length <= 512_000)
-            val array = JSONArray(cached)
-            require(array.length() <= 1024)
-            List(array.length()) { index ->
-                val item = array.getJSONObject(index)
-                val id = item.getString("id")
-                val name = item.getString("name")
-                require(id.isNotBlank() && id.length <= 512 && id.none(Char::isISOControl))
-                require(name.isNotBlank() && name.length <= 512 && name.none(Char::isISOControl))
-                val modalities = item.optJSONArray("input_modalities")
-                require(modalities == null || modalities.length() <= 16)
-                officialModelChoice(id, name, modalities?.let { array ->
-                    List(array.length()) { array.getString(it).also { value ->
-                        require(value.length <= 64 && value.none(Char::isISOControl))
-                    } }
-                }.orEmpty())
-            }.also { require(it.map { model -> model.id }.distinct().size == it.size) }
-        }.getOrNull() ?: return
+        val models = runCatching { DeepSeekModelCatalog.decodeCache(cached).map(::officialModelChoice) }
+            .getOrNull() ?: return
         modelChoices.addAll(0, models)
-        val remembered = settingsPreferences?.getString("deepseek_selected_model", null)
-        models.firstOrNull { it.id == remembered }?.let { selectModel(it.id) }
-            ?: models.firstOrNull()?.let { selectModel(it.id) }
+        val remembered = settingsPreferences?.getString("selected_model", null)
+            ?: settingsPreferences?.getString("deepseek_selected_model", null)
+        if (remembered?.contains("::") != true) {
+            models.firstOrNull { it.id == remembered }?.let { selectModel(it.id) }
+                ?: models.firstOrNull()?.let { selectModel(it.id) }
+        }
     }
 
-    private fun officialModelChoice(id: String, name: String, modalities: List<String> = emptyList()): ModelChoice {
-        val options = if (DeepSeekThinkingPolicy.canToggle(id)) {
-            listOf(ReasoningOption("disabled", "不思考"), ReasoningOption("enabled", "思考"))
-        } else emptyList()
-        return ModelChoice(id, "DeepSeek", name, options, if (options.isEmpty()) -1 else 1, false, modalities)
+    private fun officialModelChoice(model: DeepSeekChatClient.Model): ModelChoice {
+        val options = DeepSeekThinkingPolicy.options(model).map { ReasoningOption(it.id, it.label) }
+        val defaultId = DeepSeekThinkingPolicy.defaultOptionId(model)
+        return ModelChoice(model.id, "DeepSeek", model.name ?: model.id, options,
+            options.indexOfFirst { it.id == defaultId }, false, model.inputModalities, model)
+    }
+
+    private fun officialReasoning(model: ModelChoice, option: ReasoningOption?): DeepSeekThinkingPolicy.Selection {
+        return model.officialCapabilities?.let { DeepSeekThinkingPolicy.selection(it, option?.id) }
+            ?: DeepSeekThinkingPolicy.Selection(null, null)
     }
 
     private fun supportsImages(model: ModelChoice): Boolean = !model.isExample &&
@@ -1529,18 +2402,19 @@ class DemoRepository : ViewModel() {
                 if (generation != credentialGeneration) return@launch
                 val remembered = settingsPreferences?.getString("deepseek_selected_model", null)
                 val oldId = selectedModel.id.takeUnless { selectedModel.isExample || it == "unconfigured" } ?: remembered
-                val models = fetched.map { model ->
-                    officialModelChoice(model.id, model.name?.takeIf { it.isNotBlank() } ?: model.id,
-                        model.inputModalities)
-                }
+                val previousReasoning = selectedReasoningOption?.id
+                val models = fetched.map(::officialModelChoice)
                 invalidateRemoteModels()
                 modelChoices.addAll(0, models)
-                val cache = JSONArray()
-                models.forEach { cache.put(JSONObject().put("id", it.id).put("name", it.name.take(512))
-                    .put("input_modalities", JSONArray(it.inputModalities))) }
-                settingsPreferences?.edit()?.putString("deepseek_model_catalog", cache.toString())?.apply()
-                models.firstOrNull { it.id == oldId }?.let { selectModel(it.id) }
-                    ?: models.firstOrNull()?.let { selectModel(it.id) }
+                settingsPreferences?.edit()?.putString("deepseek_model_catalog", DeepSeekModelCatalog.encodeCache(fetched))?.apply()
+                if (selectedModel.runtimeModel == null) {
+                    models.firstOrNull { it.id == oldId }?.let { selectModel(it.id) }
+                        ?: models.firstOrNull()?.let { selectModel(it.id) }
+                }
+                selectedModel.officialCapabilities?.let { capabilities ->
+                    val valid = DeepSeekThinkingPolicy.normalizeOptionId(capabilities, previousReasoning)
+                    selectedReasoningIndex = selectedModel.reasoningOptions.indexOfFirst { it.id == valid }
+                }
                 if (models.isEmpty()) deepSeekModelError = "账户没有返回可用模型"
                 else updateNotice("已获取 ${models.size} 个 DeepSeek 模型")
             } catch (cancelled: CancellationException) { throw cancelled }
@@ -1550,8 +2424,21 @@ class DemoRepository : ViewModel() {
     }
 
     fun setReasoningIndex(index: Int) {
+        if (connectionMode == "online") {
+            val selected = remoteDshState.projection?.workspace?.settings?.selection
+                ?: remoteDshState.projection?.workspace?.catalog?.selection ?: return
+            val option = displaySelectedModel.reasoningOptions.getOrNull(index) ?: return
+            remoteOperation { remoteDsh?.selectModel(selected.provider, selected.model, option.id) }
+            return
+        }
         if (index !in selectedModel.reasoningOptions.indices) return
         selectedReasoningIndex = index
+        settingsPreferences?.edit()?.putString("deepseek_reasoning_${selectedModel.id}", selectedReasoningOption?.id)?.apply()
+    }
+
+    fun setReasoningId(id: String?) {
+        val index = id?.let { value -> selectedModel.reasoningOptions.indexOfFirst { it.id == value } } ?: -1
+        if (index >= 0) setReasoningIndex(index)
     }
 
     fun toggleAttachment(id: String) {
@@ -1864,85 +2751,373 @@ class DemoRepository : ViewModel() {
         if (mode == workspaceMode) return
         cancelResponse()
         workspaceMode = mode
-        // Frontend lifecycle rehearsal only; a real runtime will be connected later.
-        if (mode == WorkspaceMode.Dsh) startRuntime()
+        if (mode == WorkspaceMode.Dsh && connectionMode == "local") startRuntime()
     }
 
     fun startRuntime() {
-        if (runtimeStatus == RuntimeStatus.Running || runtimeStatus == RuntimeStatus.Starting) return
-        if (runtimeStatus == RuntimeStatus.Stopping) {
-            updateNotice("演示环境正在停止，请稍后再启动")
+        if (workspaceDeletionBusy || localArchiveRecoveryFailed || localArchivePendingIds.isNotEmpty()) {
+            updateNotice("请先完成本机共享历史的永久删除，再启动 DSH")
             return
         }
-        runtimeJob?.cancel()
-        runtimeStatus = RuntimeStatus.Starting
-        runtimeProgress = 0
-        runtimeStep = "准备启动演示环境"
-        runtimeJob = viewModelScope.launch { animateStartup() }
+        runtimeAutostartSuppressed = false
+        if (dshInstallation?.state?.value?.installing == true) {
+            updateNotice("DSH 运行包正在安装，请等待校验完成")
+            return
+        }
+        if (localEngineSwitchBusy || runtimeStatus == RuntimeStatus.Running || runtimeStatus == RuntimeStatus.Starting) return
+        if (runtimeStatus == RuntimeStatus.Stopping) {
+            updateNotice("DSH 服务正在停止，请稍后再启动")
+            return
+        }
+        val manager = dshRuntimeManager
+        if (manager == null) {
+            updateNotice("DSH 运行服务尚未初始化，请稍后重试")
+            return
+        }
+        val previous = runtimeJob
+        previous?.cancel()
+        runtimeJob = viewModelScope.launch {
+            localEngineSwitchBusy = engineMode == "dsh"
+            localEngineSwitchError = null
+            try {
+                previous?.join()
+                localEngineGate.withLock { startLocalDsh(sharedHistory = engineMode == "dsh") }
+                updateNotice("DSH 服务已启动")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                runtimeStep = error.message ?: "DSH 服务启动失败"
+                runtimeLastError = runtimeStep
+                localEngineSwitchError = runtimeStep
+                updateNotice("DSH 服务启动失败：${runtimeStep}")
+            } finally { localEngineSwitchBusy = false }
+        }
+    }
+
+    private fun hasNativeRunningTasks(): Boolean = isResponding || sendPending || workspaceDeletionBusy ||
+        deepSeekConfigurationBusy || modelRuntime?.state?.value?.busy == true ||
+        backgroundTasks?.tasks?.value.orEmpty().any {
+            it.status in setOf(BackgroundTaskStatus.QUEUED, BackgroundTaskStatus.RUNNING, BackgroundTaskStatus.STOPPING)
+        }
+
+    private suspend fun startLocalDsh(sharedHistory: Boolean) {
+        check(!localArchiveRecoveryFailed && localArchivePendingIds.isEmpty()) {
+            "共享历史的永久删除尚未完成，请在归档页刷新后重试"
+        }
+        val manager = requireNotNull(dshRuntimeManager) { "DSH 服务管理器尚未初始化" }
+        val baseline = workspaceSnapshot()
+        val directory = localDshWorkspace(baseline.selectedWorkspaceId)
+        if (sharedHistory) {
+            check(!hasNativeRunningTasks()) { "本机任务尚未停止，不能共享运行中的历史" }
+            val access = manager.snapshot.value.accessUrl
+            if (access != null) { requireLocalDshIdle(access); manager.stop() }
+            modelRuntime?.shutdown()
+            connectPluginHost?.stop()
+            synchronizeOfficialCredentialToVault()
+            val published = requireNotNull(localDshHistory).publish(baseline)
+            localDshSessionId = published.selectedSessionId
+            localEngineSharingWarnings = published.warnings
+            published.warnings.firstOrNull()?.let(::updateNotice)
+            check(workspaceSnapshot() == baseline) { "工作区或对话已变化，历史保留，请重新切换" }
+        }
+        val started = manager.start(directory)
+        if (sharedHistory) {
+            val access = requireNotNull(started.accessUrl) { "DSH 未提供已认证网页入口" }
+            try {
+                lastDshProviderRevision = requireNotNull(sharedDshConfiguration).writeToDsh(access).revision
+                dshSharedConfigurationError = null
+            }
+            catch (failure: Throwable) {
+                withContext(NonCancellable) { manager.stop() }
+                throw failure
+            }
+        }
+    }
+
+    private suspend fun synchronizeOfficialCredentialToVault() = withContext(Dispatchers.IO) {
+        val store = requireNotNull(modelProviderStore)
+        val portable = store.exportPortable()
+        val secrets = portable.getJSONObject("credentials")
+        val old = secrets.optJSONObject("deepseek")
+        val key = requireNotNull(deepSeekBalanceStore).readApiKeyForRequest()
+        val value = key?.let { JSONObject().put("type", "api_key").put("key", it) }
+        if (old?.toString() != value?.toString()) {
+            if (value == null) secrets.remove("deepseek") else secrets.put("deepseek", value)
+            store.importPortableIfRevision(portable, portable.getLong("revision"))
+        }
+    }
+
+    private suspend fun requireLocalDshIdle(access: String) {
+        val rpc = DshLocalConfigurationRpc()
+        val state = rpc.call(access, "session/list", JSONObject().put("_request", JSONObject()))
+        val items = state.getJSONArray("items")
+        for (index in 0 until items.length()) {
+            val item = items.getJSONObject(index)
+            check(item.opt("running") is Boolean) { "无法确认 DSH 任务状态，请先在 DSH 中检查" }
+            check(!item.getBoolean("running")) { "DSH 仍有任务在运行，请先停止并等待结束" }
+            val projections = rpc.call(access, "session/projections",
+                JSONObject().put("request", JSONObject().put("sessionId", item.getString("sessionId"))))
+            val inbox = requireNotNull(projections.optJSONObject("values")?.optJSONObject("inbox")) {
+                "无法确认 DSH 待办队列，请先在 DSH 中检查"
+            }
+            check(inbox.getJSONArray("next-turn").length() == 0 && inbox.getJSONArray("next-step").length() == 0) {
+                "DSH 仍有待办消息，请先处理或清除后再切换引擎"
+            }
+        }
+    }
+
+    private suspend fun synchronizeFromLocalDsh() {
+        val manager = requireNotNull(dshRuntimeManager)
+        if (dshInstallation?.state?.value?.installedVersion == null && manager.snapshot.value.accessUrl == null) {
+            updateNotice("DSH 运行组件未安装，继续使用现有本机历史")
+            return
+        }
+        val access = manager.snapshot.value.accessUrl
+        if (access != null) {
+            requireLocalDshIdle(access)
+            val imported = requireNotNull(sharedDshConfiguration).readFromDsh(access)
+            var keyChanged = false
+            try {
+                withContext(Dispatchers.IO) {
+                    val secret = requireNotNull(modelProviderStore).exportPortable().getJSONObject("credentials").optJSONObject("deepseek")
+                    val balance = requireNotNull(deepSeekBalanceStore)
+                    val before = balance.readApiKeyForRequest()
+                    val after = secret?.let { require(it.getString("type") == "api_key"); it.getString("key") }
+                    keyChanged = before != after
+                    if (keyChanged) {
+                        if (after == null) balance.clearApiKey() else balance.setApiKey(after)
+                    }
+                    deepSeekConfigured = balance.hasKey()
+                }
+            } catch (failure: Exception) {
+                deepSeekConfigured = false
+                invalidateRemoteModels()
+                throw IllegalStateException("DSH 设置已读取，但官方凭据保存未完成，请在模型页重新保存 API Key", failure)
+            }
+            modelProviderOrder = imported.providers.map { it.id }
+            modelProviderEnabled = imported.providers.associate { it.id to it.enabled }
+            if (keyChanged) invalidateRemoteModels()
+            manager.stop()
+        }
+        val baseline = workspaceSnapshot()
+        val result = requireNotNull(localDshHistory).read(baseline)
+        check(workspaceSnapshot() == baseline) { "对话已变化，历史保留，请重新切换" }
+        check(commitWorkspace(result.snapshot)) { "共享历史尚未安全保存，不能切换引擎" }
+        workspaces.clear(); workspaces.addAll(result.snapshot.workspaces)
+        conversations.clear(); conversations.addAll(result.snapshot.conversations)
+        conversationMessages.clear()
+        result.snapshot.messages.forEach { (id, values) ->
+            conversationMessages[id] = mutableStateListOf<ChatMessage>().apply { addAll(values) }
+        }
+        nextMessageId = (result.snapshot.messages.values.flatten().maxOfOrNull { it.id } ?: 0L) + 1L
+        persistenceRevision++
+        requireNotNull(localDshHistory).acknowledge(result)
+        modelRuntime?.refresh()
+        val modelState = modelRuntime?.state?.value
+        if (modelState != null && modelState.status != ModelRuntimeStatus.MISSING &&
+            modelState.providers.providers.any { it.enabled && !it.protected }) modelRuntime?.refreshCatalog()
+        localEngineSharingWarnings = result.warnings
+        result.warnings.firstOrNull()?.let(::updateNotice)
+        notifyTaskConfiguration()
+    }
+
+    private fun scheduleLocalProviderSynchronization(revision: Long) {
+        if (engineMode != "dsh" || connectionMode != "local" || localEngineSwitchBusy ||
+            revision == lastDshProviderRevision || runtimeStatus != RuntimeStatus.Running ||
+            hasNativeRunningTasks() || dshProviderSyncJob?.isActive == true) return
+        dshProviderSyncJob = viewModelScope.launch {
+            try {
+                localEngineGate.withLock {
+                    repeat(4) {
+                        if (engineMode != "dsh" || connectionMode != "local" || localEngineSwitchBusy) return@withLock
+                        val current = requireNotNull(modelProviderStore).read().revision
+                        if (current == lastDshProviderRevision) return@withLock
+                        val access = requireNotNull(dshRuntimeManager?.snapshot?.value?.accessUrl) { "DSH 服务已停止" }
+                        lastDshProviderRevision = requireNotNull(sharedDshConfiguration).writeToDsh(access).revision
+                        dshSharedConfigurationError = null
+                        modelRuntime?.refresh()
+                    }
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                dshSharedConfigurationError = failure.message ?: "提供商已在手机保存，DSH 同步未完成，请重试"
+                updateNotice(requireNotNull(dshSharedConfigurationError))
+            }
+        }
+    }
+
+    fun retryLocalProviderSynchronization() {
+        if (dshProviderSyncJob?.isActive == true) return
+        lastDshProviderRevision = -1L
+        modelProviderStore?.read()?.revision?.let(::scheduleLocalProviderSynchronization)
     }
 
     fun stopRuntime() {
         if (workspaceMode == WorkspaceMode.Dsh) cancelResponse()
         if (runtimeStatus == RuntimeStatus.Stopped || runtimeStatus == RuntimeStatus.Stopping) return
-        runtimeJob?.cancel()
-        runtimeStatus = RuntimeStatus.Stopping
-        runtimeStep = "正在停止演示环境"
+        val manager = dshRuntimeManager ?: return
+        val previous = runtimeJob
+        previous?.cancel()
         runtimeJob = viewModelScope.launch {
-            delay(450)
-            runtimeStatus = RuntimeStatus.Stopped
-            runtimeProgress = 0
-            runtimeStep = "演示环境已停止"
-            updateNotice("演示环境已停止")
+            try {
+                previous?.join()
+                manager.stop()
+                updateNotice("DSH 服务已停止")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                updateNotice("DSH 服务停止失败：${error.message ?: "请重试"}")
+            }
         }
     }
 
     fun restartRuntime() {
-        if (runtimeStatus == RuntimeStatus.Starting || runtimeStatus == RuntimeStatus.Stopping) {
-            updateNotice("演示环境正在切换状态，请稍后再试")
+        if (workspaceDeletionBusy || localArchiveRecoveryFailed || localArchivePendingIds.isNotEmpty()) {
+            updateNotice("请先完成本机共享历史的永久删除，再重启 DSH")
             return
         }
-        if (runtimeStatus == RuntimeStatus.Stopped) {
-            startRuntime()
+        if (localEngineSwitchBusy || runtimeStatus == RuntimeStatus.Stopping || dshInstallation?.state?.value?.installing == true) {
+            updateNotice("DSH 正在停止或安装，请稍后再试")
             return
         }
+        val manager = dshRuntimeManager ?: return
         if (workspaceMode == WorkspaceMode.Dsh) cancelResponse()
-        runtimeJob?.cancel()
-        runtimeStatus = RuntimeStatus.Stopping
-        runtimeStep = "正在重启演示环境"
+        val previous = runtimeJob
+        previous?.cancel()
         runtimeJob = viewModelScope.launch {
-            delay(450)
-            runtimeStatus = RuntimeStatus.Starting
-            runtimeProgress = 0
-            runtimeStep = "准备重新启动演示环境"
-            animateStartup()
+            localEngineSwitchBusy = engineMode == "dsh"
+            localEngineSwitchError = null
+            try {
+                // Await cleanup of the previous launch before creating the next generation.
+                previous?.join()
+                localEngineGate.withLock {
+                    if (engineMode == "dsh") {
+                        manager.snapshot.value.accessUrl?.let { requireLocalDshIdle(it) }
+                        manager.stop()
+                        startLocalDsh(sharedHistory = true)
+                    } else manager.restart(localDshWorkspace())
+                }
+                updateNotice("DSH 服务已重启")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                runtimeStep = error.message ?: "DSH 服务重启失败"
+                runtimeLastError = runtimeStep
+                localEngineSwitchError = runtimeStep
+                updateNotice("DSH 服务重启失败：${runtimeStep}")
+            } finally { localEngineSwitchBusy = false }
         }
     }
 
-    private suspend fun animateStartup() {
-        val stages = listOf(
-            15 to "演示 · 检查运行组件",
-            40 to "演示 · 准备本地工作区",
-            70 to "演示 · 初始化对话服务",
-            90 to "演示 · 连接手机界面",
-            100 to "演示环境已就绪 · 未运行真实 DSH",
-        )
-        for ((progress, label) in stages) {
-            delay(550)
-            runtimeProgress = progress
-            runtimeStep = label
+    private suspend fun localDshWorkspace(id: String = selectedWorkspaceId): java.io.File = withContext(Dispatchers.IO) {
+        val app = requireNotNull(applicationContext) { "工作区尚未初始化" }
+        require(id.matches(Regex("[a-zA-Z0-9-]+"))) { "工作区身份无效" }
+        val root = java.io.File(app.filesDir, "linux-workspaces").canonicalFile
+        val directory = java.io.File(root, id).canonicalFile
+        require(directory.parentFile == root && (directory.mkdirs() || directory.isDirectory)) {
+            "无法准备当前工作区的 Linux 工作目录"
+        }
+        directory
+    }
+
+    fun checkDshRelease() {
+        val controller = dshInstallation ?: return
+        if (dshInstallJob?.isActive == true) return
+        dshCheckJob?.cancel()
+        dshCheckJob = viewModelScope.launch { controller.check(dshVersionChannel) }
+    }
+
+    /** A running web service may own tasks which are not represented by native chat. */
+    fun dshUpdateNeedsInterruption(): Boolean = runtimeStatus != RuntimeStatus.Stopped || isResponding ||
+        backgroundTasks?.tasks?.value.orEmpty().any {
+            it.status in setOf(BackgroundTaskStatus.QUEUED, BackgroundTaskStatus.RUNNING, BackgroundTaskStatus.STOPPING)
         }
 
-        runtimeStatus = RuntimeStatus.Running
-        updateNotice("演示环境已就绪，可体验本地模拟对话")
+    fun installDshRelease(interruptConfirmed: Boolean = false) {
+        val controller = dshInstallation ?: return
+        if (dshInstallJob?.isActive == true || controller.state.value.available == null) return
+        if (dshUpdateNeedsInterruption() && !interruptConfirmed) {
+            updateNotice("DSH 或任务仍在运行，请先选择立即中断或稍后更新")
+            return
+        }
+        dshInstallJob = viewModelScope.launch {
+            try {
+                if (interruptConfirmed) {
+                    val response = responseJob
+                    cancelResponse()
+                    response?.join()
+                    val tasks = backgroundTasks?.tasks?.value.orEmpty().filter {
+                        it.status in setOf(BackgroundTaskStatus.QUEUED, BackgroundTaskStatus.RUNNING, BackgroundTaskStatus.STOPPING)
+                    }
+                    tasks.forEach { backgroundTasks?.stop(it.id) }
+                    tasks.forEach { backgroundTasks?.awaitTerminal(it.id) }
+                    runtimeJob?.cancelAndJoin()
+                    dshRuntimeManager?.stop()
+                }
+                dshCheckJob?.join()
+                modelRuntime?.shutdown()
+                controller.install(downloadSource)
+                dshRuntimeManager?.refresh()
+                updateNotice("DSH 已安装并通过网页验证")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                updateNotice(failure.message ?: "DSH 运行包安装失败，原版本已保留")
+            }
+        }
     }
+
+    fun cancelDshInstall() { dshInstallJob?.cancel() }
 
     suspend fun sendMessage(text: String): Boolean {
+        if (connectionMode == "online") {
+            if ((text.isBlank() && activeAttachments.isEmpty()) || sendPending || attachmentImportCount > 0) return false
+            val selected = attachmentPreviews
+            val binding = remoteWorkspaceScope ?: run { updateNotice("请先连接电脑并选择工作区"); return false }
+            val workspace = displayWorkspaceId
+            val generation = composerGeneration
+            val selection = attachmentSelectionGeneration
+            sendPending = true
+            return try {
+                val accepted = if (selected.isEmpty()) requireNotNull(remoteDsh).send(text, expectedScope = binding) else {
+                    if (remoteDshState.connection?.optJSONObject("capabilities")?.optBoolean("remote_attachments") != true) {
+                        updateNotice("电脑尚未启用附件传输，附件和草稿已保留（预留）")
+                        return false
+                    }
+                    val store = requireNotNull(attachmentStore)
+                    val sources = withContext(Dispatchers.IO) { selected.map { preview ->
+                        val actual = requireNotNull(store.load(preview.id)) { "附件未保存在手机，请重新选择" }
+                        RemoteAttachmentComposer.Source(actual.id, actual.name, actual.sizeBytes, store.resolveFile(actual.id))
+                    } }
+                    requireNotNull(remoteAttachmentComposer).send(binding, workspace, text, sources) {
+                        withContext(Dispatchers.Main.immediate) {
+                            require(connectionMode == "online" && displayWorkspaceId == workspace &&
+                                composerGeneration == generation && attachmentSelectionGeneration == selection &&
+                                attachmentPreviews == selected) { "工作区或附件选择已变化，草稿已保留" }
+                        }
+                    }
+                }
+                if (accepted && composerGeneration == generation && attachmentSelectionGeneration == selection && attachmentPreviews == selected)
+                    clearAttachments()
+                accepted
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { updateNotice(RemoteDshApplicationController.remoteFailure(failure)); false }
+            finally { sendPending = false }
+        }
         val caller = currentCoroutineContext()[Job]
         return withContext(NonCancellable + Dispatchers.Main.immediate) { sendMessageCommitted(text, caller) }
     }
 
     private suspend fun sendMessageCommitted(text: String, caller: Job?): Boolean {
-        if (sendPending) return false
+        if (sendPending || workspaceDeletionBusy || localEngineSwitchBusy) return false
+        dshRuntimeManager?.snapshot?.value?.accessUrl?.let { access ->
+            try { requireLocalDshIdle(access) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                updateNotice(failure.message ?: "无法确认 DSH 任务状态，草稿已保留")
+                return false
+            }
+        }
         if (workspaceSaveError != null) {
             updateNotice("还有未合并到索引的本地内容；请先重试保存，草稿已保留")
             return false
@@ -1970,12 +3145,13 @@ class DemoRepository : ViewModel() {
                 updateNotice("DSH 模型服务尚未接入，请选择官方轻引擎")
                 return false
             }
-            if (selectedModel.isExample || selectedModel.id == "unconfigured" || !deepSeekConfigured) {
-                updateNotice("请在设置—模型中保存 API Key、获取并选择 DeepSeek 模型")
+            if (selectedModel.isExample || selectedModel.id == "unconfigured" ||
+                (selectedModel.runtimeModel == null && !deepSeekConfigured)) {
+                updateNotice("请在设置—模型中配置提供商、获取并选择真实模型")
                 return false
             }
-            if (!isModelProviderEnabled("deepseek")) {
-                updateNotice("请先启用 DeepSeek 提供商")
+            if (!isModelProviderEnabled(selectedModel.runtimeModel?.providerId ?: "deepseek")) {
+                updateNotice("请先启用所选模型提供商")
                 return false
             }
             if (activeAttachments.any { it.textContent == null && !isImageAttachment(it) }) {
@@ -2055,20 +3231,24 @@ class DemoRepository : ViewModel() {
                         attachmentStore?.readImageDataUrls(requiredImages).orEmpty()
                     }
                     check(imageData.size == requiredImages.size) { "图片读取失败" }
-                    preparedHistory = listOf(OfficialToolSession.systemMessage()) +
+                    preparedHistory = listOf(OfficialTokenSavingPolicy.applyToSystemMessage(
+                        OfficialToolSession.systemMessage(), tokenSavingMode)) +
                         OfficialChatHistory.build(source, true, imageData, attachmentCatalog)
                     val toolSchemas = OfficialToolContract.schemas(
                         includeWeather = true, includeWeatherSelection = true, includeWeb = true,
+                        includeScripts = true, includeScriptEscalation = true, includePermissions = true, includeSkills = true,
                     )
                     val tools = List(toolSchemas.length()) { index ->
                         val function = toolSchemas.getJSONObject(index).getJSONObject("function")
                         DeepSeekChatClient.FunctionTool(function.getString("name"),
                             function.getString("description"), function.getJSONObject("parameters"))
                     }
-                    withContext(Dispatchers.IO) {
+                    if (sentModel.runtimeModel == null) withContext(Dispatchers.IO) {
+                        val reasoning = officialReasoning(sentModel, sentReasoning)
                         checkNotNull(deepSeekClient).validateRequest(DeepSeekChatClient.Request(
-                            sentModel.id, preparedHistory, sentReasoning?.let { it.id == "enabled" },
-                            officialEngineStreaming, tools))
+                            sentModel.id, preparedHistory, reasoning.thinking,
+                            officialEngineStreaming, tools,
+                            reasoningEffort = reasoning.reasoningEffort, modelCapabilities = sentModel.officialCapabilities))
                     }
                 } catch (_: Exception) {
                     updateNotice("图片读取失败或完整上下文超过 4 MiB，请减少附件或新建对话；草稿已保留")
@@ -2121,8 +3301,10 @@ class DemoRepository : ViewModel() {
             if (deferredSave) persistWorkspaces()
         }
         if (workspaceMode == WorkspaceMode.Lite && !sentModel.isExample) {
-            sendDeepSeekMessage(conversationId, if (sentAttachments.isEmpty()) input else modelInput,
-                sentModel.id, sentReasoning?.let { it.id == "enabled" }, preparedHistory)
+            if (sentModel.runtimeModel != null) sendPiAiMessage(conversationId,
+                if (sentAttachments.isEmpty()) input else modelInput, sentModel, sentReasoning, preparedHistory)
+            else sendDeepSeekMessage(conversationId, if (sentAttachments.isEmpty()) input else modelInput,
+                    sentModel, sentReasoning, preparedHistory)
             return true
         }
         val id = nextMessageId++
@@ -2201,6 +3383,7 @@ class DemoRepository : ViewModel() {
 
     /** True when [message] is the latest failed official reply in the selected conversation. */
     fun canRetryResponse(message: ChatMessage): Boolean {
+        if (connectionMode == "online") return false
         val snapshot = message.streamSnapshot ?: return false
         val list = conversationMessages[selectedConversationId] ?: return false
         return message.role == "assistant" && snapshot.source == AssistantStreamSource.BACKEND &&
@@ -2267,7 +3450,8 @@ class DemoRepository : ViewModel() {
                         attachmentStore?.readImageDataUrls(requiredImages).orEmpty()
                     }
                     check(imageData.size == requiredImages.size) { "图片读取失败" }
-                    history = listOf(OfficialToolSession.systemMessage()) +
+                    history = listOf(OfficialTokenSavingPolicy.applyToSystemMessage(
+                        OfficialToolSession.systemMessage(), tokenSavingMode)) +
                         OfficialChatHistory.build(source, true, imageData, catalog)
                 } catch (error: Exception) {
                     updateNotice("重试准备失败：${error.message ?: "图片或上下文不可用"}")
@@ -2288,8 +3472,7 @@ class DemoRepository : ViewModel() {
             }
             persistWorkspaces()
             // Match the original send: attachments are folded into modelInput, not text.
-            sendDeepSeekMessage(conversationId, user.modelInput ?: user.text, model.id,
-                reasoning?.let { it.id == "enabled" }, history)
+            sendDeepSeekMessage(conversationId, user.modelInput ?: user.text, model, reasoning, history)
             true
         }
 
@@ -2304,12 +3487,26 @@ class DemoRepository : ViewModel() {
     fun responseRunMetrics(message: ChatMessage): ChatRunMetrics? {
         val snapshot = message.streamSnapshot ?: return null
         if (snapshot.source != AssistantStreamSource.BACKEND) return null
-        if (activeResponseId == message.id) {
+        if (connectionMode == "local" && activeResponseId == message.id) {
             activeRunMetrics?.let { return it.snapshot(android.os.SystemClock.elapsedRealtime()) }
         }
-        return chatRunMetricsFromSnapshot(message.id, selectedConversationId, snapshot,
+        return chatRunMetricsFromSnapshot(message.id, displayConversationId, snapshot,
             snapshot.runElapsedMillis, snapshot.runRounds, snapshot.runSteps)
     }
+
+    fun activeTaskNotificationIdentity(): Pair<String, Long>? {
+        if (connectionMode == "online") return remoteDshState.selectedView?.messages
+            ?.lastOrNull { it.role == "assistant" }?.let { displayConversationId to it.id }
+        if (activeRunMetrics == null) return null
+        val conversationId = activeResponseConversationId ?: return null
+        val responseId = activeResponseId ?: return null
+        return conversationId to responseId
+    }
+
+    fun taskNotificationStatus(identity: Pair<String, Long>): AssistantRunStatus? =
+        if (connectionMode == "online") remoteDshState.projection?.sessions?.get(identity.first)?.activity?.runStatus
+        else conversationMessages[identity.first]?.firstOrNull { it.id == identity.second }?.streamSnapshot
+            ?.takeIf { it.source == AssistantStreamSource.BACKEND }?.runStatus
 
     private fun measuredSnapshot(snapshot: AssistantStreamSnapshot): AssistantStreamSnapshot {
         val metrics = activeRunMetrics?.snapshot(android.os.SystemClock.elapsedRealtime()) ?: return snapshot
@@ -2350,10 +3547,12 @@ class DemoRepository : ViewModel() {
             attachment.textContent == null && attachment.id in importedAttachments
 
     private fun sendDeepSeekMessage(
-        conversationId: String, input: String, modelId: String, thinking: Boolean?,
+        conversationId: String, input: String, model: ModelChoice, option: ReasoningOption?,
         history: List<DeepSeekChatClient.HistoryMessage>,
     ) {
         val client = deepSeekClient ?: return
+        val modelId = model.id
+        val reasoning = officialReasoning(model, option)
         val id = nextMessageId++
         val generation = ++responseGeneration
         activeResponseId = id
@@ -2368,7 +3567,7 @@ class DemoRepository : ViewModel() {
         val dispatcher = OfficialToolDispatcher({ backgroundTasks }, outputStore, conversationId, { modelId },
             scriptProvider = applicationContext?.let { context ->
                 val workspaceId = conversations.firstOrNull { it.id == conversationId }?.workspaceId
-                workspaceId?.let { OfficialLinuxScriptProvider(context, it) { downloadSource } }
+                workspaceId?.let { OfficialLinuxScriptProvider(context, it, OfficialSandboxPolicy(localSandboxMode)) { downloadSource } }
             },
             weatherProvider = object : OfficialToolWeatherSelectionProvider {
                 private val weather = OfficialWeatherClient()
@@ -2378,6 +3577,9 @@ class DemoRepository : ViewModel() {
                     weather.getWeather(city, countryCode, locationId)
             },
             webProvider = OfficialWebClient(),
+            permissionProvider = applicationContext?.let(ApplicationPermissionBridge::get),
+            skillProvider = officialSkills(conversationId),
+            mutationPolicy = officialMutationPolicy(conversationId),
         )
         val streaming = officialEngineStreaming
         messages += ChatMessage(id, "assistant", "正在连接 DeepSeek…", reducer.snapshot())
@@ -2389,8 +3591,10 @@ class DemoRepository : ViewModel() {
                     DeepSeekChatClient.Request(
                         model = modelId,
                         history = history,
-                        thinking = thinking,
+                        thinking = reasoning.thinking,
                         streaming = streaming,
+                        reasoningEffort = reasoning.reasoningEffort,
+                        modelCapabilities = model.officialCapabilities,
                     ),
                     dispatcher,
                     onOutput = { result ->
@@ -2460,7 +3664,167 @@ class DemoRepository : ViewModel() {
         }
     }
 
+    private fun sendPiAiMessage(conversationId: String, input: String, model: ModelChoice,
+        option: ReasoningOption?, history: List<DeepSeekChatClient.HistoryMessage>) {
+        val runtime = modelRuntime ?: return
+        val nativeModel = requireNotNull(model.runtimeModel)
+        val precedingMessageId = conversationMessages[conversationId]?.dropLast(1)?.lastOrNull()?.id
+        val id = nextMessageId++
+        val generation = ++responseGeneration
+        activeResponseId = id
+        activeResponseConversationId = conversationId
+        val reducer = AssistantStreamReducer(source = AssistantStreamSource.BACKEND)
+        activeResponseReducer = reducer
+        val metrics = ChatRunMetricsCollector(id, conversationId, android.os.SystemClock.elapsedRealtime())
+        activeRunMetrics = metrics
+        activeStreamMessageId = null
+        val dispatcher = OfficialToolDispatcher({ backgroundTasks }, requireNotNull(officialOutputStore),
+            conversationId, { model.id }, scriptProvider = applicationContext?.let { app ->
+                conversations.firstOrNull { it.id == conversationId }?.workspaceId?.let { workspace ->
+                    OfficialLinuxScriptProvider(app, workspace, OfficialSandboxPolicy(localSandboxMode)) { downloadSource }
+                }
+            }, weatherProvider = object : OfficialToolWeatherSelectionProvider {
+                private val weather = OfficialWeatherClient()
+                override suspend fun weather(city: String, countryCode: String?): JSONObject = weather.getWeather(city, countryCode)
+                override suspend fun weather(city: String, countryCode: String?, locationId: Long): JSONObject =
+                    weather.getWeather(city, countryCode, locationId)
+            }, webProvider = OfficialWebClient(), permissionProvider = applicationContext?.let(ApplicationPermissionBridge::get),
+            skillProvider = officialSkills(conversationId), mutationPolicy = officialMutationPolicy(conversationId))
+        val streaming = officialEngineStreaming
+        conversationMessages.getValue(conversationId).add(ChatMessage(id, "assistant", "正在连接 ${model.provider}…", reducer.snapshot()))
+        isResponding = true
+        responseJob = viewModelScope.launch {
+            try {
+                val context = withContext(Dispatchers.IO) {
+                    nativeTranscriptStore?.prepare(conversationId, nativeModel, precedingMessageId, history)
+                        ?: piContextFromHistory(history, nativeModel)
+                }
+                val result = OfficialMultiProviderSession.generate(runtime,
+                    PiAiChatRequest(nativeModel.providerId, nativeModel.id, context,
+                        option?.id, requestId = "native-$id-${UUID.randomUUID()}", allowPublicThinking = true),
+                    dispatcher,
+                    onOutput = { output -> withContext(Dispatchers.Main.immediate) {
+                        ensureActive()
+                        check(generation == responseGeneration)
+                        output.outputs.forEach { officialOutputs[it.id] = it }
+                    } },
+                    onEvent = { event -> withContext(Dispatchers.Main.immediate) {
+                        ensureActive()
+                        if (generation == responseGeneration) {
+                            val snapshot = reducer.apply(event).snapshot
+                            metrics.onEvent(event, android.os.SystemClock.elapsedRealtime())
+                            snapshot.messages.lastOrNull()?.let { activeStreamMessageId = it.messageId }
+                            if (streaming || event is AssistantStreamEvent.MessageCompleted || event is AssistantStreamEvent.MessageFailed ||
+                                event is AssistantStreamEvent.MessageIncomplete)
+                                replaceStreamMessage(conversationId, id, measuredSnapshot(snapshot))
+                            if (event is AssistantStreamEvent.MessageStarted) {
+                                val index = conversations.indexOfFirst { it.id == conversationId }
+                                if (index >= 0 && conversations[index].title == "新对话") {
+                                    conversations[index] = conversations[index].copy(title = input.replace('\n', ' ').take(30))
+                                }
+                            }
+                        }
+                    } }, onTranscript = { transcript -> withContext(Dispatchers.IO) {
+                        nativeTranscriptStore?.save(conversationId, nativeModel, id, transcript, completed = false)
+                    } })
+                ensureActive()
+                if (generation == responseGeneration) {
+                    withContext(Dispatchers.IO) {
+                        nativeTranscriptStore?.save(conversationId, nativeModel, id, result.transcript(), completed = result.completed)
+                    }
+                    metrics.finish(if (result.completed) ChatRunStatus.Completed else ChatRunStatus.Failed,
+                        android.os.SystemClock.elapsedRealtime())
+                    replaceStreamMessage(conversationId, id, measuredSnapshot(reducer.finish()))
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                ensureActive()
+                if (generation == responseGeneration) {
+                    val reason = if (failure is ModelRuntimeException) failure.message.orEmpty() else "模型请求失败，请检查提供商认证与运行组件"
+                    reducer.apply(AssistantStreamEvent.MessageFailed(reducer.snapshot().nextExpectedSequenceNumber ?: 0L,
+                        "native-model-error-$id", reason, (failure as? ModelRuntimeException)?.code ?: "REQUEST_FAILED"))
+                    metrics.finish(ChatRunStatus.Failed, android.os.SystemClock.elapsedRealtime())
+                    replaceStreamMessage(conversationId, id, measuredSnapshot(reducer.finish()))
+                }
+            } finally {
+                if (generation == responseGeneration) {
+                    withContext(NonCancellable) { saveJob?.cancelAndJoin(); saveJob = null; commitWorkspace(workspaceSnapshot()) }
+                    isResponding = false
+                    activeResponseId = null
+                    activeResponseConversationId = null
+                    activeResponseReducer = null
+                    activeStreamMessageId = null
+                    activeRunMetrics = null
+                    responseJob = null
+                }
+            }
+        }
+    }
+
+    private suspend fun runMultiProviderBackgroundTask(request: BackgroundTaskRequest, model: ModelChoice,
+        emit: suspend (String) -> Unit): BackgroundTaskResult {
+        val runtime = requireNotNull(modelRuntime)
+        val native = requireNotNull(model.runtimeModel)
+        val reducer = AssistantStreamReducer(source = AssistantStreamSource.BACKEND)
+        val system = delegatedTaskSystemMessage()
+        val dispatcher = delegatedTaskDispatcher(request, model.id)
+        val reasoning = if (selectedModel.id == model.id) selectedReasoningOption?.id else native.defaultReasoning
+        var lastProgressAt = 0L
+        runtime.withSession(native.providerId) {
+            val result = OfficialMultiProviderSession.generate(runtime, PiAiChatRequest(native.providerId, native.id,
+                piContextFromHistory(listOf(system, DeepSeekChatClient.HistoryMessage("user", request.prompt)), native),
+                reasoning = reasoning, requestId = "task-${request.id}", allowPublicThinking = true),
+                dispatcher, onOutput = {}, onEvent = { event ->
+                val snapshot = reducer.apply(event).snapshot
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (now - lastProgressAt >= 100L) {
+                    lastProgressAt = now
+                    emit(snapshot.messages.flatMap { it.blocks }.filterIsInstance<AssistantContentBlockSnapshot.Text>()
+                        .joinToString("") { it.text }.takeLast(4096))
+                }
+            })
+            currentCoroutineContext().ensureActive()
+            check(result.completed) { "task_incomplete" }
+        }
+        val finished = reducer.finish()
+        val text = finished.messages.flatMap { it.blocks }.filterIsInstance<AssistantContentBlockSnapshot.Text>()
+            .joinToString("") { it.text }
+        check(text.isNotBlank()) { "task_empty" }
+        return BackgroundTaskResult(text)
+    }
+
+    private fun delegatedTaskSystemMessage(): DeepSeekChatClient.HistoryMessage {
+        val system = OfficialToolSession.systemMessage()
+        return OfficialTokenSavingPolicy.applyToSystemMessage(
+        system.copy(content = system.content +
+            "\nThis is an independent delegated task. Use only the supplied tools, including installed skills and scripts. " +
+            "Never create subagents or background tasks. Execution device is this Android phone; report actual tool outcomes."),
+        tokenSavingMode)
+    }
+
+    private fun delegatedTaskDispatcher(request: BackgroundTaskRequest, modelId: String): OfficialToolDispatcher {
+        check(!request.allowTaskCreation) { "递归任务创建不可用" }
+        val app = requireNotNull(applicationContext)
+        val workspace = conversations.firstOrNull { it.id == request.parentConversationId }?.workspaceId ?: selectedWorkspaceId
+        return OfficialToolDispatcher({ null }, requireNotNull(officialOutputStore),
+            request.parentConversationId ?: request.id, { modelId },
+            scriptProvider = OfficialLinuxScriptProvider(app, workspace, OfficialSandboxPolicy(localSandboxMode)) { downloadSource },
+            webProvider = OfficialWebClient(), permissionProvider = ApplicationPermissionBridge.get(app),
+            skillProvider = OfficialSkillAdapter(app, workspace), allowTaskCreation = false, allowFileOutputs = false)
+    }
+
+    private fun officialMutationPolicy(conversationId: String): OfficialToolMutationPolicy {
+        val workspace = conversations.firstOrNull { it.id == conversationId }?.workspaceId
+            ?: return OfficialToolMutationPolicy { _, _ -> false }
+        return OfficialNativeMutationPolicy(OfficialSandboxPolicy(localSandboxMode), workspace)
+    }
+
     fun cancelResponse() {
+        if (connectionMode == "online") {
+            if (remoteAttachmentProgress.busy) { remoteAttachmentComposer?.cancel(); return }
+            remoteOperation { remoteDsh?.cancelTask() }
+            return
+        }
         if (!isResponding && responseJob == null) return
         ++responseGeneration
         deepSeekClient?.cancel()
@@ -2518,6 +3882,12 @@ class DemoRepository : ViewModel() {
     }
 
     fun newConversation() {
+        if (connectionMode == "online") {
+            clearAttachments()
+            remoteOperation { remoteDsh?.newSession(); composerGeneration++ }
+            return
+        }
+        if (workspaceDeletionBusy) return
         if (initializationStarted && !workspaceInitialized) return
         val selectedEmptyConversation = conversations.firstOrNull {
             it.id == selectedConversationId && it.workspaceId == selectedWorkspaceId && it.archivedAtMillis == null
@@ -2583,7 +3953,74 @@ class DemoRepository : ViewModel() {
         lastNotice = text
     }
 
+    fun refreshRemoteDsh() = remoteOperation { remoteDsh?.refresh() }
+    fun refreshConversationArchives() {
+        if (connectionMode != "online") { purgeExpiredArchives(); return }
+        val binding = remoteWorkspaceScope ?: return
+        remoteOperation { remoteDsh?.refreshArchive(expectedScope = binding) }
+    }
+
+    private fun requestRemoteLifecycleMutation(binding: RemoteDshScope,
+        action: suspend (RemoteDshApplicationController, RemoteDshScope) -> Unit): Boolean {
+        if (connectionMode != "online" || workspaceDeletionBusy || remoteDshState.busy ||
+            !remoteWorkspaceLifecycleReady || remoteWorkspaceScope != binding) return false
+        val controller = remoteDsh ?: return false
+        val previousSelection = remoteDshState.selectedWorkspaceId to remoteDshState.selectedSessionId
+        workspaceDeletionBusy = true
+        updateNotice("正在等待电脑提交操作…")
+        viewModelScope.launch {
+            try {
+                binding.requireCurrent(requireNotNull(remoteDshState.connection), requireOnline = true)
+                action(controller, binding)
+                check(connectionMode == "online" && remoteWorkspaceScope == binding) { "电脑配对关系已改变，请重新读取状态" }
+                if ((remoteDshState.selectedWorkspaceId to remoteDshState.selectedSessionId) != previousSelection) {
+                    clearAttachments()
+                    composerDraftText = ""
+                    composerGeneration++
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { updateNotice(RemoteDshApplicationController.remoteFailure(failure)) }
+            finally { workspaceDeletionBusy = false }
+        }
+        return true
+    }
+    fun updateRemoteForeground(foreground: Boolean) {
+        remoteDsh?.setForeground(foreground, powerSavingMode)
+        remoteArtifactDownloads?.onPowerState(foreground, powerSavingMode)
+        remoteAttachmentComposer?.onPowerState(foreground, powerSavingMode)
+        notificationMonitor?.reconcile(foreground, powerSavingMode)
+        connectVisibilityJob?.cancel()
+        connectVisibilityJob = viewModelScope.launch {
+            try { connectPluginHost?.setBackgroundPaused(!foreground && powerSavingMode) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { updateNotice("连接插件暂时无法恢复，请在插件页重试") }
+        }
+    }
+
+    private fun officialSkills(conversationId: String): OfficialToolSkillProvider? {
+        val app = applicationContext ?: return null
+        val workspace = conversations.firstOrNull { it.id == conversationId }?.workspaceId ?: return null
+        return OfficialSkillAdapter(app, workspace)
+    }
+    fun selectRemoteSandbox(value: String) = remoteOperation { remoteDsh?.selectSandbox(value) }
+    fun suppressDshAutostartAfterImport() { runtimeAutostartSuppressed = true }
+    private fun remoteOperation(action: suspend () -> Unit) {
+        viewModelScope.launch {
+            try { action() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { updateNotice(RemoteDshApplicationController.remoteFailure(failure)) }
+        }
+    }
+
     override fun onCleared() {
+        dshProviderSyncJob?.cancel()
+        notificationMonitor?.close()
+        pushSettings?.close()
+        remoteArtifactDownloads?.close()
+        remoteAttachmentComposer?.cancel()
+        remoteDsh?.close()
+        dshSnapshotJob?.cancel()
+        dshRuntimeManager?.close()
         backgroundTasks?.close()
         taskClients.toList().forEach { it.cancel() }
         deepSeekClient?.cancel()

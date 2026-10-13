@@ -1,0 +1,88 @@
+package com.dafeiyu.mobile.data
+
+import org.json.JSONObject
+
+/** Only capture's repository boundary is substituted; codec/validation are production code. */
+class DemoRepository {
+    val workspaces = emptyList<Workspace>()
+    val conversations = emptyList<Conversation>()
+    val messages = emptyList<ChatMessage>()
+    val selectedWorkspaceId = ""
+    val selectedConversationId = ""
+    var themeMode = "system"
+    var reduceTransparency = false
+    var reduceMotion = false
+    var notificationsEnabled = true
+    var keepRunning = false
+    var downloadSource = "cdn"
+    var accentColorKey = "blue"
+    var glassMaterial = true
+    var pageTransitions = true
+    var springButtons = true
+    var powerSavingMode = false
+    var interfaceScale = 1f
+    var liveIslandNotifications = true
+    var announcementNotifications = true
+    var deviceNotifications = true
+    var messageNotifications = true
+    var backendStatusNotifications = true
+    var engineMode = "official"
+    var connectionMode = "local"
+    var autoStartDsh = false
+    var officialEngineStreaming = true
+    var officialEngineShowReasoning = true
+    var officialEngineExpandActivities = false
+    var tokenSavingMode = false
+    var localSandboxMode = LinuxSandboxContract.WORKSPACE_WRITE
+    var rejectSandboxRestore = false
+    var updatePolicy = "remind"
+    var updateWifiOnly = true
+    var autoCleanupCache = false
+    var dshVersionChannel = "stable"
+    var dshUpdatePolicy = "remind"
+    var isResponding = false
+    var sendPending = false
+    var deepSeekConfigurationBusy = false
+    var backgroundTasks: BackgroundTaskEngine? = null
+    var autostartSuppressed = false
+
+    fun updateThemeMode(value: String) { themeMode = value }
+    fun updateReduceTransparency(value: Boolean) { reduceTransparency = value }
+    fun updateReduceMotion(value: Boolean) { reduceMotion = value }
+    fun updateNotificationsEnabled(value: Boolean) { notificationsEnabled = value }
+    fun updateKeepRunning(value: Boolean) { keepRunning = value }
+    fun updateDownloadSource(value: String) { downloadSource = value }
+    fun updateAccentColor(value: String) { accentColorKey = value }
+    fun updateGlassMaterial(value: Boolean) { glassMaterial = value }
+    fun updatePageTransitions(value: Boolean) { pageTransitions = value }
+    fun updateSpringButtons(value: Boolean) { springButtons = value }
+    fun updatePowerSavingMode(value: Boolean) { powerSavingMode = value }
+    fun updateInterfaceScale(value: Float) { interfaceScale = value }
+    fun updateLiveIslandNotifications(value: Boolean) { liveIslandNotifications = value }
+    fun updateAnnouncementNotifications(value: Boolean) { announcementNotifications = value }
+    fun updateDeviceNotifications(value: Boolean) { deviceNotifications = value }
+    fun updateMessageNotifications(value: Boolean) { messageNotifications = value }
+    fun updateBackendStatusNotifications(value: Boolean) { backendStatusNotifications = value }
+    fun updateEngineMode(value: String) { engineMode = value; autostartSuppressed = false }
+    fun updateConnectionMode(value: String) { connectionMode = value }
+    fun updateAutoStartDsh(value: Boolean) { autoStartDsh = value }
+    fun updateOfficialEngineStreaming(value: Boolean) { officialEngineStreaming = value }
+    fun updateOfficialEngineShowReasoning(value: Boolean) { officialEngineShowReasoning = value }
+    fun updateOfficialEngineExpandActivities(value: Boolean) { officialEngineExpandActivities = value }
+    fun updateTokenSavingMode(value: Boolean) { tokenSavingMode = value }
+    fun restoreLocalSandboxPreference(value: String): Boolean {
+        require(value in LinuxSandboxContract.modes)
+        if (rejectSandboxRestore) return false
+        localSandboxMode = value
+        return true
+    }
+    fun updateUpdatePolicy(value: String) { updatePolicy = value }
+    fun updateUpdateWifiOnly(value: Boolean) { updateWifiOnly = value }
+    fun updateAutoCleanupCache(value: Boolean) { autoCleanupCache = value }
+    fun updateDshVersionChannel(value: String) { dshVersionChannel = value }
+    fun updateDshUpdatePolicy(value: String) { dshUpdatePolicy = value }
+    fun suppressDshAutostartAfterImport() { autostartSuppressed = true }
+    fun exportDymProviderConfiguration(): JSONObject = JSONObject()
+    suspend fun restoreDymProviderConfiguration(value: JSONObject): Result<Unit> = runCatching { check(value.length() >= 0) }
+    fun restoreBackup(value: AndroidBackupStore.ValidatedBackup): Result<Unit> = runCatching { check(value.workspaces.isNotEmpty()) }
+}

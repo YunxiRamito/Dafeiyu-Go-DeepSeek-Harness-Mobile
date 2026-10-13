@@ -25,7 +25,7 @@ if (-not (Test-Path -LiteralPath $signer)) { $signer = 'G:/Android SDK/build-too
 $badging = @(& $aapt dump badging $apk 2>&1)
 if ($LASTEXITCODE -ne 0) { throw 'APK metadata verification failed.' }
 $package = ($badging | Where-Object { $_ -like 'package:*' }) -join ''
-if ($package -notmatch "name='com\.dafeiyu\.mobile\.preview' versionCode='(\d+)' versionName='([^']+)'") {
+if ($package -notmatch "name='com\.dafeiyu\.mobile' versionCode='(\d+)' versionName='([^']+)'") {
     throw 'Unexpected package.'
 }
 $code = [int]$Matches[1]
@@ -66,9 +66,9 @@ if ((Get-FileHash -LiteralPath $apk).Hash -ine $hash) { throw 'APK changed while
     scope = $acceptance.scope
     apk = [ordered]@{
         path = $apk; bytes = (Get-Item -LiteralPath $apk).Length
-        sha256 = $hash; package = 'com.dafeiyu.mobile.preview'
+        sha256 = $hash; package = 'com.dafeiyu.mobile'
         version = $version; versionCode = $code; minSdk = 30; targetSdk = 35
-        debuggable = $true; certificateSha256 = $certificateHash
+        debuggable = $false; certificateSha256 = $certificateHash
     }
     validation = $acceptance.validation
     acceptanceReport = [IO.Path]::GetFullPath($AcceptancePath)

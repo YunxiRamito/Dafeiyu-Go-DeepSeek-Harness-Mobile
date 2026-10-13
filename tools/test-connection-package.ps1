@@ -21,16 +21,18 @@ $compress = Find-CachedJar 'org.apache.commons\commons-compress\1.27.1'
 $commonsIo = Find-CachedJar 'commons-io\commons-io\2.16.1'
 $commonsCodec = Find-CachedJar 'commons-codec\commons-codec\1.17.1'
 $commonsLang = Find-CachedJar 'org.apache.commons\commons-lang3'
+$okhttp = Find-CachedJar 'com.squareup.okhttp3\okhttp\4.12.0'
+$okio = Find-CachedJar 'com.squareup.okio\okio-jvm\3.6.0'
 $json = Join-Path $tempRoot 'qa\workspace-presence\json-20240303.jar'
 if (-not (Test-Path -LiteralPath $json)) { throw 'Missing cached org.json offline test runtime' }
 $compilerClasspath = @($compiler, $stdlib, $coroutines, $annotations, $reflect, $trove) -join ';'
-$classpath = @($stdlib, $annotations, $coroutines, $compress, $commonsIo, $commonsCodec, $commonsLang, $json) -join ';'
+$classpath = @($stdlib, $annotations, $coroutines, $compress, $commonsIo, $commonsCodec, $commonsLang, $okhttp, $okio, $json) -join ';'
 $outputJar = Join-Path $testRoot 'connection-package-checks.jar'
 $dataRoot = Join-Path $projectRoot 'app\src\main\java\com\dafeiyu\mobile\data'
-$sources = @('ConnectionPackageValidator.kt', 'ConnectionPluginPackage.kt') | ForEach-Object { Join-Path $dataRoot $_ }
+$sources = @('ConnectionPackageValidator.kt', 'ConnectionPluginPackage.kt', 'ArtifactDownloader.kt') | ForEach-Object { Join-Path $dataRoot $_ }
 $sources += Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'tests\connection-package') -Filter '*.kt' -File |
     Select-Object -ExpandProperty FullName
-& (Join-Path $javaRoot 'bin\java.exe') -cp $compilerClasspath org.jetbrains.kotlin.cli.jvm.K2JVMCompiler `
+& (Join-Path $javaRoot 'bin\java.exe') -Xmx384m "-Djava.io.tmpdir=$testRoot" -cp $compilerClasspath org.jetbrains.kotlin.cli.jvm.K2JVMCompiler `
     -no-stdlib -no-reflect -jvm-target 17 -classpath $classpath -d $outputJar @sources
 if ($LASTEXITCODE -ne 0) { throw 'Connection package offline checks compilation failed' }
 & (Join-Path $PSScriptRoot 'prepare-connection-plugin.ps1')
@@ -38,25 +40,25 @@ $assetsRoot = Join-Path $tempRoot 'runtime\assets\connection-plugin'
 $fixtureRoot = Join-Path $testRoot ('fixture-' + [Guid]::NewGuid().ToString('N'))
 & (Join-Path $javaRoot 'bin\java.exe') -Xmx256m -cp "$outputJar;$classpath" `
     com.dafeiyu.mobile.data.ConnectionPackageChecksKt $fixtureRoot `
-    (Join-Path $assetsRoot 'dafeiyu-go-connect-0.2.0.tgz') (Join-Path $assetsRoot 'manifest.json')
+    (Join-Path $assetsRoot 'dafeiyu-go-connect-0.3.0.tgz') (Join-Path $assetsRoot 'manifest.json')
 if ($LASTEXITCODE -ne 0) { throw 'Connection package offline checks failed' }
 
 # Test the real preparation script in an isolated copy, without changing the shared frozen release.
 $prepareFixture = Join-Path $testRoot ('prepare-fixture-' + [Guid]::NewGuid().ToString('N'))
 $fakeProject = Join-Path $prepareFixture 'Project\Mobile'
 $fakeTools = Join-Path $fakeProject 'tools'
-$fakeArchiveDirectory = Join-Path $prepareFixture 'Project\Dafeiyu-GO-Connect-Plugin\Temp\Runtime-20261011\package'
-$fakeManifestDirectory = Join-Path $prepareFixture 'Project\Temp_SetupandLauncher\ConnectionIntegration-20261011\Prepared-Releases-Final\0.2.0'
+$fakeArchiveDirectory = Join-Path $fakeProject 'third_party\connection-plugin'
+$fakeManifestDirectory = $fakeArchiveDirectory
 $fakeDestination = Join-Path $prepareFixture 'Temp_Android'
 New-Item -ItemType Directory -Force -Path $fakeTools,$fakeArchiveDirectory,$fakeManifestDirectory | Out-Null
 $fakeScript = Join-Path $fakeTools 'prepare-connection-plugin.ps1'
-$fakeArchive = Join-Path $fakeArchiveDirectory 'dafeiyu-go-connect-0.2.0.tgz'
+$fakeArchive = Join-Path $fakeArchiveDirectory 'dafeiyu-go-connect-0.3.0.tgz'
 $fakeManifest = Join-Path $fakeManifestDirectory 'manifest.json'
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'prepare-connection-plugin.ps1') -Destination $fakeScript
-Copy-Item -LiteralPath (Join-Path $assetsRoot 'dafeiyu-go-connect-0.2.0.tgz') -Destination $fakeArchive
+Copy-Item -LiteralPath (Join-Path $assetsRoot 'dafeiyu-go-connect-0.3.0.tgz') -Destination $fakeArchive
 Copy-Item -LiteralPath (Join-Path $assetsRoot 'manifest.json') -Destination $fakeManifest
 & $fakeScript -TempRoot $fakeDestination
-$preparedArchive = Join-Path $fakeDestination 'runtime\assets\connection-plugin\dafeiyu-go-connect-0.2.0.tgz'
+$preparedArchive = Join-Path $fakeDestination 'runtime\assets\connection-plugin\dafeiyu-go-connect-0.3.0.tgz'
 $preparedManifest = Join-Path $fakeDestination 'runtime\assets\connection-plugin\manifest.json'
 $archiveHash = (Get-FileHash -LiteralPath $preparedArchive -Algorithm SHA256).Hash
 $manifestHash = (Get-FileHash -LiteralPath $preparedManifest -Algorithm SHA256).Hash
@@ -75,7 +77,7 @@ function Assert-PreparationFails([string]$Name) {
 Assert-PreparationFails 'SHA mismatch'
 [IO.File]::Delete($fakeArchive)
 Assert-PreparationFails 'missing frozen package'
-Copy-Item -LiteralPath (Join-Path $assetsRoot 'dafeiyu-go-connect-0.2.0.tgz') -Destination $fakeArchive
+Copy-Item -LiteralPath (Join-Path $assetsRoot 'dafeiyu-go-connect-0.3.0.tgz') -Destination $fakeArchive
 $invalidManifest = [IO.File]::ReadAllText($fakeManifest) | ConvertFrom-Json
 $invalidManifest.archive_path = '/other/package'
 [IO.File]::WriteAllText($fakeManifest, ($invalidManifest | ConvertTo-Json -Depth 8))

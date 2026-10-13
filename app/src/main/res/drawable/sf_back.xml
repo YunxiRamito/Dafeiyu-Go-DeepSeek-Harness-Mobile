@@ -1,7 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Source: UsePreside/sf-symbols, SF Symbols 4.0 converted data. Local preview asset; see third_party/sf-symbols/NOTICE.md. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="27.446875" android:viewportHeight="27.446875">
-  <group android:translateX="6.292773" android:translateY="1.2">
-    <path android:fillColor="#FF000000" android:pathData="M0.0041 12.5245C0.0041 13.1945 0.2441 13.7545 0.8041 14.3045L11.1441 24.4345C11.5641 24.8445 12.0541 25.0445 12.6641 25.0445C13.8641 25.0445 14.8641 24.0745 14.8641 22.8745C14.8641 22.2545 14.6041 21.7145 14.1541 21.2645L5.1441 12.5145L14.1541 3.7745C14.6041 3.3345 14.8641 2.7745 14.8641 2.1745C14.8641 0.9845 13.8641 0.0045 12.6641 0.0045C12.0541 0.0045 11.5641 0.2045 11.1441 0.6145L0.8041 10.7445C0.2441 11.2745 0.0141 11.8445 0.0041 12.5245Z" />
-  </group>
+<!--
+MIT License
+
+Copyright (c) 2020 Microsoft Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Microsoft Fluent UI System Icons a347af95478f989038cccbf085978865264c048a
+assets/Chevron Left/SVG/ic_fluent_chevron_left_24_regular.svg
+Original SVG path preserved; converted to Android VectorDrawable. Resource ID retained for app compatibility.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+  <path android:fillColor="#FF000000" android:pathData="M15.5303 4.21967C15.8232 4.51256 15.8232 4.98744 15.5303 5.28033L8.81066 12L15.5303 18.7197C15.8232 19.0126 15.8232 19.4874 15.5303 19.7803C15.2374 20.0732 14.7626 20.0732 14.4697 19.7803L7.21967 12.5303C6.92678 12.2374 6.92678 11.7626 7.21967 11.4697L14.4697 4.21967C14.7626 3.92678 15.2374 3.92678 15.5303 4.21967Z" />
 </vector>

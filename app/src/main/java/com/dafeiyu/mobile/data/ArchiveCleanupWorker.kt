@@ -10,14 +10,28 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
-/** Persistent safety net: expired archived conversations are removed even when the UI stays closed. */
+/** Retention authorizes the same real deletion transaction as the foreground;
+ * service/process ownership failures preserve history and retry later. */
 class ArchiveCleanupWorker(
     appContext: Context,
     parameters: WorkerParameters,
 ) : CoroutineWorker(appContext, parameters) {
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         runCatching {
-            WorkspaceStore(applicationContext).purgeExpiredArchives(System.currentTimeMillis())
+            val store = WorkspaceStore(applicationContext)
+            val history = LocalDshHistoryController(applicationContext)
+            for (pending in history.pendingPermanentDeletions().filter { it.phase in setOf("deleting", "native_deleted") }) {
+                val receipt = history.deletePermanentHistory(pending)
+                store.commitPermanentDeletion(receipt)
+                history.acknowledgePermanentDeletion(receipt)
+            }
+            val now = System.currentTimeMillis()
+            for (candidate in store.expiredArchiveCandidates(now)) {
+                val intent = history.preparePermanentDeletion(candidate)
+                val receipt = history.deletePermanentHistory(intent)
+                store.commitPermanentDeletion(receipt)
+                history.acknowledgePermanentDeletion(receipt)
+            }
         }.fold(
             onSuccess = { Result.success() },
             onFailure = { error ->

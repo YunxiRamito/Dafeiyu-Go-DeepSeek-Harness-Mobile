@@ -1,7 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Source: UsePreside/sf-symbols, SF Symbols 4.0 converted data. Local preview asset; see third_party/sf-symbols/NOTICE.md. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="29.019141" android:viewportHeight="29.019141">
-  <group android:translateX="1.2" android:translateY="3.537891">
-    <path android:fillColor="#FF000000" android:pathData="M26.6237 10.9806C26.6237 10.4406 26.3837 9.8806 26.0137 9.5106L17.1137 0.6306C16.6937 0.2006 16.2037 0.0006 15.7237 0.0006C14.5637 0.0006 13.7637 0.8106 13.7637 1.8706C13.7637 2.4706 14.0237 2.9406 14.3937 3.2906L17.4637 6.3706L20.4837 9.1606L17.5037 9.0006H2.0537C0.8237 9.0006 0.0037 9.7906 0.0037 10.9806C0.0037 12.1506 0.8237 12.9606 2.0537 12.9606H17.5037L20.4937 12.8006L17.4637 15.5906L14.3937 18.6506C14.0237 19.0006 13.7637 19.4806 13.7637 20.0706C13.7637 21.1406 14.5637 21.9406 15.7237 21.9406C16.2037 21.9406 16.6937 21.7406 17.1037 21.3306L26.0137 12.4406C26.3837 12.0706 26.6237 11.5106 26.6237 10.9806Z" />
-  </group>
+<!--
+MIT License
+
+Copyright (c) 2020 Microsoft Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Microsoft Fluent UI System Icons a347af95478f989038cccbf085978865264c048a
+assets/Arrow Up/SVG/ic_fluent_arrow_up_24_regular.svg
+Original SVG path preserved; converted to Android VectorDrawable. Resource ID retained for app compatibility.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+  <path android:fillColor="#FF000000" android:pathData="M4.20889 10.7327C3.9232 11.0326 3.93475 11.5074 4.23467 11.7931C4.5346 12.0788 5.00933 12.0672 5.29502 11.7673L11.2495 5.516V20.25C11.2495 20.6642 11.5853 21 11.9995 21C12.4137 21 12.7495 20.6642 12.7495 20.25V5.51565L18.7043 11.7673C18.99 12.0672 19.4648 12.0788 19.7647 11.7931C20.0646 11.5074 20.0762 11.0326 19.7905 10.7327L12.7238 3.31379C12.5627 3.14474 12.3573 3.04477 12.1438 3.01386C12.0971 3.00477 12.0489 3 11.9995 3C11.9498 3 11.9012 3.00483 11.8543 3.01406C11.6412 3.04518 11.4363 3.14509 11.2756 3.31379L4.20889 10.7327Z" />
 </vector>

@@ -55,6 +55,7 @@ import com.google.zxing.DecodeHintType
 import com.google.zxing.MultiFormatReader
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
+import com.dafeiyu.mobile.data.ApplicationPermissionBridge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -76,17 +77,18 @@ fun ScannerScreen(onBack: () -> Unit, notify: (String) -> Unit, onDecoded: (Stri
     var cameraEpoch by remember { mutableIntStateOf(0) }
     val camera = rememberCameraQrState()
     val cameraBackdrop = rememberGlassBackdropState()
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { accepted ->
-        requesting = false
-        granted = accepted
-        if (accepted) { cameraFailure = ""; cameraEpoch++ }
-    }
+    val permissionBridge = remember(context) { ApplicationPermissionBridge.get(context) }
     fun requestCamera() {
         if (requesting) return
         permissionRequested = true
         requesting = true
-        try { permission.launch(Manifest.permission.CAMERA) }
-        catch (_: Exception) { requesting = false; notify("无法请求相机权限，请在系统应用设置中授权") }
+        scope.launch {
+            try {
+                permissionBridge.requestConsent("camera", "用于在本机扫描配对二维码。识别出的内容不会自动打开或执行，摄像头画面不会上传。")
+                granted = hasCameraPermission(context)
+                if (granted) { cameraFailure = ""; cameraEpoch++ }
+            } finally { requesting = false }
+        }
     }
     DisposableEffect(lifecycle, context) {
         val observer = LifecycleEventObserver { _, event ->

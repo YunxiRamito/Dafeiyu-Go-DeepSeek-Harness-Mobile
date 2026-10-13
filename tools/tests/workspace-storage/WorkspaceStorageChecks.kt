@@ -89,7 +89,7 @@ y"}"""
     test("version 1 index remains readable and keeps modelInput and attachmentIds") {
         val ctx = context(File(root, "v1"))
         val file = indexFile(ctx)
-        file.parentFile.mkdirs()
+        checkNotNull(file.parentFile).mkdirs()
         val oldModelInput = """{"role":"user","content":"legacy \"content\""}"""
         val oldAttachment = validId(42)
         val json = JSONObject()
@@ -124,7 +124,7 @@ y"}"""
         check(message.modelInput == null && message.attachmentIds.isEmpty() && message.streamSnapshot == null)
         check(loaded.conversations.single().archivedAtMillis == null)
         store.save(loaded)
-        check(JSONObject(file.readText()).getInt("version") == 2)
+        check(JSONObject(file.readText()).getInt("version") == 3)
         check(requireNotNull(store.initialize(0L)).messages.getValue("c1").single() == message)
     }
 
@@ -180,23 +180,24 @@ y"}"""
             listOf(validId(1), validId(2), validId(3)))
     }
 
-    test("workspace load examines first 200 positions and creates default if absent") {
+    test("workspace load examines first 200 positions without recreating an absent default") {
         val ctx = context(File(root, "workspace-limit"))
         val store = WorkspaceStore(ctx)
         val workspaces = (0 until 201).map { Workspace("w$it", "Workspace", if (it == 0) "file:///unsafe" else "content://tree/$it") }
         store.save(snapshot(workspaces, emptyList(), emptyMap(), selectedWorkspaceId = "w200"))
         val loaded = requireNotNull(store.initialize(0L))
-        check(loaded.workspaces.size == 201 && loaded.workspaces.first().id == "default")
+        check(loaded.workspaces.size == 200 && loaded.workspaces.first().id == "w0")
+        check(loaded.workspaces.none { it.id == "default" })
         check(loaded.workspaces.none { it.id == "w200" })
         check(loaded.workspaces.first { it.id == "w0" }.uri == null)
         check(loaded.workspaces.first { it.id == "w1" }.uri == "content://tree/1")
-        check(loaded.selectedWorkspaceId == "default")
+        check(loaded.selectedWorkspaceId == "w0")
     }
 
     test("attachment and collection limits are enforced during load") {
         val ctx = context(File(root, "limits"))
         val file = indexFile(ctx)
-        file.parentFile.mkdirs()
+        checkNotNull(file.parentFile).mkdirs()
         val attachments = JSONArray()
         repeat(8) { attachments.put(if (it == 7) "not-an-attachment" else validId(it)) }
         val conversations = JSONArray()

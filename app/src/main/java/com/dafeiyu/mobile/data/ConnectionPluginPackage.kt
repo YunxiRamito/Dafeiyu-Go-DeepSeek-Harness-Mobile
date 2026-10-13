@@ -8,20 +8,45 @@ import java.net.URI
 import java.security.KeyStore
 import java.security.cert.CertificateFactory
 import java.util.UUID
-import javax.net.ssl.HttpsURLConnection
+import java.util.Base64
+import java.util.concurrent.TimeUnit
+import javax.net.ssl.X509TrustManager
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 /** Prepares the immutable shared package; runtime loading is owned by the host. */
 class ConnectionPluginPackage(private val context: Context) {
     private val root = File(context.noBackupFilesDir, "connection-plugin").apply { mkdirs() }
     private val prepared = AtomicFile(File(root, "prepared.json"))
     private val legacy = AtomicFile(File(root, "active.json"))
+    private val downloadClient by lazy {
+        val certificates = context.resources.openRawResource(R.raw.dafeiyu_download_ca).use {
+            CertificateFactory.getInstance("X.509").generateCertificates(it)
+        }
+        val store = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
+            load(null); certificates.forEachIndexed { index, certificate -> setCertificateEntry("server-$index", certificate) }
+        }
+        val manager = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply { init(store) }
+            .trustManagers.filterIsInstance<X509TrustManager>().single()
+        val ssl = SSLContext.getInstance("TLS").apply { init(null, arrayOf(manager), null) }
+        val pin = "2c72728755267c607124b2ac86e431743c34af5c6069aa22bbcc401e0f626f0b"
+            .chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        OkHttpClient.Builder().sslSocketFactory(ssl.socketFactory, manager)
+            .certificatePinner(okhttp3.CertificatePinner.Builder().add("202.189.21.218",
+                "sha256/" + Base64.getEncoder().encodeToString(pin)).build())
+            .connectTimeout(10, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS)
+            .callTimeout(15, TimeUnit.MINUTES).followRedirects(false).followSslRedirects(false).build()
+    }
 
     fun current(): File? = synchronized(storageLock) { currentManifest()?.let { installed(it) } }
 
@@ -89,19 +114,24 @@ class ConnectionPluginPackage(private val context: Context) {
         }
     }
 
-    suspend fun ensureBundled(): File = withContext(Dispatchers.IO) {
+    suspend fun ensureBundled(requiredBundledVersion: String? = null): File = withContext(Dispatchers.IO) {
         lock.withLock {
-            current()?.let { return@withLock it }
+            if (requiredBundledVersion == null) current()?.let { return@withLock it }
             val manifest = context.assets.open("connection-plugin/manifest.json").use {
                 ConnectionPackageValidator.manifest(ConnectionPackageValidator.readBounded(it, ConnectionPackageValidator.MAX_MANIFEST))
             }
+            require(requiredBundledVersion == null || manifest.version == requiredBundledVersion) { "plugin_host_version_mismatch" }
+            synchronized(storageLock) {
+                currentManifest()?.takeIf { it.version == manifest.version && it.sha256 == manifest.sha256 }?.let(::installed)
+            }?.let { return@withLock it }
             context.assets.open("connection-plugin/${manifest.fileName}").use {
                 install(manifest, ConnectionPackageValidator.readBounded(it, ConnectionPackageValidator.MAX_ARCHIVE))
             }
         }
     }
 
-    suspend fun update(baseUrl: String = DeveloperCenterPresenceClient.DEFAULT_BASE_URL): String =
+    suspend fun update(baseUrl: String = DeveloperCenterPresenceClient.DEFAULT_BASE_URL,
+        progress: (ArtifactDownloadProgress) -> Unit = {}): String =
         withContext(Dispatchers.IO) {
             lock.withLock {
                 val base = URI(baseUrl)
@@ -109,8 +139,18 @@ class ConnectionPluginPackage(private val context: Context) {
                     base.rawQuery == null && base.fragment == null && base.path.orEmpty() in setOf("", "/"))
                 val manifest = ConnectionPackageValidator.manifest(
                     fetch(base.resolve("/api/connection-plugin/releases/current"), ConnectionPackageValidator.MAX_MANIFEST))
-                val archive = fetch(base.resolve(manifest.archivePath), ConnectionPackageValidator.MAX_ARCHIVE)
+                val downloads = File(root, "downloads")
+                val downloaded = ArtifactDownloader(downloads, { downloadClient }).download(ArtifactDownloadRequest(
+                    urls = listOf(base.resolve(manifest.archivePath).toString()), destination = File(downloads, "${manifest.sha256}.tgz"),
+                    checksum = ArtifactChecksum("SHA-256", manifest.sha256), expectedSize = manifest.sizeBytes,
+                    maxBytes = ConnectionPackageValidator.MAX_ARCHIVE.toLong(),
+                ), progress).file
+                val archive = downloaded.inputStream().use { ConnectionPackageValidator.readBounded(it, ConnectionPackageValidator.MAX_ARCHIVE) }
+                currentCoroutineContext().ensureActive()
                 install(manifest, archive)
+                // Installation already committed its durable receipt. A cache
+                // cleanup failure must not report the old version as retained.
+                downloaded.delete()
                 manifest.version
             }
         }
@@ -142,25 +182,19 @@ class ConnectionPluginPackage(private val context: Context) {
         return pkg
     }
 
-    private fun fetch(uri: URI, limit: Int): ByteArray {
-        val connection = uri.toURL().openConnection() as HttpsURLConnection
-        try {
-            connection.instanceFollowRedirects = false
-            connection.connectTimeout = 10000; connection.readTimeout = 20000
-            val ca = context.resources.openRawResource(R.raw.dafeiyu_download_ca).use {
-                CertificateFactory.getInstance("X.509").generateCertificate(it)
-            }
-            val store = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
-                load(null); setCertificateEntry("dafeiyu", ca)
-            }
-            val trust = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply { init(store) }
-            connection.sslSocketFactory = SSLContext.getInstance("TLS").apply { init(null, trust.trustManagers, null) }.socketFactory
-            connection.hostnameVerifier = HttpsURLConnection.getDefaultHostnameVerifier()
-            require(connection.responseCode == 200 && connection.contentLengthLong <= limit) { "plugin_download_failed" }
-            return connection.inputStream.use { input ->
-                ConnectionPackageValidator.readBounded(input, limit)
-            }
-        } finally { connection.disconnect() }
+    @OptIn(kotlinx.coroutines.InternalCoroutinesApi::class)
+    private suspend fun fetch(uri: URI, limit: Int): ByteArray {
+        currentCoroutineContext().ensureActive()
+        val call = downloadClient.newCall(Request.Builder().url(uri.toString()).build())
+        val cancellation = currentCoroutineContext()[Job]?.invokeOnCompletion(onCancelling = true, invokeImmediately = true) {
+            if (it != null) call.cancel()
+        }
+        return try { call.execute().use { response ->
+            require(response.code == 200 && response.body?.contentLength()?.let { it <= limit } == true) { "plugin_download_failed" }
+            val bytes = requireNotNull(response.body).byteStream().use { ConnectionPackageValidator.readBounded(it, limit) }
+            currentCoroutineContext().ensureActive()
+            bytes
+        } } finally { cancellation?.dispose() }
     }
 
     companion object {

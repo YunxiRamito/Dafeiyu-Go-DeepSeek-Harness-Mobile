@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Setup/src/DshInstaller.Shared/Backup/UserDataBackup.cs" Link="UserDataBackup.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Setup/src/DshInstaller.Shared/Backup/DymArchive.cs" Link="DymArchive.cs" />
+    <EmbeddedResource Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Setup/src/DshInstaller.Shared/Backup/7zr.exe" LogicalName="DshInstaller.Shared.Backup.7zr.exe" />
+  </ItemGroup>
+</Project>

@@ -5,7 +5,7 @@
 ## 1. 磁盘与目录
 
 - **不往 C 盘写任何文件。** 临时脚本、备份、日志、APK、QA 产物一律放 `G:\DeepSeek DSH\DSH Works\Project\Dafeiyu-Go\Temp_Android\`（相对本仓为 `../Temp_Android`），不要用 `/tmp`、`%TEMP%` 或 Agent 的 job 目录。用完清理。唯一例外：用户明确要求时，APK 可以复制到桌面。
-- 仓库**没有 git**，改动无法回滚。改文件前先把原文件复制到 `../Temp_Android/backup-<版本>/`。
+- 仓库已建立 Git `main` 和公开远端 `YunxiRamito/Dafeiyu-Go-DeepSeek-Harness-Mobile`。改文件前仍先把原文件复制到 `../Temp_Android/backup-<版本>/`；提交不能覆盖他人的未提交工作。
 - 共享工作树里会有其他人的改动，保留，不要回退。
 
 ## 2. 改代码
@@ -16,14 +16,14 @@
   export JAVA_HOME='C:\Program Files\Java\JDK21'
   pwsh -NoProfile -File tools/build.ps1 -MaxWorkers 2 > ../Temp_Android/<名字>.log 2>&1
   ```
-  只编译 Kotlin 时加 `-Tasks :app:compileDebugKotlin`。默认任务是 `assembleDebug` + `lintDebug`，APK 会复制到 `../Temp_Android/Dist/Dafeiyu-Go-Mobile-<版本>.apk`，并生成 `.sha256`。
+  只编译正式 Kotlin 时加 `-Tasks :app:compileReleaseKotlin`。默认任务是 `assembleRelease` + `lintRelease`，APK 会复制到 `../Temp_Android/Dist/Dafeiyu-Go-Mobile-<版本>.apk`，并生成 `.sha256`。调试包使用 `.dev` 包名后缀及 `-dev.apk` 文件名。
 - **构建输出必须先写进日志文件再查。** 终端输出会被截断，只看得到 "BUILD FAILED"。查错误用：`grep -aE "^e:" <log> | sed 's/\x1b\[[0-9;]*m//g'`。
 - 升版本时要同时改三处：`app/build.gradle.kts` 的 `versionCode`/`versionName`，以及 `tools/build.ps1` 第 39 行硬编码的 APK 文件名。版本号按 `0.1.x` 递增。
 - 整仓构建同一时间只跑一个（build.ps1 会检查可用内存是否 ≥1536 MiB），也不要和模拟器启动叠在一起。
 
 ## 3. 子 Agent
 
-- **用户自费，要控制成本。** 同时在跑的子 Agent 不超过 4 个。**每个子 Agent 的指令里都要写明“不得再派生子 Agent”。** 读文档、整理文档这类工作由主 Agent 自己做，不要外包。
+- **用户自费，要控制成本。** 同一轮主 Agent 加最多 3 个子 Agent。**每个子 Agent 的指令里都要写明“不得再派生子 Agent”。** 读文档、整理文档这类工作由主 Agent 自己做，不要外包。
 - 派活时写清楚：文件所有权（各 Agent 之间不重叠）、具体要改什么、完成标准、备份位置（本文件第 1 节）。
 - 子 Agent 的报告不等于事实。主 Agent 要对照代码核对关键改动，尤其是 shader uniform、数据层逻辑和“已完成”的说法。
 
@@ -46,7 +46,7 @@
 
 - 视觉方向是 Apple Liquid Glass，和现有组件保持一致。所有出现、过渡、消失都要有动画，优先用贝塞尔曲线（统一走 `GlassMotion`）。按钮的命中区域要准确。
 - 动画不能阻挡触摸、滚动、取消或无障碍操作。要遵守“减少动态效果”、“减少透明度”以及个性化页里的几个开关（具体见 LIQUID-GLASS-SPEC）。
-- 图标不要自己画，优先用 SF Symbols 转换来的现成数据（来源记录在 `third_party/sf-symbols/`）。
+- 图标不要自己画。正式发行使用可分发的 Microsoft Fluent 固定源码（`third_party/fluent-system-icons/`）；旧 `sf_` 资源 ID 仅为兼容名字，SF Symbols 历史来源记录仍保留。
 - 不要做只弹 Toast、没有实际作用的“假按钮”。功能还没接通的开关，标注“（预留）”并禁用。
 
 ## 7. 如实记录

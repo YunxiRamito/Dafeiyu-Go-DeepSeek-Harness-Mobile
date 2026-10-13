@@ -1,7 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Source: UsePreside/sf-symbols, SF Symbols 4.0 converted data. Local preview asset; see third_party/sf-symbols/NOTICE.md. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="35.034766" android:viewportHeight="35.034766">
-  <group android:translateX="1.2" android:translateY="4.44707">
-    <path android:fillColor="#FF000000" android:pathData="M4.8237 26.1377H27.8037C30.9437 26.1377 32.6337 24.4477 32.6337 21.3377V4.7977C32.6337 1.6977 30.9437 -0.0023 27.8037 -0.0023H4.8237C1.7137 -0.0023 0.0037 1.6977 0.0037 4.7977V21.3377C0.0037 24.4477 1.7137 26.1377 4.8237 26.1377ZM5.2137 22.6177C4.1137 22.6177 3.5237 22.0777 3.5237 20.9177V5.2177C3.5237 4.0577 4.1137 3.5277 5.2137 3.5277H27.4237C28.5237 3.5277 29.1037 4.0577 29.1037 5.2177V20.9177C29.1037 22.0777 28.5237 22.6177 27.4237 22.6177ZM6.7537 11.1877C5.3737 12.0277 6.5537 14.1277 8.0537 13.1777L11.7837 10.8277C12.7237 10.2377 12.7037 8.8277 11.7837 8.2577L8.0537 5.9177C6.5637 4.9777 5.3737 7.0677 6.7437 7.8977L9.4737 9.5577ZM12.4537 12.9777C12.4537 13.6077 12.9637 14.1277 13.6137 14.1277H18.5937C19.2537 14.1277 19.7437 13.6077 19.7437 12.9777C19.7437 12.3177 19.2537 11.8277 18.5937 11.8277H13.6137C12.9737 11.8277 12.4537 12.3177 12.4537 12.9777Z" />
-  </group>
+<!--
+MIT License
+
+Copyright (c) 2020 Microsoft Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Microsoft Fluent UI System Icons a347af95478f989038cccbf085978865264c048a
+assets/Window Console/SVG/ic_fluent_window_console_20_regular.svg
+Original SVG path preserved; converted to Android VectorDrawable. Resource ID retained for app compatibility.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="20" android:viewportHeight="20">
+  <path android:fillColor="#FF000000" android:pathData="M5.64645 9.14645C5.84171 8.95118 6.15829 8.95118 6.35355 9.14645L8.35355 11.1464C8.44732 11.2402 8.5 11.3674 8.5 11.5C8.5 11.6326 8.44732 11.7598 8.35355 11.8536L6.35355 13.8536C6.15829 14.0488 5.84171 14.0488 5.64645 13.8536C5.45118 13.6583 5.45118 13.3417 5.64645 13.1464L7.29289 11.5L5.64645 9.85355C5.45118 9.65829 5.45118 9.34171 5.64645 9.14645ZM14.5 13H9.5C9.22386 13 9 13.2239 9 13.5C9 13.7761 9.22386 14 9.5 14H14.5C14.7761 14 15 13.7761 15 13.5C15 13.2239 14.7761 13 14.5 13ZM2.99609 5.5C2.99609 4.11929 4.11538 3 5.49609 3H14.4961C15.8768 3 16.9961 4.11929 16.9961 5.5V6H16.999V7H16.9961V14.5C16.9961 15.8807 15.8768 17 14.4961 17H5.49609C4.11538 17 2.99609 15.8807 2.99609 14.5V5.5ZM15.9961 6V5.5C15.9961 4.67157 15.3245 4 14.4961 4H5.49609C4.66767 4 3.99609 4.67157 3.99609 5.5V6H15.9961ZM3.99609 7V14.5C3.99609 15.3284 4.66767 16 5.49609 16H14.4961C15.3245 16 15.9961 15.3284 15.9961 14.5V7H3.99609Z" />
 </vector>

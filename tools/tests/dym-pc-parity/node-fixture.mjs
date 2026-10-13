@@ -1,0 +1,14 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+const base = path.resolve(process.argv[2]), root = path.resolve(process.argv[3]);
+const require = createRequire(path.join(root, 'package.json'));
+const { initProfile } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-app-boot')).href);
+await fs.mkdir(path.join(base, 'source-home/profiles'), { recursive: true });
+await fs.mkdir(path.join(base, 'target-home/profiles'), { recursive: true });
+for (const name of ['source-home', 'target-home']) await initProfile(path.join(base, name, 'profiles/web'), ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app']);
+const source = path.join(base, 'source-home');
+await fs.writeFile(path.join(source, 'profiles/web/cordis.patch.yml'), `- id: llm-pi-ai\n  config:\n    providers:\n      om-fixture:\n        displayName: Fixture provider\n        api: openai-completions\n        baseURL: https://example.invalid/v1\n        apiKeyEnv: FIXTURE_PROVIDER_KEY\n        models:\n          - id: fixture-model\n            name: Fixture model\n`);
+await fs.writeFile(path.join(source, '.credentials.yaml'), `version: 1\nrefs:\n  DEEPSEEK_API_KEY: fixture-official-key\n  FIXTURE_PROVIDER_KEY: fixture-other-key\n  UNRELATED_IDENTITY: must-not-export\nrecords: {}\n`, { mode: 0o600 });
+process.stdout.write('fixture ready\n');

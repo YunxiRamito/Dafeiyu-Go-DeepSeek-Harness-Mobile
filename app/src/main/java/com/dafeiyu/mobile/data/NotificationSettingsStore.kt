@@ -21,8 +21,9 @@ object NotificationChannelIds {
     const val LIVE_STATUS = "dafeiyu.live_status"
     const val ANNOUNCEMENTS = "dafeiyu.announcements"
     const val DEVICES = "dafeiyu.devices"
+    const val BACKEND = "dafeiyu.backend"
 
-    val all: List<String> = listOf(GENERAL, TASKS, LIVE_STATUS, ANNOUNCEMENTS, DEVICES)
+    val all: List<String> = listOf(GENERAL, TASKS, LIVE_STATUS, ANNOUNCEMENTS, DEVICES, BACKEND)
 }
 
 data class NotificationChannelState(
@@ -153,7 +154,7 @@ class NotificationSettingsStore(context: Context) {
         val requestedPermissions = runCatching {
             @Suppress("DEPRECATION")
             appContext.packageManager
-                .getPackageInfo(appContext.packageName, 0)
+                .getPackageInfo(appContext.packageName, PackageManager.GET_PERMISSIONS)
                 .requestedPermissions
                 .orEmpty()
                 .toSet()
@@ -202,7 +203,7 @@ class NotificationSettingsStore(context: Context) {
         ChannelDefinition(
             id = NotificationChannelIds.LIVE_STATUS,
             name = "进行中的状态",
-            description = "为未来的进行中状态展示预留的通知渠道",
+            description = "显示任务运行中和完成状态",
             importance = NotificationManager.IMPORTANCE_LOW,
         ),
         ChannelDefinition(
@@ -216,6 +217,12 @@ class NotificationSettingsStore(context: Context) {
             name = "连接的设备",
             description = "电脑或 Aries 设备的连接状态",
             importance = NotificationManager.IMPORTANCE_LOW,
+        ),
+        ChannelDefinition(
+            id = NotificationChannelIds.BACKEND,
+            name = "后端服务器状态",
+            description = "服务不可用或恢复连接时提醒",
+            importance = NotificationManager.IMPORTANCE_DEFAULT,
         ),
     )
 

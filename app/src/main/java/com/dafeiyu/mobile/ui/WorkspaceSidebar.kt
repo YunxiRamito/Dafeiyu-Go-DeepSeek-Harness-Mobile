@@ -60,6 +60,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.dafeiyu.mobile.data.DeveloperCenterPresenceClient
 import com.dafeiyu.mobile.data.DemoRepository
+import com.dafeiyu.mobile.data.RemoteDshApplicationController
+import com.dafeiyu.mobile.data.RemoteDshScope
 import com.dafeiyu.mobile.ui.components.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -90,7 +92,7 @@ fun WorkspaceSidebar(
         deletionTasks, deletionStorageIssue, repository,
     ) {
         derivedStateOf {
-            repository.workspaces.filter { repository.canDeleteWorkspace(it.id) }.mapTo(HashSet()) { it.id }
+            repository.displayWorkspaces.filter { repository.canRemoveWorkspace(it.id) }.mapTo(HashSet()) { it.id }
         }
     }.value
     val presenceClient = remember { DeveloperCenterPresenceClient() }
@@ -99,11 +101,41 @@ fun WorkspaceSidebar(
     }
     var presenceLoading by remember { mutableStateOf(true) }
     var showNewWorkspace by remember { mutableStateOf(false) }
+    var showRemoteDirectory by remember { mutableStateOf(false) }
+    var showRemoteArtifacts by remember { mutableStateOf(false) }
     var workspaceName by remember { mutableStateOf("") }
     var pendingWorkspaceUri by remember { mutableStateOf<Uri?>(null) }
     var revealedRow by remember { mutableStateOf<SidebarSwipeIdentity?>(null) }
     var workspaceToDeleteId by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(repository.selectedWorkspaceId) { revealedRow = null }
+    var confirmWorkspaceFiles by remember { mutableStateOf(false) }
+    var preparingWorkspaceRemoval by remember { mutableStateOf(false) }
+    var workspacePreparationError by remember { mutableStateOf<String?>(null) }
+    var workspacePreparationAttempt by remember { mutableIntStateOf(0) }
+    var conversationToArchiveId by remember { mutableStateOf<String?>(null) }
+    var conversationArchiveScope by remember { mutableStateOf<RemoteDshScope?>(null) }
+    val remoteScope = repository.remoteWorkspaceScope
+    LaunchedEffect(repository.displayWorkspaceId) { revealedRow = null }
+    LaunchedEffect(repository.connectionMode, remoteScope) {
+        workspaceToDeleteId = null
+        conversationToArchiveId = null
+        conversationArchiveScope = null
+        confirmWorkspaceFiles = false
+        repository.clearWorkspaceRemovalConfirmation()
+    }
+    LaunchedEffect(workspaceToDeleteId, workspacePreparationAttempt) {
+        workspacePreparationError = null
+        val id = workspaceToDeleteId
+        if (id == null) {
+            preparingWorkspaceRemoval = false
+            repository.clearWorkspaceRemovalConfirmation()
+            return@LaunchedEffect
+        }
+        preparingWorkspaceRemoval = true
+        try { repository.prepareWorkspaceRemovalDetails(id) }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) { workspacePreparationError = RemoteDshApplicationController.remoteFailure(failure) }
+        finally { preparingWorkspaceRemoval = false }
+    }
     LaunchedEffect(presenceClient, lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
@@ -118,18 +150,28 @@ fun WorkspaceSidebar(
     }
     val performSwipeAction: (SidebarSwipeIdentity) -> Boolean = { identity ->
         val accepted = identity.perform(
-            archiveConversation = repository::archiveConversation,
-            canDeleteWorkspace = repository::canDeleteWorkspace,
-            requestWorkspaceDeletion = { id -> workspaceToDeleteId = id; true },
+            archiveConversation = { id ->
+                if (repository.connectionMode == "online" && repository.remoteConversationArchiveRequiresStop(id)) {
+                    conversationToArchiveId = id
+                    conversationArchiveScope = remoteScope
+                    true
+                } else repository.archiveConversation(id)
+            },
+            canDeleteWorkspace = repository::canRemoveWorkspace,
+            requestWorkspaceDeletion = { id ->
+                workspaceToDeleteId = id
+                confirmWorkspaceFiles = false
+                true
+            },
         )
         if (accepted) {
             if (revealedRow == identity) revealedRow = null
-            if (identity.action == SidebarSwipeAction.Archive) onConversationChanged()
+            if (identity.action == SidebarSwipeAction.Archive && conversationToArchiveId == null) onConversationChanged()
         }
         accepted
     }
-    val visibleConversations = repository.conversations.filter { conversation ->
-        conversation.workspaceId == repository.selectedWorkspaceId &&
+    val visibleConversations = repository.displayConversations.filter { conversation ->
+        conversation.workspaceId == repository.displayWorkspaceId &&
             repository.isConversationVisibleInWorkspace(conversation)
     }
     Column(Modifier.fillMaxHeight().widthIn(max = 296.dp).padding(horizontal = 14.dp)) {
@@ -143,7 +185,7 @@ fun WorkspaceSidebar(
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             SidebarIconAction("添加工作目录", "plus", enabled = repository.workspaceInitialized) {
-                folderPicker.launch(null)
+                if (repository.connectionMode == "online") showRemoteDirectory = true else folderPicker.launch(null)
             }
             SidebarIconAction("关闭侧栏", "close", onClick = onClose)
         }
@@ -164,13 +206,13 @@ fun WorkspaceSidebar(
                     }
                 }
             }
-            items(repository.workspaces, key = { "workspace-${it.id}" }) { workspace ->
+            items(repository.displayWorkspaces, key = { "workspace-${it.id}" }) { workspace ->
                 val identity = SidebarSwipeIdentity(workspace.id, SidebarSwipeAction.DeleteEmptyWorkspace)
                 SidebarSwipeRow(
                     identity = identity,
                     title = workspace.name,
                     glyph = if (workspace.uri == null) "menu" else "folder",
-                    selected = workspace.id == repository.selectedWorkspaceId,
+                    selected = workspace.id == repository.displayWorkspaceId,
                     actionEnabled = workspace.id in deletableWorkspaceIds,
                     revealedRow = revealedRow,
                     onRevealChanged = { row, revealed ->
@@ -187,7 +229,10 @@ fun WorkspaceSidebar(
             }
             item("create-internal-workspace") {
                 TextButton(
-                    onClick = { workspaceName = ""; showNewWorkspace = true },
+                    onClick = {
+                        if (repository.connectionMode == "online") showRemoteDirectory = true
+                        else { workspaceName = ""; showNewWorkspace = true }
+                    },
                     enabled = repository.workspaceInitialized,
                     modifier = Modifier.fillMaxWidth().applyButtonDeformation(
                         enabled = repository.workspaceInitialized, consumeDrag = false, drawShadow = false,
@@ -195,7 +240,7 @@ fun WorkspaceSidebar(
                 ) {
                     FishGlyph("plus", Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("新建应用内目录", style = MaterialTheme.typography.labelMedium)
+                    Text(if (repository.connectionMode == "online") "选择电脑目录" else "新建应用内目录", style = MaterialTheme.typography.labelMedium)
                 }
             }
             item("conversations-heading") {
@@ -228,8 +273,8 @@ fun WorkspaceSidebar(
                     identity = identity,
                     title = conversation.title,
                     glyph = "chat",
-                    selected = conversation.id == repository.selectedConversationId,
-                    actionEnabled = true,
+                    selected = conversation.id == repository.displayConversationId,
+                    actionEnabled = repository.canArchiveConversation(conversation.id),
                     revealedRow = revealedRow,
                     onRevealChanged = { row, revealed ->
                         if (revealed) revealedRow = row
@@ -246,6 +291,7 @@ fun WorkspaceSidebar(
             }
         }
         DeveloperCenterPresenceStatusBar(presenceSnapshot, presenceLoading, onOnlineMetrics)
+        if (repository.connectionMode == "online") SidebarItem("电脑工作区文件", "document", false) { showRemoteArtifacts = true }
         SidebarItem("设置", "settings", false) { onSettings() }
         Spacer(Modifier.height(12.dp))
     }
@@ -302,27 +348,107 @@ fun WorkspaceSidebar(
         )
     }
 
-    val workspaceToDelete = repository.workspaces.firstOrNull { it.id == workspaceToDeleteId }
-    if (workspaceToDelete != null) {
+    if (showRemoteDirectory) RemoteDirectoryPicker(repository.remoteDsh,
+        onDismiss = { showRemoteDirectory = false }, notify = repository::updateNotice)
+    if (showRemoteArtifacts) RemoteArtifactsContent(repository, onDismiss = { showRemoteArtifacts = false })
+    val conversationToArchive = repository.displayConversations.firstOrNull { it.id == conversationToArchiveId }
+    if (conversationToArchive != null && conversationArchiveScope != null) {
         AlertDialog(
-            onDismissRequest = { workspaceToDeleteId = null },
-            title = { Text("永久删除此空工作区？") },
-            // Only empty workspaces are deletable; the repository re-checks before removing.
+            onDismissRequest = { conversationToArchiveId = null; conversationArchiveScope = null },
+            title = { Text("停止任务并归档电脑会话？") },
+            text = { Text("“${conversationToArchive.title}”仍有任务运行。电脑确认停止任务后才会归档，会话内容保留。") },
+            confirmButton = {
+                TextButton(enabled = repository.canArchiveConversation(conversationToArchive.id) &&
+                    conversationArchiveScope == remoteScope, onClick = {
+                    if (repository.requestArchiveRemoteConversation(conversationToArchive.id, stopRunningTasks = true,
+                            expectedScope = conversationArchiveScope)) {
+                        conversationToArchiveId = null
+                        conversationArchiveScope = null
+                        onConversationChanged()
+                    }
+                }) { Text("停止任务并归档") }
+            },
+            dismissButton = { TextButton(onClick = {
+                conversationToArchiveId = null; conversationArchiveScope = null
+            }) { Text("取消") } },
+        )
+    }
+    val workspaceToDelete = repository.displayWorkspaces.firstOrNull { it.id == workspaceToDeleteId }
+    if (workspaceToDelete != null) {
+        val details = repository.workspaceRemovalDetails(workspaceToDelete.id)
+        val canRemove = repository.canRemoveWorkspace(workspaceToDelete.id) && details != null &&
+            !preparingWorkspaceRemoval && workspacePreparationError == null
+        val computerFiles = repository.connectionMode == "online"
+        val runningTasks = details?.hasRunningTasks == true
+        val dismissRemoval = { workspaceToDeleteId = null; confirmWorkspaceFiles = false }
+        AlertDialog(
+            onDismissRequest = dismissRemoval,
+            title = { Text(if (confirmWorkspaceFiles) "删除此工作区的文件？" else "移除此工作区？") },
             text = {
-                Text(if (repository.canDeleteWorkspace(workspaceToDelete.id))
-                    "\"${workspaceToDelete.name}\"将从本机永久删除，无法撤销。"
-                else "\"${workspaceToDelete.name}\"已包含数据或任务，暂时不能删除。")
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(workspaceToDelete.name, fontWeight = FontWeight.Medium)
+                    Text(if (computerFiles) "电脑工作区中的对话将归档，可在归档页还原。"
+                        else "工作区中的对话将归档，保留 30 天，可在归档页还原。")
+                    if (runningTasks) Text("此工作区仍有任务运行。继续将先停止任务，确认停止后再移除。")
+                    if (details != null) {
+                        Text("执行设备：${details.deviceLabel}", style = MaterialTheme.typography.bodySmall,
+                            color = palette.onSurfaceVariant)
+                        details.directoryPaths.forEach { path ->
+                            Text(path, style = MaterialTheme.typography.bodySmall,
+                                color = palette.onSurfaceVariant)
+                        }
+                        details.externalUri?.let { uri ->
+                            Text("外部目录保留：$uri", style = MaterialTheme.typography.bodySmall,
+                                color = palette.onSurfaceVariant)
+                        }
+                    }
+                    if (confirmWorkspaceFiles) {
+                        Text(if (computerFiles) "以上电脑路径中的目录及文件将永久删除，无法撤销。归档消息仍保留，已删除的文件不会随对话还原。"
+                            else "以上应用内目录及文件将永久删除，无法撤销。归档消息仍会保留，已删除的文件不会随对话还原。",
+                            color = palette.error)
+                    } else {
+                        Text("磁盘文件默认保留。")
+                        TextButton(
+                            onClick = { confirmWorkspaceFiles = true },
+                            enabled = canRemove && details?.canDeleteOwnedFiles == true,
+                        ) { Text(if (computerFiles) "同时删除电脑文件…" else "同时删除应用内文件…", color = palette.error) }
+                    }
+                    if (preparingWorkspaceRemoval) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Text("正在核对任务和目录状态…", style = MaterialTheme.typography.bodySmall)
+                        }
+                    } else if (workspacePreparationError != null) {
+                        Text(requireNotNull(workspacePreparationError), color = palette.error)
+                        TextButton(onClick = { workspacePreparationAttempt++ },
+                            enabled = repository.canRemoveWorkspace(workspaceToDelete.id)) { Text("重新读取") }
+                    } else if (!canRemove) Text("工作区状态暂不可确认，请稍后重试。", color = palette.onSurfaceVariant)
+                }
             },
             confirmButton = {
                 TextButton(
-                    enabled = repository.canDeleteWorkspace(workspaceToDelete.id),
+                    enabled = canRemove && (!confirmWorkspaceFiles || details?.canDeleteOwnedFiles == true),
                     onClick = {
-                        if (repository.deleteEmptyWorkspace(workspaceToDelete.id)) onConversationChanged()
-                        workspaceToDeleteId = null
+                        if (repository.requestRemoveWorkspace(
+                                workspaceToDelete.id,
+                                deleteFiles = confirmWorkspaceFiles,
+                                stopRunningTasks = runningTasks,
+                            )) {
+                            onConversationChanged()
+                            dismissRemoval()
+                        }
                     },
-                ) { Text("永久删除", color = MaterialTheme.colorScheme.error) }
+                ) {
+                    Text(if (confirmWorkspaceFiles) {
+                        if (runningTasks) "停止任务并删除文件" else "移除并删除文件"
+                    } else if (runningTasks) "停止任务并移除" else "保留文件并移除", color = palette.error)
+                }
             },
-            dismissButton = { TextButton(onClick = { workspaceToDeleteId = null }) { Text("取消") } },
+            dismissButton = {
+                TextButton(onClick = {
+                    if (confirmWorkspaceFiles) confirmWorkspaceFiles = false else dismissRemoval()
+                }) { Text(if (confirmWorkspaceFiles) "返回" else "取消") }
+            },
         )
     }
 

@@ -60,6 +60,7 @@ $generated = Join-Path $testRoot 'PreflightSubject.kt'
     "        var preparedHistory: List<DeepSeekChatClient.HistoryMessage> = emptyList()`n" +
     $preflight + $tail + "`n" + $models)
 $sources = @('AssistantStreamProtocol.kt', 'BalanceStore.kt', 'DeepSeekChatProtocol.kt', 'DeepSeekChatClient.kt',
+    'DeepSeekThinkingPolicy.kt', 'DeepSeekModelCatalog.kt',
     'BackgroundTaskModels.kt', 'BackgroundTaskEngine.kt', 'BackgroundTaskJson.kt',
     'OfficialToolSession.kt', 'OfficialToolDispatcher.kt', 'OfficialToolContract.kt', 'OfficialToolOutputStore.kt',
     'OfficialWeatherClient.kt', 'OfficialChatHistory.kt', 'ChatMessage.kt',

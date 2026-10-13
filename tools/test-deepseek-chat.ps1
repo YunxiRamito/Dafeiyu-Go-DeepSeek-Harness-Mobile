@@ -31,7 +31,7 @@ $compilerClasspath = @($compiler, $stdlib, $coroutines, $annotations, $reflect, 
 $outputJar = Join-Path $testRoot 'deepseek-chat-checks.jar'
 $dataRoot = Join-Path $projectRoot 'app\src\main\java\com\dafeiyu\mobile\data'
 $sources = @('AssistantStreamProtocol.kt', 'BalanceStore.kt', 'DeepSeekChatProtocol.kt', 'DeepSeekChatClient.kt',
-    'DeepSeekThinkingPolicy.kt',
+    'DeepSeekThinkingPolicy.kt', 'DeepSeekModelCatalog.kt',
     'ChatMessage.kt', 'OfficialChatHistory.kt') |
     ForEach-Object { Join-Path $dataRoot $_ }
 $sources += Join-Path $PSScriptRoot 'tests\DeepSeekChatChecks.kt'

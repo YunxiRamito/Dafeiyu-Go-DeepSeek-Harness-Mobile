@@ -36,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,12 +52,16 @@ import androidx.lifecycle.LifecycleOwner
 import com.dafeiyu.mobile.ui.components.FishButton
 import com.dafeiyu.mobile.ui.components.FishCard
 import com.dafeiyu.mobile.ui.components.SectionLabel
+import com.dafeiyu.mobile.data.ApplicationPermissionBridge
+import kotlinx.coroutines.launch
 import java.io.File
 
 /** Android permission status and system-entry surface. It never claims external capabilities are granted. */
 @Composable
 fun PermissionsScreen(onBack: () -> Unit, notify: (String) -> Unit) {
     val context = LocalContext.current
+    val permissionBridge = remember(context) { ApplicationPermissionBridge.get(context) }
+    val scope = rememberCoroutineScope()
     val scroll = rememberScrollState()
     val collapseRange = with(LocalDensity.current) { 112.dp.toPx() }
     val collapsedTitle = rememberCollapsedTitleState(scroll.value, "权限与系统", collapseRange)
@@ -76,13 +81,11 @@ fun PermissionsScreen(onBack: () -> Unit, notify: (String) -> Unit) {
         onDispose { lifecycle?.removeObserver(observer) }
     }
 
-    val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        refresh()
-        latestNotify(if (granted) "已允许系统通知" else "尚未允许通知，可在系统设置中修改")
-    }
-    val camera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        refresh()
-        latestNotify(if (granted) "已允许相机访问" else "尚未允许相机访问，可在系统设置中修改")
+    fun requestPermission(permission: String, purpose: String) {
+        scope.launch {
+            permissionBridge.requestConsent(permission, purpose)
+            refresh()
+        }
     }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         refresh()
@@ -176,11 +179,7 @@ fun PermissionsScreen(onBack: () -> Unit, notify: (String) -> Unit) {
                 if (Build.VERSION.SDK_INT >= 33 && notificationDeclared && !status.notificationPermission) "允许通知" else "通知设置",
             ) {
                 if (Build.VERSION.SDK_INT >= 33 && notificationDeclared && !status.notificationPermission) {
-                    try {
-                        notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    } catch (_: Exception) {
-                        openAppNotificationSettings()
-                    }
+                    requestPermission("notifications", "用于提醒任务运行与完成、设备状态、公告和通知；各类别仍由通知设置中的开关控制。")
                 } else {
                     openAppNotificationSettings()
                 }
@@ -195,11 +194,7 @@ fun PermissionsScreen(onBack: () -> Unit, notify: (String) -> Unit) {
                 if (!status.isDeclared(Manifest.permission.CAMERA)) {
                     appDetails()
                 } else if (!status.cameraPermission) {
-                    try {
-                        camera.launch(Manifest.permission.CAMERA)
-                    } catch (_: Exception) {
-                        appDetails()
-                    }
+                    requestPermission("camera", "用于扫码配对和拍摄对话附件；画面在本机处理，只有你发送的照片才交给模型。")
                 } else {
                     appDetails()
                 }
@@ -207,10 +202,13 @@ fun PermissionsScreen(onBack: () -> Unit, notify: (String) -> Unit) {
             PermissionDivider()
             PermissionRow(
                 "相册",
-                "使用 Android 系统照片选择器按张访问，不申请整库读取",
-                if (status.photoPickerAvailable) "系统选择器可用" else "不可用 · 需系统选择器",
-                "选择照片",
-            ) { openPhotoPicker() }
+                "在附件面板读取你授权的相册照片，也可仅允许选中的照片",
+                when (permissionBridge.state("media")) { "granted" -> "已允许"; "limited" -> "已允许 · 仅选中照片"; else -> "未允许" },
+                if (permissionBridge.state("media") == "denied") "允许相册" else "选择照片",
+            ) {
+                if (permissionBridge.state("media") == "denied") requestPermission("media", "用于在附件面板展示你授权的照片。照片仅在你主动发送时提供给所选模型。")
+                else openPhotoPicker()
+            }
             PermissionDivider()
             PermissionRow(
                 "所有文件",
@@ -219,7 +217,7 @@ fun PermissionsScreen(onBack: () -> Unit, notify: (String) -> Unit) {
                 if (status.isDeclared(Manifest.permission.MANAGE_EXTERNAL_STORAGE)) "管理文件权限" else "应用设置",
             ) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && status.isDeclared(Manifest.permission.MANAGE_EXTERNAL_STORAGE)) {
-                    openSettings(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${context.packageName}")))
+                    requestPermission("all_files", "用于你指定的文件任务访问手机共享存储。请仅在确实需要处理这些目录时授权；模型不能自动授予该权限。")
                 } else {
                     appDetails()
                 }
@@ -448,7 +446,7 @@ private fun readPermissionStatus(context: Context): PermissionStatus {
 
     val requestedPermissions = runCatching {
         @Suppress("DEPRECATION")
-        context.packageManager.getPackageInfo(context.packageName, 0).requestedPermissions.orEmpty().toSet()
+        context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions.orEmpty().toSet()
     }.getOrDefault(emptySet())
     val notificationPermission = Build.VERSION.SDK_INT < 33 || hasPermission(Manifest.permission.POST_NOTIFICATIONS)
     val notificationsEnabled = try {

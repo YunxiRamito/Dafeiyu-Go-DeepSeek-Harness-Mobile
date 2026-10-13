@@ -1,7 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Source: UsePreside/sf-symbols, SF Symbols 4.0 converted data. Local preview asset; see third_party/sf-symbols/NOTICE.md. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="30.482031" android:viewportHeight="30.482031">
-  <group android:translateX="1.261523" android:translateY="1.2">
-    <path android:fillColor="#FF000000" android:pathData="M21.3327 17.9258C14.5427 17.9258 10.3227 13.8658 10.3227 7.2958C10.3227 5.4658 10.6227 3.7558 11.1327 2.8158C11.4027 2.2958 11.5127 1.8858 11.5127 1.4758C11.5127 0.6858 10.9227 -0.0042 10.0127 -0.0042C9.7327 -0.0042 9.3427 0.0658 8.8427 0.2558C3.5827 2.4058 0.0027 7.7658 0.0027 13.6058C0.0027 21.9658 6.0927 28.0858 14.4627 28.0858C20.3527 28.0858 25.3627 24.8258 27.6427 19.6158C27.8727 19.0958 27.9627 18.6458 27.9627 18.3358C27.9627 17.4558 27.3527 16.8958 26.5927 16.8958C26.1927 16.8958 25.8027 16.9958 25.2627 17.2358C24.3227 17.6658 22.8027 17.9258 21.3327 17.9258ZM3.4827 13.5658C3.4827 10.3058 4.9927 7.0558 7.5227 5.0758C7.2727 5.9158 7.1327 6.8258 7.1327 7.8158C7.1327 16.0258 12.2527 21.0458 20.6427 21.0458C21.4327 21.0458 22.1327 20.9558 22.7727 20.7358C20.9427 23.1758 17.8127 24.5958 14.5027 24.5958C8.1527 24.5958 3.4827 19.9358 3.4827 13.5658Z" />
-  </group>
+<!--
+MIT License
+
+Copyright (c) 2020 Microsoft Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Microsoft Fluent UI System Icons a347af95478f989038cccbf085978865264c048a
+assets/Weather Moon/SVG/ic_fluent_weather_moon_24_regular.svg
+Original SVG path preserved; converted to Android VectorDrawable. Resource ID retained for app compatibility.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+  <path android:fillColor="#FF000000" android:pathData="M20.0258 17.0014C17.2639 21.7851 11.1471 23.4241 6.3634 20.6622C5.06068 19.9101 3.964 18.8926 3.12872 17.6797C2.84945 17.2741 3.0301 16.7141 3.49369 16.5482C7.26112 15.1997 9.27892 13.6372 10.4498 11.4021C11.6825 9.04908 12.001 6.47162 11.1387 2.93862C11.0195 2.45008 11.4053 1.98492 11.9075 2.01186C13.4645 2.09539 14.9856 2.54263 16.3649 3.33903C21.1486 6.10088 22.7876 12.2177 20.0258 17.0014ZM11.7785 12.0981C10.5272 14.4867 8.46706 16.1972 4.96104 17.597C5.5693 18.2929 6.29275 18.8894 7.1134 19.3632C11.1796 21.7108 16.3791 20.3176 18.7267 16.2514C21.0744 12.1852 19.6812 6.98571 15.6149 4.63807C14.7379 4.1317 13.7951 3.79168 12.8228 3.62253C13.4699 7.00652 13.0525 9.66622 11.7785 12.0981Z" />
 </vector>

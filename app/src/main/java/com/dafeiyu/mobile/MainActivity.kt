@@ -54,6 +54,12 @@ import com.dafeiyu.mobile.data.DeveloperCenterPresenceClient
 import com.dafeiyu.mobile.data.ArchiveCleanupScheduler
 import com.dafeiyu.mobile.data.DemoRepository
 import com.dafeiyu.mobile.data.AriesConnectionProvider
+import com.dafeiyu.mobile.data.PowerSavingPolicy
+import com.dafeiyu.mobile.data.ApplicationPermissionBridge
+import com.dafeiyu.mobile.data.NotificationPublisher
+import com.dafeiyu.mobile.data.AndroidUpdateScheduler
+import com.dafeiyu.mobile.data.AndroidAppVisibility
+import com.dafeiyu.mobile.data.AssistantRunStatus
 import com.dafeiyu.mobile.ui.*
 import com.dafeiyu.mobile.ui.components.*
 import com.dafeiyu.mobile.ui.theme.FishTheme
@@ -79,6 +85,7 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
     val scope = rememberCoroutineScope()
     val savedPages = rememberSaveableStateHolder()
     val context = LocalContext.current
+    val permissionBridge = remember(context) { ApplicationPermissionBridge.get(context) }
     val lifecycleOwner = LocalLifecycleOwner.current
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -97,16 +104,57 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
     var tasksOverlay by remember { mutableFloatStateOf(0f) }
     var tasksSurfaceVisible by remember { mutableStateOf(false) }
     var selectedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
-    val reducedMotion = repository.reduceMotion || !ValueAnimator.areAnimatorsEnabled()
+    val effects = PowerSavingPolicy.resolve(repository.powerSavingMode, repository.glassMaterial,
+        repository.pageTransitions, repository.springButtons,
+        reduceTransparency = repository.reduceTransparency, reduceMotion = repository.reduceMotion)
+    val reducedMotion = effects.reduceMotion || !ValueAnimator.areAnimatorsEnabled()
     // 「页面切换效果」只关闭页面级路由/设置/侧栏转场；按钮按压等微交互仍由 reducedMotion 决定。
-    val pageMotionReduced = reducedMotion || !repository.pageTransitions
+    val pageMotionReduced = reducedMotion || !effects.pageTransitions
     val connectionProvider = remember(context) { AriesConnectionProvider(context) }
+    val notificationPublisher = remember(context) { NotificationPublisher(context) }
+    val dshInstallation = repository.dshInstallation?.state?.collectAsState()?.value
+    var awaitingDshHome by remember { mutableStateOf(false) }
+    var observedTask by remember { mutableStateOf<Pair<String, Long>?>(null) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, _ ->
+            val foreground = lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+            AndroidAppVisibility.setForeground(foreground)
+            repository.updateRemoteForeground(foreground)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        AndroidAppVisibility.setForeground(lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer); AndroidAppVisibility.setForeground(false) }
+    }
+    LaunchedEffect(repository.displayResponding, repository.notificationsEnabled, repository.liveIslandNotifications, repository.messageNotifications) {
+        if (repository.displayResponding) {
+            observedTask = repository.activeTaskNotificationIdentity()
+            notificationPublisher.postRunning(
+                enabled = observedTask != null && repository.notificationsEnabled && repository.liveIslandNotifications,
+            )
+        } else if (observedTask != null) {
+            val state = observedTask?.let(repository::taskNotificationStatus)
+            observedTask = null
+            val detail = when (state) {
+                AssistantRunStatus.COMPLETED -> "任务已完成"
+                AssistantRunStatus.FAILED -> "任务执行失败，打开对话查看原因"
+                AssistantRunStatus.CANCELLED -> "任务已取消"
+                AssistantRunStatus.INCOMPLETE -> "任务未完成，打开对话查看状态"
+                else -> null
+            }
+            notificationPublisher.postCompleted(
+                enabled = detail != null && repository.notificationsEnabled &&
+                    (repository.messageNotifications || repository.liveIslandNotifications),
+                detail = detail.orEmpty(),
+            )
+        } else {
+            notificationPublisher.clearRunning()
+        }
+    }
     var isPaired by remember(repository.ariesEndpoint, repository.ariesNodeId,
-        repository.ariesGroupId, repository.ariesDeviceId) { mutableStateOf(false) }
+        repository.ariesGroupId, repository.ariesDeviceId) { mutableStateOf(repository.ariesGroupId != null) }
     LaunchedEffect(lifecycleOwner, repository.ariesEndpoint, repository.ariesNodeId,
         repository.ariesGroupId, repository.ariesDeviceId, route) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
-            isPaired = false
             while (true) {
                 if (repository.ariesEndpoint.isNotBlank() && repository.ariesGroupId != null) {
                     isPaired = try {
@@ -114,7 +162,7 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {
-                        false
+                        isPaired
                     }
                 }
                 kotlinx.coroutines.delay(60_000L)
@@ -124,6 +172,7 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
     LaunchedEffect(repository, context) {
         repository.initializeWorkspaces(context)
         ArchiveCleanupScheduler.ensureScheduled(context)
+        AndroidUpdateScheduler.reconcile(context, repository.updatePolicy, repository.updateWifiOnly)
     }
     LaunchedEffect(lifecycleOwner, context) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
@@ -138,9 +187,9 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
         }
     }
     fun newConversation() {
-        val oldKey = "home-${repository.selectedConversationId}"
+        val oldKey = "home-${repository.displayConversationId}"
         repository.newConversation()
-        if (oldKey != "home-${repository.selectedConversationId}") savedPages.removeState(oldKey)
+        if (oldKey != "home-${repository.displayConversationId}") savedPages.removeState(oldKey)
     }
     fun navigate(action: suspend () -> Unit) {
         navigationJob?.cancel()
@@ -183,6 +232,27 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
             }
         }
     }
+    LaunchedEffect(repository.workspaceInitialized, repository.engineMode, repository.connectionMode,
+        repository.autoStartDsh, dshInstallation?.installedVersion, repository.runtimeAutostartSuppressed) {
+        if (repository.workspaceInitialized && !repository.runtimeAutostartSuppressed && repository.connectionMode == "local" &&
+            (repository.engineMode == "dsh" || repository.autoStartDsh)) {
+            awaitingDshHome = repository.engineMode == "dsh"
+            repository.startRuntime()
+        } else awaitingDshHome = false
+    }
+    LaunchedEffect(repository.runtimeLastError, menuButtonBounds, repository.engineMode, repository.connectionMode) {
+        if (awaitingDshHome && repository.engineMode == "dsh" && repository.connectionMode == "local" &&
+            repository.runtimeLastError != null && menuButtonBounds != null) openSettings("dsh-engine")
+    }
+    LaunchedEffect(repository.runtimeAccessUrl, repository.engineMode, repository.connectionMode, repository.localEngineSwitchBusy) {
+        if (awaitingDshHome && repository.engineMode == "dsh" && repository.connectionMode == "local" &&
+            repository.runtimeAccessUrl != null && !repository.localEngineSwitchBusy && repository.localEngineSwitchError == null) {
+            awaitingDshHome = false
+            settingsDetail.close(pageMotionReduced)
+            settingsHome.close(pageMotionReduced)
+            route = "home"
+        }
+    }
     LaunchedEffect(repository.lastNotice) {
         val notice = repository.lastNotice
         if (notice.isNotBlank()) {
@@ -198,6 +268,8 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
         fontFamilyKey = repository.fontFamily,
         interfaceScale = repository.interfaceScale,
     ) {
+        ApplicationPermissionHost(permissionBridge)
+        OfficialToolApprovalHost()
         val palette = MaterialTheme.colorScheme
         val view = LocalView.current
         val backdrop = rememberGlassBackdropState()
@@ -223,9 +295,9 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
             LocalGlassBackdrop provides backdrop,
             LocalFloatingGlassBackdrop provides floatingBackdrop,
             // 「液态玻璃材质」关闭时复用减少透明度的实色降级路径（不透明 surface + onSurface 文字）。
-            LocalReduceGlassTransparency provides (repository.reduceTransparency || !repository.glassMaterial),
+            LocalReduceGlassTransparency provides effects.reduceTransparency,
             LocalReduceGlassMotion provides reducedMotion,
-            LocalGlassButtonSpring provides repository.springButtons,
+            LocalGlassButtonSpring provides effects.springButtons,
             LocalGlassHaptics provides haptics,
         ) {
             val sidebar = rememberWorkspaceSidebarMorphState(menuOpen, if (menuOpen) sidebarBack.value else 0f,
@@ -297,6 +369,9 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
                                         onTasksOverlay = { tasksOverlay = it },
                                         onTasksVisibility = { tasksSurfaceVisible = it },
                                         onTasksOpening = { focus.clearFocus(); keyboard?.hide() },
+                                        onPlusOpening = {
+                                            focus.clearFocus(); keyboard?.hide()
+                                        },
                                         onTasks = {
                                             selectedTaskId = it
                                             focus.clearFocus(); keyboard?.hide()
@@ -306,10 +381,16 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
                                         onMenuBounds = { menuButtonBounds = it }, sidebar = sidebar, floatingBackdrop = floatingBackdrop,
                                         onBackdropCapture = { homeBackdropCapture = it },
                                         modalProgress = { maxOf(chatOverlay, plusOverlay, tasksOverlay, sidebar.progress) }) {
-                                        savedPages.SaveableStateProvider("home-${repository.selectedConversationId}") {
-                                            ChatScreen(repository, onModels = { openSettings("models") },
+                                        savedPages.SaveableStateProvider("home-${repository.displayConversationId}") {
+                                            if (repository.engineMode == "dsh") DshWebContent(repository,
+                                                onSettings = { openSettings("dsh-engine") })
+                                            else ChatScreen(repository, onModels = { openSettings("models") },
                                                 overlayVisible = menuOpen || tasksSurfaceVisible || settingsHome.isActive || routeSurfaceVisible,
-                                                onOverlayProgress = { chatOverlay = it })
+                                                onOverlayProgress = { chatOverlay = it },
+                                                onAttachmentsOpening = {
+                                                    scope.launch { permissionBridge.requestConsent("media",
+                                                        "用于在对话中选择和读取你授权的照片；仅在你发送附件时提供给所选模型。", automaticEntry = true) }
+                                                })
                                         }
                                     }
                                 }
@@ -334,7 +415,8 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
                                         PageChrome(target, repository, ::back, sidebar = sidebar) {
                                             savedPages.SaveableStateProvider(target) {
                                                 when (target) {
-                                                    "extensions" -> ExtensionsScreen(repository)
+                                                    "plugins", "extensions" -> ExtensionsScreen(repository, category = "plugin")
+                                                    "skills" -> ExtensionsScreen(repository, category = "skill")
                                                     "permissions" -> PermissionsScreen(::back, repository::updateNotice)
                                                     else -> SettingsDetailScreen(target, repository, ::back, repository::updateNotice, onPairing = { focus.clearFocus(); keyboard?.hide(); route = "pair" })
                                                 }
@@ -440,6 +522,7 @@ private fun PageChrome(
     onTasksOverlay: (Float) -> Unit = {},
     onTasksVisibility: (Boolean) -> Unit = {},
     onTasksOpening: () -> Unit = {},
+    onPlusOpening: () -> Unit = {},
     onTasks: (String?) -> Unit = {},
     dismissHomeActions: Boolean = false,
     onMenuBounds: (Rect) -> Unit = {},
@@ -491,8 +574,8 @@ private fun PageChrome(
                 Box(Modifier.weight(1f).padding(horizontal = 16.dp).onGloballyPositioned {
                     titleTarget = it.positionInWindow() + Offset(0f, it.size.height / 2f)
                 }) {
-                    val conversationTitle = repository.conversations.firstOrNull {
-                        it.id == repository.selectedConversationId
+                    val conversationTitle = repository.displayConversations.firstOrNull {
+                        it.id == repository.displayConversationId
                     }?.title?.takeUnless { it == "新对话" }
                     val toolbarTitle = when (page) {
                         "home" -> conversationTitle
@@ -521,7 +604,7 @@ private fun PageChrome(
                         onLauncherAlphaChanged = { actionsLauncherAlpha = it })
                             NewSessionActions(onNew, onScan, onPairing = onPairing,
                         isPaired = isPaired, onOverlayProgress = onPlusOverlay,
-                        onOpening = onTasksOpening,
+                        onOpening = onPlusOpening,
                         onSurfaceVisibilityChanged = { plusMenuVisible = it },
                         dismissRequested = dismissHomeActions || taskMenuVisible,
                         deformation = plusButton,

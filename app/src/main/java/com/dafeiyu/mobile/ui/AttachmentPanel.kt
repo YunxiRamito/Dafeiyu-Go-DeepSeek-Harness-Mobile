@@ -47,6 +47,11 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.dafeiyu.mobile.data.ApplicationPermissionBridge
+import com.dafeiyu.mobile.data.AuthorizedMediaStore
 import com.dafeiyu.mobile.data.AttachmentPreview
 import com.dafeiyu.mobile.data.ChatMessage
 import com.dafeiyu.mobile.data.DemoRepository
@@ -72,6 +77,23 @@ private val CaptureNamePattern = Regex("capture-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]
 fun AttachmentTray(repository: DemoRepository, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val permissionBridge = remember(context) { ApplicationPermissionBridge.get(context) }
+    val permissionRevision by permissionBridge.revision.collectAsState()
+    val lifecycle = LocalLifecycleOwner.current
+    var albumEpoch by remember { mutableIntStateOf(0) }
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) albumEpoch++
+        }
+        lifecycle.lifecycle.addObserver(observer)
+        onDispose { lifecycle.lifecycle.removeObserver(observer) }
+    }
+    val mediaStore = remember(context) { AuthorizedMediaStore(context) }
+    val album by produceState<List<AttachmentPreview>>(emptyList(), mediaStore, permissionRevision, albumEpoch) {
+        value = try { mediaStore.recentImages() }
+        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) { emptyList() }
+    }
     val recentPhotos = repository.recentImageAttachments()
     val storedFiles = repository.storedAttachmentPreviews().filter { it.mimeType?.startsWith("image/") != true }
     var confirmCleanup by remember { mutableStateOf(false) }
@@ -142,14 +164,24 @@ fun AttachmentTray(repository: DemoRepository, modifier: Modifier = Modifier) {
         }
     }
 
-    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        requestingCameraPermission = false
-        if (granted) launchCapture()
-        else repository.updateNotice("未允许相机权限，可以使用相册或附件选择；也可在权限管理中授权")
-    }
-
     GlassSurface(modifier = modifier, cornerRadius = 28.dp, tint = MaterialTheme.colorScheme.surface.copy(alpha = .32f)) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (album.isNotEmpty()) {
+                Text(if (permissionBridge.state("media") == "limited") "已授权的照片" else "最近照片",
+                    style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(album, key = { it.id }) { photo ->
+                        val shape = RoundedCornerShape(12.dp)
+                        Box(Modifier.size(68.dp).applyButtonDeformation(consumeDrag = false).clip(shape)
+                            .clickable(indication = null,
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                role = Role.Button) { photo.uri?.toUri()?.let(::addSelected) }
+                            .semantics { contentDescription = "添加照片：${photo.label}" }) {
+                            LocalAttachmentThumbnail(photo, Modifier.fillMaxSize())
+                        }
+                    }
+                }
+            }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("已保存的附件", Modifier.weight(1f), style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -216,10 +248,12 @@ fun AttachmentTray(repository: DemoRepository, modifier: Modifier = Modifier) {
                         launchCapture()
                     } else {
                         requestingCameraPermission = true
-                        try { cameraPermission.launch(Manifest.permission.CAMERA) }
-                        catch (_: Exception) {
-                            requestingCameraPermission = false
-                            repository.updateNotice("当前无法请求相机权限，可以使用相册或附件选择")
+                        scope.launch {
+                            try {
+                                permissionBridge.requestConsent("camera", "用于拍摄你选择发送到当前对话的照片；未发送的照片不会提供给模型。")
+                                if (permissionBridge.state("camera") == "granted") launchCapture()
+                                else repository.updateNotice("未允许相机权限，可以使用相册或附件选择；也可在权限管理中授权")
+                            } finally { requestingCameraPermission = false }
                         }
                     }
                 }

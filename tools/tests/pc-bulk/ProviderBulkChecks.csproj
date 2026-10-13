@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>disable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" /><Compile Include="SettingsShim.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/AriesConnectionService.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/AriesConnectionService.Provider.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/AriesProviderBulk.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/AriesProviderProtocol.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/AriesCrypto.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/AriesPairingModels.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/LauncherSettings.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/AriesHttpClientFactory.cs" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,13 @@
+{
+  "protocol": "dafeiyu-go.connection.v1",
+  "version": "0.3.0",
+  "sha256": "4f3657730459197835a014b7f7433b44cc652e5b32480cdb37c061b160e75bf2",
+  "size_bytes": 200430,
+  "file_name": "dafeiyu-go-connect-0.3.0.tgz",
+  "platforms": [
+    "windows",
+    "android"
+  ],
+  "minimum_host_version": "1.8.0",
+  "archive_path": "/api/connection-plugin/releases/0.3.0/package"
+}

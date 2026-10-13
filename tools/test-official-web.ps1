@@ -34,6 +34,7 @@ $compilerClasspath = @($compiler, $stdlib, $coroutines, $annotations, $reflect, 
 $dataRoot = Join-Path $projectRoot 'app\src\main\java\com\dafeiyu\mobile\data'
 $sources = @('BackgroundTaskModels.kt', 'BackgroundTaskEngine.kt', 'BackgroundTaskJson.kt',
     'AssistantStreamProtocol.kt', 'BalanceStore.kt', 'DeepSeekChatProtocol.kt', 'DeepSeekChatClient.kt',
+    'DeepSeekThinkingPolicy.kt', 'DeepSeekModelCatalog.kt',
     'OfficialToolContract.kt', 'OfficialToolOutputStore.kt', 'OfficialToolDispatcher.kt',
     'OfficialToolSession.kt', 'OfficialWebClient.kt') | ForEach-Object { Join-Path $dataRoot $_ }
 $sources += Join-Path $PSScriptRoot 'tests\official-web\OfficialWebChecks.kt'

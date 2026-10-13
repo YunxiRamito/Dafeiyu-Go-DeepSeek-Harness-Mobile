@@ -28,6 +28,7 @@ object ComponentDownloadSources {
     fun candidates(url: String, source: String): List<String> {
         val uri = URI(url)
         require(uri.scheme == "https" && uri.userInfo == null && uri.fragment == null && !uri.host.isNullOrBlank())
+        if (url.startsWith(BACKEND + "/")) return listOf(url)
         if (uri.host in setOf("api.github.com", "uploads.github.com")) return listOf(url)
         return when (source) {
             "backend" -> listOf("$BACKEND/api/download?url=" + URLEncoder.encode(url, "UTF-8"))
@@ -68,64 +69,26 @@ class ComponentDownloadClient(context: Context, directClient: OkHttpClient? = nu
             .followRedirects(false).build()
     }
 
-    @OptIn(kotlinx.coroutines.InternalCoroutinesApi::class)
+    /** First-party management uses the same private CA, host verification and SPKI pin. */
+    internal fun pinnedBackendClient(): OkHttpClient = backend
+
     suspend fun download(url: String, expectedSha256: String, destination: File, source: String,
-        progress: (Long, Long?) -> Unit = { _, _ -> }): File = withContext(Dispatchers.IO) {
-        require(expectedSha256.matches(Regex("[a-fA-F0-9]{64}")))
-        val privateRoot = app.filesDir.canonicalFile
-        val target = destination.canonicalFile
-        require(target.path.startsWith(privateRoot.path + File.separator)) { "下载必须位于应用私有目录" }
-        if (target.isFile && hash(target).equals(expectedSha256, true)) return@withContext target
-        check(target.parentFile?.let { it.isDirectory || it.mkdirs() } == true)
-        val partial = File(target.parentFile, target.name + ".partial")
-        var lastFailure: Exception? = null
-        for (candidate in ComponentDownloadSources.candidates(url, source)) {
-            currentCoroutineContext().ensureActive()
-            try {
-                val isBackend = candidate.startsWith(ComponentDownloadSources.BACKEND + "/")
-                val client = if (isBackend) backend else official
-                if (isBackend) awaitBackend(candidate, client, progress)
-                val call = client.newCall(Request.Builder().url(candidate).header("User-Agent", "Dafeiyu-Go-Android/0.1.24").build())
-                val cancellation = currentCoroutineContext()[kotlinx.coroutines.Job]?.invokeOnCompletion(onCancelling = true, invokeImmediately = true) { if (it != null) call.cancel() }
-                try {
-                    call.execute().use { response ->
-                        if (!response.isSuccessful) throw IOException("下载响应 HTTP ${response.code}")
-                        check(response.request.url.isHttps)
-                        val body = response.body ?: throw IOException("下载内容为空")
-                        val length = body.contentLength().takeIf { it >= 0 }
-                        check(length == null || length <= MAX_BYTES) { "组件文件超过下载上限" }
-                        val digest = MessageDigest.getInstance("SHA-256")
-                        var received = 0L
-                        body.byteStream().use { input -> partial.outputStream().use { output ->
-                            val buffer = ByteArray(64 * 1024)
-                            while (true) {
-                                currentCoroutineContext().ensureActive()
-                                val count = input.read(buffer)
-                                if (count < 0) break
-                                received += count
-                                check(received <= MAX_BYTES)
-                                digest.update(buffer, 0, count)
-                                output.write(buffer, 0, count)
-                                progress(received, length)
-                            }
-                        } }
-                        check(length == null || received == length) { "下载内容不完整" }
-                        check(digest.digest().joinToString("") { "%02x".format(it) }.equals(expectedSha256, true)) { "组件 SHA-256 校验失败" }
-                    }
-                } finally { cancellation?.dispose() }
-                currentCoroutineContext().ensureActive()
-                check(partial.renameTo(target)) { "无法提交已验证组件" }
-                return@withContext target
-            } catch (cancelled: CancellationException) {
-                partial.delete()
-                throw cancelled
-            } catch (failed: Exception) {
-                partial.delete()
-                currentCoroutineContext().ensureActive()
-                lastFailure = failed
+        progress: (Long, Long?) -> Unit = { _, _ -> }): File = downloadArtifact(
+            ArtifactDownloadRequest(listOf(url), destination, ArtifactChecksum("SHA-256", expectedSha256)),
+            source,
+        ) { value -> progress(value.receivedBytes, value.totalBytes) }.file
+
+    suspend fun downloadArtifact(request: ArtifactDownloadRequest, source: String,
+        progress: (ArtifactDownloadProgress) -> Unit = {}): ArtifactDownloadResult {
+        val candidates = request.urls.flatMap { ComponentDownloadSources.candidates(it, source) }.distinct()
+        val downloader = ArtifactDownloader(app.filesDir, { url ->
+            if (url.startsWith(ComponentDownloadSources.BACKEND + "/")) backend else official
+        }) { url ->
+            if (url.startsWith(ComponentDownloadSources.BACKEND + "/api/download?")) awaitBackend(url, backend) { received, total ->
+                progress(ArtifactDownloadProgress(received, total, 0, url, "正在准备服务器下载缓存"))
             }
         }
-        throw IOException("下载线路均失败：${lastFailure?.message.orEmpty()}", lastFailure)
+        return downloader.download(request.copy(urls = candidates, allowHttpForTests = false), progress)
     }
 
     @OptIn(kotlinx.coroutines.InternalCoroutinesApi::class)
@@ -159,18 +122,5 @@ class ComponentDownloadClient(context: Context, directClient: OkHttpClient? = nu
         throw IOException("下载服务器准备超时")
     }
 
-    private suspend fun hash(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input -> val buffer = ByteArray(64 * 1024)
-            while (true) {
-                currentCoroutineContext().ensureActive()
-                val n = input.read(buffer)
-                if (n < 0) break
-                digest.update(buffer, 0, n)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
-    }
     private fun hex(value: String): ByteArray = value.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-    private companion object { const val MAX_BYTES = 512L * 1024 * 1024 }
 }

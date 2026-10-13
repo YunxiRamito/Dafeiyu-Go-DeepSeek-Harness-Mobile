@@ -102,7 +102,8 @@ import kotlin.math.roundToInt
 
 @Composable
 fun ChatScreen(repository: DemoRepository, onModels: () -> Unit, onSettings: () -> Unit = {},
-    overlayVisible: Boolean = false, onOverlayProgress: (Float) -> Unit = {}) {
+    overlayVisible: Boolean = false, onOverlayProgress: (Float) -> Unit = {},
+    onAttachmentsOpening: () -> Unit = {}) {
     var draft by rememberSaveable { mutableStateOf("") }
     var draftRevision by remember { mutableLongStateOf(0L) }
     SideEffect { repository.updateComposerDraft(draft) }
@@ -117,8 +118,11 @@ fun ChatScreen(repository: DemoRepository, onModels: () -> Unit, onSettings: () 
     var modelsOpen by remember { mutableStateOf(false) }
     val modelMorph = rememberModelMenuMorphState(modelsOpen)
     var sandboxOpen by remember { mutableStateOf(false) }
-    var sandboxModeName by rememberSaveable { mutableStateOf(SandboxMode.WorkspaceWrite.name) }
-    val sandboxMode = SandboxMode.entries.firstOrNull { it.name == sandboxModeName } ?: SandboxMode.WorkspaceWrite
+    val sandboxMode = when (repository.localSandboxMode) {
+        com.dafeiyu.mobile.data.LinuxSandboxContract.READ_ONLY -> SandboxMode.ReadOnly
+        com.dafeiyu.mobile.data.LinuxSandboxContract.FULL_ACCESS -> SandboxMode.FullAccess
+        else -> SandboxMode.WorkspaceWrite
+    }
     val sandboxMorph = rememberModelMenuMorphState(sandboxOpen)
     val latestOverlayCallback by rememberUpdatedState(onOverlayProgress)
     LaunchedEffect(modelMorph, sandboxMorph) {
@@ -132,7 +136,7 @@ fun ChatScreen(repository: DemoRepository, onModels: () -> Unit, onSettings: () 
     val keyboard = LocalSoftwareKeyboardController.current
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val imeVisible = imeBottom > 0
-    val conversationId = repository.selectedConversationId
+    val conversationId = repository.displayConversationId
     val composerGeneration = repository.composerGeneration
     val listState = key(conversationId, composerGeneration) { rememberLazyListState() }
     val scrollIntent = key(conversationId, composerGeneration) {
@@ -142,7 +146,7 @@ fun ChatScreen(repository: DemoRepository, onModels: () -> Unit, onSettings: () 
     var returnToLatestJob by remember(scrollIntent) { mutableStateOf<Job?>(null) }
     val dragging by listState.interactionSource.collectIsDraggedAsState()
     val currentConversation = {
-        repository.selectedConversationId == conversationId &&
+        repository.displayConversationId == conversationId &&
             repository.composerGeneration == composerGeneration
     }
     val scrollConnection = remember(scrollIntent) {
@@ -160,8 +164,8 @@ fun ChatScreen(repository: DemoRepository, onModels: () -> Unit, onSettings: () 
         onDispose { returnToLatestJob?.cancel() }
     }
     val colors = MaterialTheme.colorScheme
-    val hasConversation = repository.messages.any { it.role == "user" }
-    val lastMessageId = repository.messages.lastOrNull()?.id
+    val hasConversation = repository.displayMessages.any { it.role == "user" }
+    val lastMessageId = repository.displayMessages.lastOrNull()?.id
     val reducedMotion = LocalReduceGlassMotion.current
     val duration = if (reducedMotion) 0 else GlassMotion.MorphMillis
     val quoteText: (String) -> Unit = { text ->
@@ -169,12 +173,12 @@ fun ChatScreen(repository: DemoRepository, onModels: () -> Unit, onSettings: () 
         updateDraft(if (draft.isBlank()) "$quoted\n\n" else "$draft\n\n$quoted\n\n")
         attachmentsOpen = false
     }
-    val runMessage = repository.messages.lastOrNull { it.role == "assistant" }
+    val runMessage = repository.displayMessages.lastOrNull { it.role == "assistant" }
     // produceState retains its value when effect keys change; reset it with the displayed snapshot.
     val runMetrics by key(conversationId, composerGeneration, runMessage) {
-        produceState(runMessage?.let(repository::responseRunMetrics), repository.isResponding) {
+        produceState(runMessage?.let(repository::responseRunMetrics), repository.displayResponding) {
             value = runMessage?.let(repository::responseRunMetrics)
-            while (currentConversation() && repository.isResponding) {
+            while (currentConversation() && repository.displayResponding) {
                 delay(1000)
                 if (currentConversation()) value = runMessage?.let(repository::responseRunMetrics)
             }
@@ -246,7 +250,7 @@ fun ChatScreen(repository: DemoRepository, onModels: () -> Unit, onSettings: () 
                     contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 22.dp,
                         bottom = dockHeight + 22.dp),
                     verticalArrangement = Arrangement.spacedBy(28.dp)) {
-                    items(repository.messages.asReversed(), key = { it.id }) { ChatMessageRow(it, repository, quoteText) }
+                    items(repository.displayMessages.asReversed(), key = { it.id }) { ChatMessageRow(it, repository, quoteText) }
                 }
                 val showReturnToLatest by remember(listState, scrollIntent) {
                     derivedStateOf {
@@ -305,6 +309,22 @@ fun ChatScreen(repository: DemoRepository, onModels: () -> Unit, onSettings: () 
                 materialProfile = GlassMaterialProfile.ReadablePanel, drawMaterial = drawOwnMaterial) {
                 Column(Modifier.fillMaxWidth()) {
                     SelectedAttachmentStrip(repository, Modifier.padding(horizontal = 14.dp).padding(top = if (repository.attachmentPreviews.isEmpty()) 0.dp else 8.dp))
+                    AnimatedVisibility(visible = repository.remoteAttachmentProgress.busy,
+                        enter = expandVertically(tween(if (reducedMotion) 0 else GlassMotion.MorphMillis, easing = GlassMotion.EaseOut)) +
+                            fadeIn(GlassMotion.scalar(GlassMotion.MorphMillis, reducedMotion)),
+                        exit = shrinkVertically(tween(if (reducedMotion) 0 else GlassMotion.MorphMillis, easing = GlassMotion.EaseOut)) +
+                            fadeOut(GlassMotion.scalar(GlassMotion.MorphMillis, reducedMotion))) {
+                        val progress = repository.remoteAttachmentProgress
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("正在发送附件到电脑 · ${progress.name.orEmpty()}",
+                                style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (progress.totalBytes > 0) LinearProgressIndicator(progress = {
+                                (progress.receivedBytes.toDouble() / progress.totalBytes).coerceIn(0.0, 1.0).toFloat()
+                            }, modifier = Modifier.fillMaxWidth(), color = colors.onSurface)
+                            else LinearProgressIndicator(Modifier.fillMaxWidth(), color = colors.onSurface)
+                        }
+                    }
                     BasicTextField(value = draft, onValueChange = ::updateDraft,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp, max = 144.dp)
                             .padding(horizontal = 20.dp, vertical = 18.dp)
@@ -322,6 +342,7 @@ fun ChatScreen(repository: DemoRepository, onModels: () -> Unit, onSettings: () 
                             glyph = if (attachmentsOpen) "close" else "add",
                             tint = colors.surface.copy(alpha = .35f),
                             onClick = {
+                                if (!attachmentsOpen) onAttachmentsOpening()
                                 focus.clearFocus(); keyboard?.hide(); attachmentsOpen = !attachmentsOpen
                             },
                         )
@@ -340,8 +361,20 @@ fun ChatScreen(repository: DemoRepository, onModels: () -> Unit, onSettings: () 
                                 FishGlyph(sandboxMode.glyph, Modifier.size(19.dp), colors.onSurface)
                             }
                             SandboxMenu(sandboxOpen, sandboxMorph, sandboxMode,
-                                onModeSelected = { sandboxModeName = it.name }, onDismiss = { sandboxOpen = false },
-                                reduceTransparency = LocalReduceGlassTransparency.current)
+                                onModeSelected = { repository.updateLocalSandboxMode(when (it) {
+                                    SandboxMode.ReadOnly -> com.dafeiyu.mobile.data.LinuxSandboxContract.READ_ONLY
+                                    SandboxMode.WorkspaceWrite -> com.dafeiyu.mobile.data.LinuxSandboxContract.WORKSPACE_WRITE
+                                    SandboxMode.FullAccess -> com.dafeiyu.mobile.data.LinuxSandboxContract.FULL_ACCESS
+                                }) }, onDismiss = { sandboxOpen = false },
+                                reduceTransparency = LocalReduceGlassTransparency.current,
+                                remoteOptions = if (repository.connectionMode == "online") repository.remoteDshState.projection
+                                    ?.workspace?.settings?.options.orEmpty().map { it.value to it.label } else null,
+                                selectedRemoteValue = repository.remoteDshState.projection?.workspace?.settings?.sandbox,
+                                onRemoteSelected = repository::selectRemoteSandbox,
+                                localSupportedModes = if (repository.localSandboxVerified) SandboxMode.entries.toSet() else setOf(SandboxMode.FullAccess),
+                                localVerificationBusy = repository.localSandboxVerifying,
+                                localVerificationDetail = repository.localSandboxDetail,
+                                onVerifyLocal = repository::verifyLocalSandbox)
                         }
                         Box(Modifier.weight(1f).padding(horizontal = 2.dp)) {
                             val modelDeformation = rememberGlassButtonDeformationState()
@@ -360,8 +393,8 @@ fun ChatScreen(repository: DemoRepository, onModels: () -> Unit, onSettings: () 
                                 }
                                 .padding(horizontal = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
-                                val modelLabel = listOfNotNull(repository.selectedModel.name.substringBefore(" ·"),
-                                    repository.selectedReasoningOption?.label).joinToString(" · ")
+                                val modelLabel = listOfNotNull(repository.displaySelectedModel.name.substringBefore(" ·"),
+                                    repository.displayReasoningOption?.label).joinToString(" · ")
                                 Text(modelLabel, Modifier.weight(1f), fontSize = 13.sp, color = colors.onSurface,
                                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Spacer(Modifier.width(5.dp))
@@ -374,26 +407,27 @@ fun ChatScreen(repository: DemoRepository, onModels: () -> Unit, onSettings: () 
                         val canSend = draft.isNotBlank() || repository.attachmentPreviews.isNotEmpty()
                         ComposerGlassButton(
                             label = when {
-                                repository.isResponding -> "停止生成"
+                                repository.remoteAttachmentProgress.busy -> "取消附件发送"
+                                repository.displayResponding -> "停止生成"
                                 repository.workspaceSaveError != null -> "重试保存"
                                 repository.sendPending || sendAwaiting -> "正在保存"
                                 else -> "发送消息"
                             },
-                            glyph = if (repository.isResponding) "stop"
+                            glyph = if (repository.displayResponding || repository.remoteAttachmentProgress.busy) "stop"
                                 else if (repository.workspaceSaveError != null) "download" else "send",
-                            enabled = !repository.sendPending && !sendAwaiting &&
-                                (repository.isResponding || canSend || repository.workspaceSaveError != null),
-                            tint = if (repository.isResponding || canSend) colors.primary.copy(alpha = .78f)
+                            enabled = repository.remoteAttachmentProgress.busy || (!repository.sendPending && !sendAwaiting &&
+                                (repository.displayResponding || canSend || repository.workspaceSaveError != null)),
+                            tint = if (repository.displayResponding || canSend) colors.primary.copy(alpha = .78f)
                                 else colors.surface.copy(alpha = .40f),
-                            iconColor = if (repository.isResponding || canSend) Color.White else colors.onSurfaceVariant,
-                            materialProfile = if (repository.isResponding || canSend) GlassMaterialProfile.AccentButton
+                            iconColor = if (repository.displayResponding || canSend) Color.White else colors.onSurfaceVariant,
+                            materialProfile = if (repository.displayResponding || canSend) GlassMaterialProfile.AccentButton
                                 else GlassMaterialProfile.Button,
                             onClick = {
-                                if (repository.isResponding) repository.cancelResponse()
+                                if (repository.displayResponding || repository.remoteAttachmentProgress.busy) repository.cancelResponse()
                                 else if (!repository.sendPending && !sendAwaiting) {
                                     val submittedDraft = draft
                                     val submittedRevision = draftRevision
-                                    val submittedConversation = repository.selectedConversationId
+                                    val submittedConversation = repository.displayConversationId
                                     val submittedComposer = repository.composerGeneration
                                     val submittedScrollRevision = scrollIntent.revision
                                     val retrySave = repository.workspaceSaveError != null
@@ -403,12 +437,12 @@ fun ChatScreen(repository: DemoRepository, onModels: () -> Unit, onSettings: () 
                                             if (retrySave) {
                                                 repository.retryWorkspaceSave()
                                             } else if (canSend && repository.sendMessage(submittedDraft)) {
-                                                if (repository.selectedConversationId == submittedConversation &&
+                                                if (repository.displayConversationId == submittedConversation &&
                                                     repository.composerGeneration == submittedComposer) {
                                                     scrollIntent.acceptSend(submittedScrollRevision)
                                                 }
                                                 if (draftRevision == submittedRevision && draft == submittedDraft &&
-                                                    repository.selectedConversationId == submittedConversation &&
+                                                    repository.displayConversationId == submittedConversation &&
                                                     repository.composerGeneration == submittedComposer) {
                                                     updateDraft("")
                                                     attachmentsOpen = false
@@ -704,7 +738,7 @@ private fun ChatMessageRow(message: ChatMessage, repository: DemoRepository, onQ
                 onRetry = if (canRetry) ({
                     retryScope.launch { repository.retryFailedResponse(message.id) }
                 }) else null,
-                retryEnabled = !repository.isResponding && !repository.sendPending)
+                retryEnabled = !repository.displayResponding && !repository.sendPending)
         }
         MessageAttachmentStrip(repository, message, Modifier.fillMaxWidth())
         if (user) {
@@ -720,7 +754,7 @@ private fun ChatMessageRow(message: ChatMessage, repository: DemoRepository, onQ
                 val snapshot = message.streamSnapshot
                 val streaming = snapshot?.let {
                     !it.isFinal && it.messages.any { part -> part.status == AssistantMessageStatus.IN_PROGRESS }
-                } ?: (repository.isResponding && repository.messages.lastOrNull()?.id == message.id)
+                } ?: (repository.displayResponding && repository.displayMessages.lastOrNull()?.id == message.id)
                 ChatMarkdown(responseText, streaming, "message-${message.id}",
                     modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyLarge,
                     color = colors.onSurface, onSaveCode = { code, _ ->

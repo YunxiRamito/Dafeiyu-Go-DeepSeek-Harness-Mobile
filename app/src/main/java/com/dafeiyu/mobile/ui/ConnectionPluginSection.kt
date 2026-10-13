@@ -1,6 +1,11 @@
 package com.dafeiyu.mobile.ui
 
 import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,6 +23,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -31,9 +38,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.dafeiyu.mobile.data.ConnectionPluginPackage
+import com.dafeiyu.mobile.data.ArtifactDownloadProgress
+import com.dafeiyu.mobile.data.ConnectPluginHost
+import com.dafeiyu.mobile.data.ConnectPluginHostStatus
 import com.dafeiyu.mobile.ui.components.FishButton
 import com.dafeiyu.mobile.ui.components.FishCard
 import com.dafeiyu.mobile.ui.components.FishGlyph
+import com.dafeiyu.mobile.ui.components.GlassMotion
+import com.dafeiyu.mobile.ui.components.LocalReduceGlassMotion
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -43,6 +55,8 @@ import javax.net.ssl.SSLException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -69,24 +83,29 @@ internal class ConnectionPluginUiState(
     var error by mutableStateOf<String?>(null)
         private set
     private var operation by mutableStateOf<ConnectionPackageOperation?>(null)
+    val downloadProgress = MutableStateFlow<ArtifactDownloadProgress?>(null)
+    private var operationJob: Job? = null
     val busy: Boolean get() = operation != null || !hasLoaded
+    val canCancel: Boolean get() = operation == ConnectionPackageOperation.UPDATE && operationJob?.isActive == true
     val progressLabel: String get() = operation?.label ?: ConnectionPackageOperation.READ.label
 
     fun matches(query: String): Boolean = query.isBlank() ||
-        "大肥鱼连接插件 dafeiyu-go-connect 设备 同步 APK 内置 0.2.0 待运行时接入 ${currentVersion.orEmpty()}"
+        "大肥鱼连接插件 dafeiyu-go-connect 设备 同步 APK 内置 ${ConnectPluginHost.VERSION} ${currentVersion.orEmpty()}"
             .contains(query.trim(), ignoreCase = true)
 
     fun refresh() = perform(ConnectionPackageOperation.READ)
     fun installBundled() = perform(ConnectionPackageOperation.INSTALL)
     fun update() = perform(ConnectionPackageOperation.UPDATE)
+    fun cancelUpdate() { if (canCancel) operationJob?.cancel() }
 
     private fun perform(requested: ConnectionPackageOperation) {
         if (operation != null) return
         operation = requested
         message = null
         error = null
+        downloadProgress.value = null
         val previousVersion = currentVersion
-        scope.launch {
+        operationJob = scope.launch {
             try {
                 val installedVersion = withContext(Dispatchers.IO) {
                     val packages = ConnectionPluginPackage(context)
@@ -95,7 +114,7 @@ internal class ConnectionPluginUiState(
                         ConnectionPackageOperation.INSTALL ->
                             readConnectionPackageVersion(packages.ensureBundled())
                         ConnectionPackageOperation.UPDATE -> {
-                            val publishedVersion = packages.update()
+                            val publishedVersion = packages.update(progress = { downloadProgress.value = it })
                             val installed = packages.current() ?: error("未读取到已安装包")
                             readConnectionPackageVersion(installed).also {
                                 check(it == publishedVersion) { "安装版本与发布包不一致" }
@@ -115,6 +134,9 @@ internal class ConnectionPluginUiState(
                     }
                 }
             } catch (cancelled: CancellationException) {
+                if (requested == ConnectionPackageOperation.UPDATE) {
+                    message = "已取消更新。下次检查可继续下载。"
+                }
                 throw cancelled
             } catch (failure: Exception) {
                 if (requested == ConnectionPackageOperation.READ) readFailed = true
@@ -125,6 +147,7 @@ internal class ConnectionPluginUiState(
             } finally {
                 hasLoaded = true
                 operation = null
+                operationJob = null
             }
         }
     }
@@ -150,7 +173,25 @@ internal fun rememberConnectionPluginUiState(refreshRevision: Int): ConnectionPl
 @Composable
 internal fun ConnectionPluginSection(state: ConnectionPluginUiState) {
     val colors = MaterialTheme.colorScheme
-    FishCard {
+    val reducedMotion = LocalReduceGlassMotion.current
+    val downloadProgress by state.downloadProgress.collectAsState()
+    val context = LocalContext.current
+    val host = remember(context) { ConnectPluginHost.get(context) }
+    val runtime by host.snapshot.collectAsState()
+    val scope = rememberCoroutineScope()
+    var working by remember { mutableStateOf(false) }
+    var runtimeError by remember { mutableStateOf<String?>(null) }
+    fun operation(action: suspend () -> Unit) {
+        if (working) return
+        working = true
+        scope.launch {
+            try { runtimeError = null; action() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { runtimeError = "插件启动或停止未完成，请确认 Linux 与 Node.js 组件可用后重试" }
+            finally { working = false }
+        }
+    }
+    FishCard(Modifier.animateContentSize(tween(if (reducedMotion) 0 else GlassMotion.MorphMillis, easing = GlassMotion.EaseOut))) {
         Column(
             Modifier.fillMaxWidth().padding(17.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -165,7 +206,7 @@ internal fun ConnectionPluginSection(state: ConnectionPluginUiState) {
                     Text("dafeiyu-go-connect", fontSize = 12.sp, color = colors.onSurfaceVariant)
                 }
             }
-            Text("APK 内置包 v0.2.0", fontSize = 12.sp, color = colors.onSurfaceVariant)
+            Text("APK 内置包 v${ConnectPluginHost.VERSION}", fontSize = 12.sp, color = colors.onSurfaceVariant)
             Text(
                 when {
                     !state.hasLoaded -> "安装状态：正在读取"
@@ -178,20 +219,54 @@ internal fun ConnectionPluginSection(state: ConnectionPluginUiState) {
                 lineHeight = 19.sp,
                 fontWeight = FontWeight.Medium,
             )
-            Text("待运行时接入", fontSize = 12.sp, color = colors.onSurfaceVariant)
+            Text(when (runtime.status) {
+                ConnectPluginHostStatus.RUNNING -> "正在运行 · v${runtime.version}"
+                ConnectPluginHostStatus.STARTING -> "正在启动"
+                ConnectPluginHostStatus.PAUSED -> "省电模式已暂停后台连接"
+                ConnectPluginHostStatus.FAILED -> "启动未完成"
+                ConnectPluginHostStatus.STOPPED -> "已停止"
+            }, fontSize = 12.sp, color = colors.onSurfaceVariant)
             Text(
-                "已安装包不代表 DSH 运行时已加载。当前运行时尚未接入，连接、同步和配对功能尚不能由此插件执行。",
+                "连接插件在本机 Node.js 中运行。在线任务由电脑 DSH 处理，停止手机插件只断开观察，电脑已接收的任务继续。",
                 fontSize = 12.sp,
                 lineHeight = 19.sp,
                 color = colors.onSurfaceVariant,
             )
-            if (state.busy) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Text(state.progressLabel, fontSize = 12.sp, color = colors.onSurfaceVariant)
+            (runtimeError ?: runtime.reason)?.let { Text(it, color = colors.error, fontSize = 12.sp) }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FishButton(onClick = { operation { host.start() } }, enabled = !working && runtime.status !in
+                    setOf(ConnectPluginHostStatus.RUNNING, ConnectPluginHostStatus.STARTING, ConnectPluginHostStatus.PAUSED),
+                    modifier = Modifier.weight(1f)) { Text("启动") }
+                FishButton(onClick = { operation { host.stop() } }, enabled = !working && runtime.status in
+                    setOf(ConnectPluginHostStatus.RUNNING, ConnectPluginHostStatus.STARTING), accent = false,
+                    modifier = Modifier.weight(1f)) { Text("停止") }
+                FishButton(onClick = { operation { host.restart() } }, enabled = !working && runtime.status == ConnectPluginHostStatus.RUNNING,
+                    accent = false, modifier = Modifier.weight(1f)) { Text("重启") }
+            }
+            AnimatedVisibility(state.busy,
+                enter = fadeIn(GlassMotion.scalar(GlassMotion.MorphMillis, reducedMotion)),
+                exit = fadeOut(GlassMotion.scalar(GlassMotion.MorphMillis, reducedMotion))) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Text(state.progressLabel, fontSize = 12.sp, color = colors.onSurfaceVariant)
+                    }
+                    downloadProgress?.let { progress ->
+                        val total = progress.totalBytes
+                        if (total != null && total > 0L) {
+                            LinearProgressIndicator(progress = {
+                                (progress.receivedBytes.toDouble() / total).coerceIn(0.0, 1.0).toFloat()
+                            }, modifier = Modifier.fillMaxWidth())
+                        } else LinearProgressIndicator(Modifier.fillMaxWidth())
+                        Text("已下载 ${connectionDownloadBytes(progress.receivedBytes)}" +
+                            (total?.let { " / ${connectionDownloadBytes(it)}" } ?: "") +
+                            if (progress.threads > 0) " · ${progress.threads} 线程" else "",
+                            fontSize = 12.sp, color = colors.onSurfaceVariant)
+                        progress.reason?.let { Text(it, fontSize = 12.sp, color = colors.onSurfaceVariant) }
+                    }
+                    if (state.canCancel) {
+                        FishButton(onClick = state::cancelUpdate, accent = false) { Text("取消更新") }
+                    }
                 }
             }
             state.error?.let {
@@ -207,7 +282,7 @@ internal fun ConnectionPluginSection(state: ConnectionPluginUiState) {
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     FishGlyph("archive", Modifier.size(18.dp))
-                    Text("安装内置包 v0.2.0", fontSize = 13.sp)
+                    Text("安装内置包 v${ConnectPluginHost.VERSION}", fontSize = 13.sp)
                 }
             }
             FishButton(
@@ -239,6 +314,12 @@ internal fun ConnectionPluginSection(state: ConnectionPluginUiState) {
             )
         }
     }
+}
+
+private fun connectionDownloadBytes(bytes: Long): String = when {
+    bytes >= 1024L * 1024L -> String.format(java.util.Locale.ROOT, "%.1f MiB", bytes.toDouble() / (1024 * 1024))
+    bytes >= 1024L -> String.format(java.util.Locale.ROOT, "%.1f KiB", bytes.toDouble() / 1024)
+    else -> "$bytes B"
 }
 
 private fun readConnectionPackageVersion(packageDirectory: File): String {

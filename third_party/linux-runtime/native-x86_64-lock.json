@@ -1,0 +1,74 @@
+{
+  "architecture": "x86_64",
+  "nativeFiles": [
+    {
+      "bytes": 14368,
+      "elfMachine": 62,
+      "member": "./data/data/com.termux/files/usr/lib/libandroid-shmem.so",
+      "package": "libandroid-shmem",
+      "packaged": "liblinux_androidshmem.so",
+      "sha256": "092926060298acd3778e6239033d7aef1280dcb59aebe021a3719612e6a3465f"
+    },
+    {
+      "bytes": 32536,
+      "elfMachine": 62,
+      "member": "./data/data/com.termux/files/usr/lib/libtalloc.so.2.5.0",
+      "package": "libtalloc",
+      "packaged": "liblinux_talloc.so",
+      "sha256": "7fa6722a4320495b1b85832fc7fd02de0cb367b45f116c1921b2830a6936da90"
+    },
+    {
+      "bytes": 263784,
+      "elfMachine": 62,
+      "member": "./data/data/com.termux/files/usr/bin/proot",
+      "package": "proot",
+      "packaged": "liblinux_proot.so",
+      "sha256": "9a1303a51e69b89d78beaf40e4ec829c5c2ca98cbd5672411bdb15eebd871316"
+    },
+    {
+      "bytes": 18368,
+      "elfMachine": 62,
+      "member": "./data/data/com.termux/files/usr/libexec/proot/loader",
+      "package": "proot",
+      "packaged": "liblinux_prootloader.so",
+      "sha256": "a836b0569c84b1661333d16bacf6b396ff08fea816a5c936a82e08ddeeca8341"
+    },
+    {
+      "bytes": 6036,
+      "elfMachine": 3,
+      "member": "./data/data/com.termux/files/usr/libexec/proot/loader32",
+      "package": "proot",
+      "packaged": "liblinux_prootloader32.so",
+      "sha256": "fd5b394aa0801619e293b76fe6e830a3beb363aed4fa4b9a5a41f1388a0cb9b9"
+    }
+  ],
+  "nativePackages": [
+    {
+      "Depends": null,
+      "Filename": "pool/main/liba/libandroid-shmem/libandroid-shmem_0.7_x86_64.deb",
+      "Package": "libandroid-shmem",
+      "SHA256": "ffa9e4c87467b158b148d0ff92dda796aa038276c2075af3269cdcdb06f25797",
+      "Size": "7388",
+      "Version": "0.7"
+    },
+    {
+      "Depends": null,
+      "Filename": "pool/main/libt/libtalloc/libtalloc_2.5.0_x86_64.deb",
+      "Package": "libtalloc",
+      "SHA256": "b8c6d95f20075dc1f9ec6573575b2444e8d526e48e0d8d6d5cf4e071e6e06530",
+      "Size": "34536",
+      "Version": "2.5.0"
+    },
+    {
+      "Depends": "libandroid-shmem, libtalloc",
+      "Filename": "pool/main/p/proot/proot_5.1.107.96_x86_64.deb",
+      "Package": "proot",
+      "SHA256": "77ea45540071ca543adda2b51aca2bc3761c52904d013fd0890682288eff9455",
+      "Size": "108820",
+      "Version": "5.1.107.96"
+    }
+  ],
+  "rebuilt": false,
+  "schema": 1,
+  "sourceArchives": "same fixed PRoot5.1.107.96/talloc2.5.0/shmem0.7 complete sources already packaged"
+}

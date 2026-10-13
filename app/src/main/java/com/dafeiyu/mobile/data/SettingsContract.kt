@@ -7,14 +7,14 @@ import java.net.URI
  * Keep these ids protocol-facing; display labels belong to the UI layer.
  */
 object SettingsContract {
-    const val SETTINGS_VERSION = 2
+    const val SETTINGS_VERSION = 3
 
     val THEME_MODES = setOf("system", "light", "dark")
     val DOWNLOAD_SOURCES = setOf("official", "cdn", "backend")
     val UPDATE_POLICIES = setOf("auto", "remind", "off")
     val DSH_VERSION_CHANNELS = setOf("stable", "preview")
     val ENGINE_MODES = setOf("official", "dsh")
-    val CONNECTION_MODES = setOf("local", "online", "hybrid")
+    val CONNECTION_MODES = setOf("local", "online")
     val ONLINE_CONNECTION_STATES = setOf(
         "unconfigured",
         "checking",
@@ -85,6 +85,9 @@ data class SettingsSnapshot(
     val updateWifiOnly: Boolean = true,
     val dshVersionChannel: String = "stable",
     val dshUpdatePolicy: String = "remind",
+    val tokenSavingMode: Boolean = false,
+    val powerSavingMode: Boolean = false,
+    val officialEngineExpandActivities: Boolean = false,
     val aries: AriesConnectionSettings = AriesConnectionSettings(),
 )
 

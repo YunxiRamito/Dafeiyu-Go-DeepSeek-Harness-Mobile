@@ -17,7 +17,7 @@ import org.json.JSONObject
 class AndroidBackupStore {
     companion object {
         const val SCHEMA = "dafeiyu-android-backup"
-        const val SCHEMA_VERSION = 2
+        const val SCHEMA_VERSION = 4
         const val MAX_BACKUP_BYTES = 2 * 1024 * 1024
         const val MAX_WORKSPACES = 200
         const val MAX_CONVERSATIONS = 100
@@ -28,6 +28,8 @@ class AndroidBackupStore {
         private const val MAX_WORKSPACE_NAME_LENGTH = 80
         private const val MAX_CONVERSATION_TITLE_LENGTH = 100
         private const val MAX_MESSAGE_LENGTH = 65_536
+        private const val MAX_ACTIVITY_ITEMS = 512
+        private const val MAX_STREAM_BYTES = 512 * 1024
 
         private val THEME_MODES = setOf("system", "light", "dark")
         private val DOWNLOAD_SOURCES = setOf("official", "cdn", "backend")
@@ -74,12 +76,23 @@ class AndroidBackupStore {
         val title: String,
         val workspaceId: String,
         val archivedAtMillis: Long? = null,
+        val archiveOrigin: BackupArchiveOrigin? = null,
+    )
+
+    /** Portable provenance contains no external grants or machine-specific paths. */
+    data class BackupArchiveOrigin(
+        val workspaceId: String,
+        val workspaceName: String,
+        val workspaceOrder: Int,
+        val conversationOrder: Int,
     )
 
     data class BackupMessage(
         val id: Long,
         val role: String,
         val text: String,
+        val streamSnapshot: AssistantStreamSnapshot? = null,
+        val modelInput: String? = null,
     )
 
     /** Settings allowlist. Do not add credentials or device identity to this type. */
@@ -124,7 +137,9 @@ class AndroidBackupStore {
     fun capture(repository: DemoRepository, context: Context): BackupInput {
         val currentWorkspaces = repository.workspaces.map { BackupWorkspace(it.id, it.name) }
         val currentConversations = repository.conversations.map {
-            BackupConversation(it.id, it.title, it.workspaceId, it.archivedAtMillis)
+            BackupConversation(it.id, it.title, it.workspaceId, it.archivedAtMillis,
+                it.archiveOrigin?.let { origin -> BackupArchiveOrigin(origin.workspace.id, origin.workspace.name,
+                    origin.workspaceOrder, origin.conversationOrder) })
         }
 
         val persisted = runCatching {
@@ -133,10 +148,10 @@ class AndroidBackupStore {
 
         val messages = currentConversations.associate { conversation ->
             val persistedMessages = persisted?.messages?.get(conversation.id).orEmpty().map {
-                BackupMessage(it.id, it.role, it.text)
+                portableMessage(it)
             }
             val currentMessages = if (conversation.id == repository.selectedConversationId) {
-                repository.messages.map { BackupMessage(it.id, it.role, it.text) }
+                repository.messages.map(::portableMessage)
             } else {
                 persistedMessages
             }
@@ -184,7 +199,12 @@ class AndroidBackupStore {
                         .put("id", conversation.id)
                         .put("title", conversation.title)
                         .put("workspaceId", conversation.workspaceId)
-                        .put("archivedAtMillis", conversation.archivedAtMillis ?: JSONObject.NULL))
+                        .put("archivedAtMillis", conversation.archivedAtMillis ?: JSONObject.NULL)
+                        .apply { conversation.archiveOrigin?.let { origin ->
+                            put("archiveOrigin", JSONObject().put("workspaceId", origin.workspaceId)
+                                .put("workspaceName", origin.workspaceName).put("workspaceOrder", origin.workspaceOrder)
+                                .put("conversationOrder", origin.conversationOrder))
+                        } })
                 }
             })
             .put("messages", JSONObject().apply {
@@ -194,7 +214,11 @@ class AndroidBackupStore {
                             put(JSONObject()
                                 .put("id", message.id)
                                 .put("role", message.role)
-                                .put("text", message.text))
+                                .put("text", message.text)
+                                .apply {
+                                    message.streamSnapshot?.let { put("streamSnapshot", AssistantStreamSnapshotJson.encode(it)) }
+                                    message.modelInput?.let { put("modelInput", it) }
+                                })
                         }
                     })
                 }
@@ -318,6 +342,7 @@ class AndroidBackupStore {
             requiredObject(json, "messages", "根对象"),
             conversations,
             conversationIds,
+            version,
         )
         val settings = parseSettings(requiredObject(json, "settings", "根对象"))
 
@@ -352,7 +377,11 @@ class AndroidBackupStore {
             validateId(it.id, "会话 id")
             validateText(it.title, "会话标题", MAX_CONVERSATION_TITLE_LENGTH, allowBlank = false)
             if (it.archivedAtMillis != null && it.archivedAtMillis < 0L) throw BackupFormatException("归档时间无效")
-            if (it.workspaceId !in workspaceIdSet) throw BackupFormatException("会话引用了不存在的工作区")
+            it.archiveOrigin?.let { origin -> validateArchiveOrigin(origin, it.workspaceId) }
+            if (it.archiveOrigin != null && it.archivedAtMillis == null) throw BackupFormatException("未归档对话不能携带归档归属")
+            if (it.workspaceId !in workspaceIdSet && (it.archivedAtMillis == null || it.archiveOrigin == null)) {
+                throw BackupFormatException("会话引用了不存在的工作区")
+            }
             it.id
         }
         if (conversationIds.size != conversationIds.toSet().size) throw BackupFormatException("会话 id 重复")
@@ -378,6 +407,11 @@ class AndroidBackupStore {
                 if (message.id < 0L) throw BackupFormatException("消息 id 无效")
                 if (message.role !in MESSAGE_ROLES) throw BackupFormatException("消息角色无效")
                 validateText(message.text, "消息正文", MAX_MESSAGE_LENGTH, allowBlank = true)
+                message.modelInput?.let { validateText(it, "兼容消息上下文", MAX_MESSAGE_LENGTH, allowBlank = true) }
+                message.streamSnapshot?.let {
+                    if (message.role != "assistant") throw BackupFormatException("只有助手消息可包含活动记录")
+                    validateStreamSnapshot(it)
+                }
             }
         }
         if (input.messages.keys != conversationIdSet) throw BackupFormatException("消息映射包含未知会话")
@@ -406,31 +440,57 @@ class AndroidBackupStore {
         val result = ArrayList<BackupConversation>(array.length())
         repeat(array.length()) { index ->
             val item = requiredObject(array, index, "conversations[$index]")
-            val allowedKeys = if (schemaVersion >= 2) setOf("id", "title", "workspaceId", "archivedAtMillis")
-                else setOf("id", "title", "workspaceId")
+            val allowedKeys = when {
+                schemaVersion >= 3 -> setOf("id", "title", "workspaceId", "archivedAtMillis", "archiveOrigin")
+                schemaVersion >= 2 -> setOf("id", "title", "workspaceId", "archivedAtMillis")
+                else -> setOf("id", "title", "workspaceId")
+            }
             rejectUnknownKeys(item, allowedKeys, "conversations[$index]")
             rejectForbiddenKeys(item, "conversations[$index]")
             val workspaceId = requiredId(item, "workspaceId", "conversations[$index]")
-            if (workspaceId !in workspaceIds) throw BackupFormatException("会话引用了不存在的工作区")
+            val archivedAtMillis = if (schemaVersion >= 2 && item.has("archivedAtMillis") && !item.isNull("archivedAtMillis")) {
+                requiredLong(item, "archivedAtMillis", "conversations[$index]").also {
+                    if (it < 0L) throw BackupFormatException("归档时间无效")
+                }
+            } else null
+            val archiveOrigin = if (schemaVersion >= 3 && item.has("archiveOrigin")) {
+                val origin = requiredObject(item, "archiveOrigin", "conversations[$index]")
+                rejectUnknownKeys(origin, setOf("workspaceId", "workspaceName", "workspaceOrder", "conversationOrder"), "archiveOrigin")
+                BackupArchiveOrigin(requiredId(origin, "workspaceId", "archiveOrigin"),
+                    requiredString(origin, "workspaceName", "archiveOrigin", MAX_WORKSPACE_NAME_LENGTH),
+                    requiredInt(origin, "workspaceOrder", "archiveOrigin"),
+                    requiredInt(origin, "conversationOrder", "archiveOrigin"))
+                    .also { validateArchiveOrigin(it, workspaceId) }
+            } else null
+            if (archiveOrigin != null && archivedAtMillis == null) throw BackupFormatException("未归档对话不能携带归档归属")
+            if (workspaceId !in workspaceIds && (archivedAtMillis == null || archiveOrigin == null)) {
+                throw BackupFormatException("会话引用了不存在的工作区")
+            }
             result += BackupConversation(
                 requiredId(item, "id", "conversations[$index]"),
                 requiredString(item, "title", "conversations[$index]", MAX_CONVERSATION_TITLE_LENGTH),
                 workspaceId,
-                if (schemaVersion >= 2 && item.has("archivedAtMillis") && !item.isNull("archivedAtMillis")) {
-                    requiredLong(item, "archivedAtMillis", "conversations[$index]").also {
-                        if (it < 0L) throw BackupFormatException("归档时间无效")
-                    }
-                } else null,
+                archivedAtMillis,
+                archiveOrigin,
             )
         }
         if (result.map { it.id }.toSet().size != result.size) throw BackupFormatException("会话 id 重复")
         return result
     }
 
+    private fun validateArchiveOrigin(origin: BackupArchiveOrigin, workspaceId: String) {
+        validateId(origin.workspaceId, "archiveOrigin.workspaceId")
+        validateText(origin.workspaceName, "archiveOrigin.workspaceName", MAX_WORKSPACE_NAME_LENGTH, false)
+        if (origin.workspaceId != workspaceId || origin.workspaceOrder < 0 || origin.conversationOrder < 0) {
+            throw BackupFormatException("归档工作区归属无效")
+        }
+    }
+
     private fun parseMessages(
         json: JSONObject,
         conversations: List<BackupConversation>,
         conversationIds: Set<String>,
+        schemaVersion: Int,
     ): Map<String, List<BackupMessage>> {
         rejectForbiddenKeys(json, "messages")
         val keys = json.keys().asSequence().toSet()
@@ -445,19 +505,124 @@ class AndroidBackupStore {
             val parsed = ArrayList<BackupMessage>(array.length())
             repeat(array.length()) { index ->
                 val item = requiredObject(array, index, "messages.${conversation.id}[$index]")
-                rejectUnknownKeys(item, setOf("id", "role", "text"), "messages.${conversation.id}[$index]")
+                rejectUnknownKeys(item, if (schemaVersion >= 4) setOf("id", "role", "text", "streamSnapshot", "modelInput")
+                    else setOf("id", "role", "text"), "messages.${conversation.id}[$index]")
                 rejectForbiddenKeys(item, "messages.${conversation.id}[$index]")
                 val id = requiredLong(item, "id", "messages.${conversation.id}[$index]")
                 if (id < 0L) throw BackupFormatException("消息 id 无效")
                 val role = requiredString(item, "role", "messages.${conversation.id}[$index]", 16)
                 if (role !in MESSAGE_ROLES) throw BackupFormatException("消息角色无效")
                 val text = requiredString(item, "text", "messages.${conversation.id}[$index]", MAX_MESSAGE_LENGTH, allowBlank = true)
-                parsed += BackupMessage(id, role, text)
+                val stream = if (schemaVersion >= 4 && item.has("streamSnapshot")) {
+                    if (role != "assistant") throw BackupFormatException("只有助手消息可包含活动记录")
+                    val value = requiredObject(item, "streamSnapshot", "messages.${conversation.id}[$index]")
+                    if (value.toString().toByteArray(Charsets.UTF_8).size > MAX_STREAM_BYTES) {
+                        throw BackupFormatException("单条活动记录超过容量上限")
+                    }
+                    val decoded = AssistantStreamSnapshotJson.decode(value)
+                        ?: throw BackupFormatException("活动记录格式无效")
+                    // The persistent display codec is lenient for legacy app files. A backup is
+                    // untrusted: reject fields, opaque payloads and coercions it would discard.
+                    requireCanonicalJson(value, AssistantStreamSnapshotJson.encode(decoded))
+                    validateStreamSnapshot(decoded)
+                    importedStream(decoded)
+                } else null
+                val modelInput = if (schemaVersion >= 4 && item.has("modelInput"))
+                    requiredString(item, "modelInput", "messages.${conversation.id}[$index]", MAX_MESSAGE_LENGTH, allowBlank = true)
+                    else null
+                parsed += BackupMessage(id, role, text, stream, modelInput)
             }
             totalMessages += parsed.size
             if (totalMessages > MAX_MESSAGES_TOTAL) throw BackupFormatException("消息总数超过限制")
             conversation.id to parsed.toList()
         }
+    }
+
+    private fun portableMessage(message: ChatMessage) = BackupMessage(
+        message.id, message.role, message.text, message.streamSnapshot, message.modelInput,
+    )
+
+    private fun validateStreamSnapshot(snapshot: AssistantStreamSnapshot) {
+        val collections = listOf(snapshot.messages, snapshot.toolCalls, snapshot.subagents, snapshot.searches,
+            snapshot.citations, snapshot.activityOrder, snapshot.pendingSequenceNumbers, snapshot.skippedSequenceGaps)
+        if (collections.any { it.size > MAX_ACTIVITY_ITEMS } ||
+            snapshot.messages.any { it.blocks.size > MAX_ACTIVITY_ITEMS } ||
+            snapshot.searches.any { it.results.size > MAX_ACTIVITY_ITEMS }) {
+            throw BackupFormatException("单条活动记录数量超过上限")
+        }
+        if (snapshot.messages.map { it.messageId }.distinct().size != snapshot.messages.size ||
+            snapshot.toolCalls.map { it.callId }.distinct().size != snapshot.toolCalls.size ||
+            snapshot.subagents.map { it.agentId }.distinct().size != snapshot.subagents.size ||
+            snapshot.searches.map { it.searchId }.distinct().size != snapshot.searches.size) {
+            throw BackupFormatException("活动记录包含重复标识")
+        }
+        val json = AssistantStreamSnapshotJson.encode(snapshot)
+        if (json.toString().toByteArray(Charsets.UTF_8).size > MAX_STREAM_BYTES) {
+            throw BackupFormatException("单条活动记录超过容量上限")
+        }
+        var values = 0
+        fun inspect(value: Any?, depth: Int) {
+            if (depth > 32 || ++values > 16_384) throw BackupFormatException("活动记录层级或数量超过上限")
+            when (value) {
+                is JSONObject -> value.keys().forEach { inspect(value.get(it), depth + 1) }
+                is JSONArray -> repeat(value.length()) { inspect(value.get(it), depth + 1) }
+                is String -> validateText(value, "活动内容", MAX_MESSAGE_LENGTH, allowBlank = true)
+                is Number -> if (!value.toDouble().isFinite() || value.toDouble() < 0) {
+                    throw BackupFormatException("活动记录数值无效")
+                }
+            }
+        }
+        inspect(json, 0)
+    }
+
+    private fun requireCanonicalJson(input: Any?, canonical: Any?, depth: Int = 0) {
+        if (depth > 32) throw BackupFormatException("活动记录层级过深")
+        val matches = when {
+            input is JSONObject && canonical is JSONObject -> {
+                val keys = input.keys().asSequence().toSet()
+                if (keys != canonical.keys().asSequence().toSet()) false else {
+                    keys.forEach { requireCanonicalJson(input.get(it), canonical.get(it), depth + 1) }
+                    true
+                }
+            }
+            input is JSONArray && canonical is JSONArray -> {
+                if (input.length() != canonical.length()) false else {
+                    repeat(input.length()) { requireCanonicalJson(input.get(it), canonical.get(it), depth + 1) }
+                    true
+                }
+            }
+            input is Number && canonical is Number -> input.toDouble().isFinite() &&
+                input.toDouble() == canonical.toDouble() && input.toDouble() == input.toLong().toDouble()
+            else -> input == canonical
+        }
+        if (!matches) throw BackupFormatException("活动记录包含未知字段、隐藏内容或错误类型")
+    }
+
+    /** Imported snapshots are display data; approvals and unfinished work never become runnable. */
+    private fun importedStream(snapshot: AssistantStreamSnapshot): AssistantStreamSnapshot {
+        val activeMessages = setOf(AssistantMessageStatus.CREATED, AssistantMessageStatus.IN_PROGRESS)
+        val activeTools = setOf(AssistantStreamEvent.ToolStatus.PENDING, AssistantStreamEvent.ToolStatus.STREAMING_ARGUMENTS,
+            AssistantStreamEvent.ToolStatus.READY, AssistantStreamEvent.ToolStatus.AWAITING_APPROVAL,
+            AssistantStreamEvent.ToolStatus.APPROVED, AssistantStreamEvent.ToolStatus.RUNNING)
+        val activeAgents = setOf(AssistantStreamEvent.SubagentStatus.PENDING, AssistantStreamEvent.SubagentStatus.STARTING,
+            AssistantStreamEvent.SubagentStatus.RUNNING)
+        val activeSearches = setOf(AssistantStreamEvent.SearchStatus.PENDING, AssistantStreamEvent.SearchStatus.RUNNING)
+        val interrupted = !snapshot.isFinal || snapshot.runStatus == AssistantRunStatus.RUNNING ||
+            snapshot.messages.any { it.status in activeMessages } || snapshot.toolCalls.any { it.status in activeTools } ||
+            snapshot.subagents.any { it.status in activeAgents } || snapshot.searches.any { it.status in activeSearches }
+        return snapshot.copy(
+            isFinal = true,
+            runStatus = if (interrupted) AssistantRunStatus.INCOMPLETE else snapshot.runStatus,
+            pendingSequenceNumbers = emptyList(),
+            messages = snapshot.messages.map { message -> if (message.status in activeMessages)
+                message.copy(status = AssistantMessageStatus.INCOMPLETE, incompleteReason = "backup_imported") else message },
+            toolCalls = snapshot.toolCalls.map { tool -> if (tool.status in activeTools)
+                tool.copy(status = AssistantStreamEvent.ToolStatus.INCOMPLETE) else tool },
+            subagents = snapshot.subagents.map { agent -> if (agent.status in activeAgents)
+                agent.copy(status = AssistantStreamEvent.SubagentStatus.INCOMPLETE, detail = "backup_imported") else agent },
+            searches = snapshot.searches.map { search -> if (search.status in activeSearches)
+                search.copy(status = AssistantStreamEvent.SearchStatus.INCOMPLETE, error = "backup_imported") else search },
+        )
     }
 
     private fun parseSettings(json: JSONObject): BackupSettings {

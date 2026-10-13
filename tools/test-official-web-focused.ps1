@@ -29,6 +29,7 @@ $classpath = @($stdlib, $coroutines, $annotations, $okhttp, $okio, $jsoup, $json
 $compilerClasspath = @($compiler, $stdlib, $coroutines, $annotations, $reflect, $trove) -join ';'
 $dataRoot = Join-Path $projectRoot 'app\src\main\java\com\dafeiyu\mobile\data'
 $sources = @('AssistantStreamProtocol.kt', 'BalanceStore.kt', 'DeepSeekChatProtocol.kt', 'DeepSeekChatClient.kt',
+    'DeepSeekThinkingPolicy.kt', 'DeepSeekModelCatalog.kt',
     'ChatMessage.kt', 'OfficialChatHistory.kt',
     'BackgroundTaskModels.kt', 'BackgroundTaskEngine.kt', 'BackgroundTaskJson.kt',
     'OfficialToolSession.kt', 'OfficialToolDispatcher.kt', 'OfficialToolContract.kt', 'OfficialToolOutputStore.kt',

@@ -28,8 +28,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
@@ -50,6 +52,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
@@ -76,7 +81,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import com.dafeiyu.mobile.data.DeveloperCenterPresenceClient
 import com.dafeiyu.mobile.data.CacheStore
-import com.dafeiyu.mobile.data.AndroidBackupStore
+import com.dafeiyu.mobile.data.DymBackupCoordinator
+import com.dafeiyu.mobile.data.DymBackupSelection
+import com.dafeiyu.mobile.data.PreparedDymBackup
+import com.dafeiyu.mobile.data.BackgroundTaskStatus
 import com.dafeiyu.mobile.data.BalanceStore
 import com.dafeiyu.mobile.data.DeepSeekBalanceClient
 import com.dafeiyu.mobile.data.AriesClient
@@ -84,8 +92,15 @@ import com.dafeiyu.mobile.data.AriesGroupStore
 import com.dafeiyu.mobile.data.AriesConnectionProvider
 import com.dafeiyu.mobile.data.DeveloperCenterClient
 import com.dafeiyu.mobile.data.DemoRepository
+import com.dafeiyu.mobile.data.RuntimeStatus
+import com.dafeiyu.mobile.data.ModelRuntimeController
+import com.dafeiyu.mobile.data.AndroidReleaseClient
+import com.dafeiyu.mobile.data.AndroidReleaseManifest
+import com.dafeiyu.mobile.data.AndroidInstallLaunch
+import com.dafeiyu.mobile.data.ArtifactDownloadProgress
 import com.dafeiyu.mobile.data.NotificationChannelIds
 import com.dafeiyu.mobile.data.NotificationSettingsStore
+import com.dafeiyu.mobile.data.ApplicationPermissionBridge
 import com.dafeiyu.mobile.data.NoticeStore
 import com.dafeiyu.mobile.data.UsageStore
 import com.dafeiyu.mobile.data.SettingsRuntimeStore
@@ -107,12 +122,15 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.core.tween
 import kotlin.math.roundToInt
+import kotlin.math.abs
 
 @Composable
 fun SettingsScreen(repository: DemoRepository, onDetail: (String) -> Unit) {
     val scroll = rememberScrollState()
+    val reducedMotion = LocalReduceGlassMotion.current
     val sectionAnchors = remember { mutableStateMapOf<String, Int>() }
     val headerRange = with(LocalDensity.current) { 112.dp.toPx() }
     val collapsedTitle = rememberCollapsedTitleState(scroll.value, "设置", headerRange)
@@ -130,33 +148,53 @@ fun SettingsScreen(repository: DemoRepository, onDetail: (String) -> Unit) {
         SettingsNoticeOverview(onDetail, noticeMinimumHeight)
 
         SettingsGroup("引擎", anchorKey = "engine", onAnchor = { y -> sectionAnchors["engine"] = y }) {
-            HomepageChoiceRow("官方轻引擎", "手机本地的轻量对话入口", repository.engineMode == "official", "model") {
+            HomepageChoiceRow("官方轻引擎", "手机本地的轻量对话入口", repository.engineMode == "official", "model", enabled = !repository.localEngineSwitchBusy) {
                 repository.updateEngineMode("official")
             }
             FishDivider(Modifier.padding(horizontal = 16.dp))
-            HomepageChoiceRow("DSH 引擎（未接入）", "使用 DSH 服务作为默认执行引擎", repository.engineMode == "dsh", "terminal", enabled = false, onSelect = {
+            HomepageChoiceRow("DSH 引擎", "本地打开手机 DSH，在线连接电脑 DSH", repository.engineMode == "dsh", "terminal", enabled = !repository.localEngineSwitchBusy, onSelect = {
                 if (repository.engineMode != "dsh") repository.updateEngineMode("dsh")
             })
             FishDivider(Modifier.padding(horizontal = 16.dp))
-            SettingRow("model", "官方引擎设置", "轻引擎偏好与响应策略", targetRoute = "official-engine", onClick = { onDetail("official-engine") })
+            SettingRow("model", "官方引擎设置", "推理、节流与回复展示", targetRoute = "official-engine", onClick = { onDetail("official-engine") })
             FishDivider(Modifier.padding(horizontal = 16.dp))
             SettingRow("terminal", "DSH 引擎设置", "服务状态、版本与更新策略", targetRoute = "dsh-engine", onClick = { onDetail("dsh-engine") })
-            FishDivider(Modifier.padding(horizontal = 16.dp))
-            ToggleRow("自动启动 DSH 服务（预留）", "服务尚未接入，暂时无法自动启动", checked = false, enabled = false)
+            AnimatedVisibility(repository.localEngineSwitchBusy || repository.localEngineSwitchError != null || repository.localEngineSharingWarnings.isNotEmpty(),
+                enter = fadeIn(GlassMotion.scalar(GlassMotion.MorphMillis, reducedMotion)),
+                exit = fadeOut(GlassMotion.scalar(GlassMotion.MorphMillis, reducedMotion))) {
+                Column(Modifier.padding(horizontal = 18.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (repository.localEngineSwitchBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Hint(repository.localEngineSwitchError ?: if (repository.localEngineSwitchBusy)
+                        "正在同步提供商与兼容历史…" else "兼容历史已同步，以下内容需要检查")
+                    if (!repository.localEngineSwitchBusy && repository.localEngineSharingWarnings.isNotEmpty())
+                        Text(repository.localEngineSharingWarnings.take(8).joinToString("\n"),
+                            color = androidx.compose.ui.graphics.Color(0xFFB8860B), style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            AnimatedVisibility(
+                visible = repository.engineMode != "dsh",
+                enter = expandVertically(tween(if (reducedMotion) 0 else GlassMotion.MorphMillis, easing = GlassMotion.EaseOut)) +
+                    fadeIn(GlassMotion.scalar(GlassMotion.MorphMillis, reducedMotion)),
+                exit = shrinkVertically(tween(if (reducedMotion) 0 else GlassMotion.MorphMillis, easing = GlassMotion.EaseOut)) +
+                    fadeOut(GlassMotion.scalar(GlassMotion.MorphMillis, reducedMotion)),
+            ) {
+                Column {
+                    FishDivider(Modifier.padding(horizontal = 16.dp))
+                    ToggleRow("自动启动 DSH 服务", "本地使用官方轻引擎时也启动手机 DSH", checked = repository.autoStartDsh, onCheckedChange = repository::updateAutoStartDsh)
+                }
+            }
         }
 
         SettingsGroup("线上", anchorKey = "online", onAnchor = { y -> sectionAnchors["online"] = y }) {
-            HomepageChoiceRow("本地", "只使用手机上的本地能力", repository.connectionMode == "local", "folder") {
+            HomepageChoiceRow("本地", "由手机上的引擎处理任务", repository.connectionMode == "local", "folder") {
                 repository.updateConnectionMode("local")
             }
             FishDivider(Modifier.padding(horizontal = 16.dp))
-            HomepageChoiceRow("在线", "连接已配对的电脑或 Aries 服务", repository.connectionMode == "online", "link") {
+            HomepageChoiceRow("在线", "由已配对电脑的 DSH 处理任务", repository.connectionMode == "online", "link") {
                 repository.updateConnectionMode("online")
             }
             FishDivider(Modifier.padding(horizontal = 16.dp))
-            HomepageChoiceRow("混合", "按能力在本地与在线之间切换", repository.connectionMode == "hybrid", "grid") {
-                repository.updateConnectionMode("hybrid")
-            }
+            SettingsConnectionSummary(repository)
             FishDivider(Modifier.padding(horizontal = 16.dp))
             SettingRow("link", "在线服务", "设备状态、配对码、Aries 与连接偏好", targetRoute = "online", onClick = { onDetail("online") })
             FishDivider(Modifier.padding(horizontal = 16.dp))
@@ -164,27 +202,25 @@ fun SettingsScreen(repository: DemoRepository, onDetail: (String) -> Unit) {
         }
 
         SettingsGroup("常规", anchorKey = "general", onAnchor = { y -> sectionAnchors["general"] = y }) {
-            SettingRow("bell", "通知", "灵动岛、公告、回复与设备推送", trailing = "预留", targetRoute = "notifications", onClick = { onDetail("notifications") })
+            SettingRow("bell", "通知", "任务动态、公告与设备状态", targetRoute = "notifications", onClick = { onDetail("notifications") })
             FishDivider(Modifier.padding(horizontal = 16.dp))
             SettingRow("sun", "个性化", "主题、主题色、材质与界面缩放", trailing = themeLabel(repository.themeMode), targetRoute = "appearance", onClick = { onDetail("appearance") })
-            FishDivider(Modifier.padding(horizontal = 16.dp))
-            SettingRow("settings", "字体", "字体族、字号与字重", targetRoute = "font", onClick = { onDetail("font") })
             FishDivider(Modifier.padding(horizontal = 16.dp))
             SettingRow("settings", "权限与系统", "常用、后台、执行与敏感权限", targetRoute = "permissions", onClick = { onDetail("permissions") })
         }
 
         SettingsGroup("模型", anchorKey = "models", onAnchor = { y -> sectionAnchors["models"] = y }) {
-            SettingRow("model", "模型", "聚合内置引擎与 DSH 模型，排序会同步", targetRoute = "models", onClick = { onDetail("models") })
+            SettingRow("model", "模型", "模型提供商、凭据与目录", targetRoute = "models", onClick = { onDetail("models") })
             FishDivider(Modifier.padding(horizontal = 16.dp))
-            SettingRow("grid", "插件与技能", "管理插件、技能目录与导入的扩展", targetRoute = "extensions", onClick = { onDetail("extensions") })
+            ExtensionSettingsRow("plugin", "插件", "Dafeiyu 插件与 DSH 插件", "plugins", onDetail)
+            FishDivider(Modifier.padding(horizontal = 16.dp))
+            ExtensionSettingsRow("skill", "技能", "给助手添加可读取的技能", "skills", onDetail)
         }
 
         SettingsGroup("环境", anchorKey = "environment", onAnchor = { y -> sectionAnchors["environment"] = y }) {
-            SettingRow("terminal", "Linux 运行环境", "本机环境、版本与安装状态", targetRoute = "virtual-machine", onClick = { onDetail("virtual-machine") })
-            FishDivider(Modifier.padding(horizontal = 16.dp))
             SettingRow("grid", "组件", "Ubuntu、Node.js、Git、pnpm 与 Python", targetRoute = "components", onClick = { onDetail("components") })
             FishDivider(Modifier.padding(horizontal = 16.dp))
-            SettingRow("terminal", "运行详情", "查看本机 Linux 环境与开发工具状态", targetRoute = "runtime", onClick = { onDetail("runtime") })
+            SettingRow("terminal", "虚拟机运行详情", "环境类型、状态与诊断", targetRoute = "runtime", onClick = { onDetail("runtime") })
         }
 
         SettingsGroup("数据", anchorKey = "data", onAnchor = { y -> sectionAnchors["data"] = y }) {
@@ -193,20 +229,23 @@ fun SettingsScreen(repository: DemoRepository, onDetail: (String) -> Unit) {
             SettingRow("download", "备份", "导出或导入工作区、会话与偏好", targetRoute = "backup", onClick = { onDetail("backup") })
             FishDivider(Modifier.padding(horizontal = 16.dp))
             SettingRow("archive", "对话归档", "恢复已归档对话，或立即永久删除", targetRoute = "archive", onClick = { onDetail("archive") })
-            FishDivider(Modifier.padding(horizontal = 16.dp))
-            SettingRow("usage", "用量概览", "DeepSeek Token 与账户余额", targetRoute = "usage", onClick = { onDetail("usage") })
         }
 
         SettingsGroup("支持", anchorKey = "support", onAnchor = { y -> sectionAnchors["support"] = y }) {
             SettingRow("download", "更新", "软件更新与版本策略", targetRoute = "update", onClick = { onDetail("update") })
             FishDivider(Modifier.padding(horizontal = 16.dp))
-            SettingRow("chat", "反馈与建议", "告诉我们哪里需要变得更好", targetRoute = "feedback", onClick = { onDetail("feedback") })
-            FishDivider(Modifier.padding(horizontal = 16.dp))
-            SettingRow("bell", "公告", "查看全部产品公告与接入进展", targetRoute = "notice", onClick = { onDetail("notice") })
+            SettingRow("chat", "反馈与建议", "把你的想法留给 Dafeiyu-GO", targetRoute = "feedback", onClick = { onDetail("feedback") })
             FishDivider(Modifier.padding(horizontal = 16.dp))
             SettingRow("info", "关于", "版本、设计与项目说明", targetRoute = "about", onClick = { onDetail("about") })
+            AnimatedVisibility(repository.developerMode,
+                enter = fadeIn(GlassMotion.scalar(GlassMotion.MorphMillis, reducedMotion)),
+                exit = fadeOut(GlassMotion.scalar(GlassMotion.MorphMillis, reducedMotion))) {
+                Column {
+                    FishDivider(Modifier.padding(horizontal = 16.dp))
+                    SettingRow("terminal", "开发者", "手机推荐、消息与反馈管理", targetRoute = "developer", onClick = { onDetail("developer") })
+                }
+            }
         }
-        Text("Android 前端 · 仅在对应数据页读取明确接入的本地、DeveloperCenter 或 Aries 状态，不修改 PC / Aries 数据", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(18.dp))
     }
     }
@@ -459,18 +498,18 @@ private fun settingsSectionSnapTarget(
 
 @Composable
 fun SettingsDetailScreen(route: String, repository: DemoRepository, onBack: () -> Unit, notify: (String) -> Unit, onPairing: () -> Unit = {}) {
-    val heading = when (route) {
-        "official-engine" -> "官方引擎设置" to "调整手机本地引擎的响应方式"
+    var displayedRoute by remember(route) { mutableStateOf(route) }
+    val heading = when (displayedRoute) {
+        "official-engine" -> "官方引擎设置" to "推理方式决定思考，偏好决定呈现"
         "dsh-engine" -> "DSH 引擎设置" to "管理 DSH 服务的前端偏好"
         "virtual-machine" -> "Linux 运行环境" to "查看本机环境与工具版本"
         "components" -> "组件" to "安装并管理本机开发工具"
         "cache" -> "缓存" to "整理应用产生的临时内容"
         "update" -> "更新" to "选择软件更新的提醒方式"
-        "feedback" -> "反馈与建议" to "把你的想法留给大肥鱼"
+        "feedback" -> "反馈与建议" to "把你的想法留给 Dafeiyu-GO"
         // Titles must equal the source row titles on the settings home (title morph contract).
         "models" -> "模型" to "给每一种想法，选择合适的模型"
         "appearance" -> "个性化" to "一套界面，两种光线"
-        "font" -> "字体" to "字体族、字号和字重"
         "notifications" -> "通知" to "有需要的时候，再提醒你"
         "backup" -> "备份" to "把值得保留的内容，带在身边"
         "archive" -> "对话归档" to "整理对话，保留或彻底删除"
@@ -478,8 +517,8 @@ fun SettingsDetailScreen(route: String, repository: DemoRepository, onBack: () -
         "online" -> "在线服务" to "连接手机、电脑与 Aries 服务"
         "server-metrics" -> "服务器" to "实时数据 · 每2秒更新"
         "about" -> "关于" to "大肥鱼 Go · 随身的创作伙伴"
-        "runtime" -> "运行详情" to "手机上的本地工作空间"
-        "usage" -> "用量概览" to "看看最近的使用节奏"
+        "developer" -> "开发者" to "管理手机推荐与公开服务"
+        "runtime" -> "虚拟机运行详情" to "查看实际运行环境与诊断"
         "notice" -> "公告" to "来自大肥鱼的一封短信"
         else -> "详情" to "大肥鱼 Go"
     }
@@ -495,27 +534,26 @@ fun SettingsDetailScreen(route: String, repository: DemoRepository, onBack: () -
                 .heightIn(min = minimumContentHeight).padding(horizontal = 22.dp),
             verticalArrangement = Arrangement.spacedBy(22.dp),
         ) {
-            SubpageHeader(heading.first, heading.second, onBack, collapseProgress = collapsedTitle.progress)
-            when (route) {
+            SubpageHeader(heading.first, heading.second, { if (displayedRoute != route) displayedRoute = route else onBack() }, collapseProgress = collapsedTitle.progress)
+            when (displayedRoute) {
                 "official-engine" -> OfficialEngineContent(repository, notify)
                 "dsh-engine" -> DshEngineContent(repository, notify)
-                "virtual-machine" -> LinuxComponentsContent(repository)
+                "virtual-machine" -> LinuxRuntimeDetailsContent(repository)
                 "components" -> LinuxComponentsContent(repository)
                 "cache" -> CacheContent(repository, notify)
                 "update" -> UpdateContent(repository, notify)
-                "feedback" -> FeedbackContent(notify)
+                "feedback" -> MobileFeedbackContent(notify)
                 "models" -> ModelsContent(repository, notify)
                 "appearance" -> AppearanceContent(repository)
-                "font" -> FontSettingsScreen(repository, onBack)
                 "notifications" -> NotificationsContent(repository, notify)
                 "backup" -> BackupContent(repository, notify)
                 "archive" -> ConversationArchiveContent(repository, notify)
                 "network" -> NetworkContent(repository, notify)
                 "online" -> OnlineContent(repository, notify, onPairing)
                 "server-metrics" -> ServerMetricsContent(notify)
-                "about" -> AboutContent()
+                "about" -> AboutContent(repository) { displayedRoute = "developer" }
+                "developer" -> DeveloperContent(repository)
                 "runtime" -> RuntimeContent(repository)
-                "usage" -> UsageContent(repository)
                 "notice" -> NoticeContent()
                 else -> DetailCard { Text("此页面将在后续版本完善。", style = MaterialTheme.typography.bodyLarge) }
             }
@@ -539,175 +577,67 @@ internal fun Hint(text: String) {
 
 @Composable
 private fun ModelsContent(repository: DemoRepository, notify: (String) -> Unit) {
-    val haptics = LocalGlassHaptics.current
-    val providerNames = mapOf(
-        "deepseek" to "DeepSeek",
-        "dsh" to "DSH 引擎",
-        "lite" to "本地轻引擎",
+    val context = LocalContext.current
+    val modelRuntime = remember(context) { ModelRuntimeController.get(context) }
+    var showDeepSeekKey by remember { mutableStateOf(false) }
+    var confirmClearKey by remember { mutableStateOf(false) }
+    var key by remember { mutableStateOf("") }
+    val online = repository.connectionMode == "online"
+    val nativeProvider = com.dafeiyu.mobile.data.RuntimeProvider("deepseek", "DeepSeek 官方", repository.deepSeekConfigured,
+        listOf("api_key"), repository.modelChoices.filter { it.runtimeModel == null && it.officialCapabilities != null }.map { model ->
+            com.dafeiyu.mobile.data.RuntimeModel("deepseek", model.id, model.name, "DeepSeek 官方 API",
+                model.reasoningOptions.map { it.id }, model.reasoningOptions.getOrNull(model.defaultReasoningIndex)?.id,
+                model.inputModalities)
+        })
+    val remoteSelection = repository.remoteDshState.projection?.workspace?.settings?.selection
+        ?: repository.remoteDshState.projection?.workspace?.catalog?.selection
+    ModelProvidersContent(
+        notify = notify,
+        onDeepSeekKey = { showDeepSeekKey = true },
+        onSelectModel = { providerId, modelId, reasoning ->
+            repository.selectProviderModel(providerId, modelId, reasoning)
+        },
+        controller = modelRuntime,
+        downloadSource = repository.downloadSource,
+        selectedProviderId = if (online) remoteSelection?.provider else repository.selectedModel.runtimeModel?.providerId ?: "deepseek",
+        selectedModelId = if (online) remoteSelection?.model else repository.selectedModel.runtimeModel?.id ?:
+            repository.selectedModel.id.takeUnless { repository.selectedModel.isExample },
+        remoteProviders = if (online) repository.remoteProviderCatalog else null,
+        onRefreshRemote = if (online) repository::refreshRemoteDsh else null,
+        nativeDeepSeekProvider = nativeProvider,
     )
-    val providers = repository.modelProviderOrder
-    var showForm by remember { mutableStateOf(false) }
-    var providerName by remember { mutableStateOf("") }
-    var endpoint by remember { mutableStateOf("") }
-    var apiKey by remember { mutableStateOf("") }
-    var officialKey by remember { mutableStateOf("") }
-    var showClearKeyConfirm by remember { mutableStateOf(false) }
-
-    fun clearForm() {
-        providerName = ""
-        endpoint = ""
-        apiKey = ""
-        showForm = false
-    }
-
-    fun moveProvider(from: Int, to: Int) {
-        if (from !in providers.indices || to !in providers.indices) return
-        val reordered = providers.toMutableList().apply {
-            add(to, removeAt(from))
-        }
-        repository.updateModelProviderOrder(reordered)
-        haptics.confirm()
-    }
-
-    DetailCard {
-        Text("DeepSeek", style = MaterialTheme.typography.titleLarge)
-        if (!repository.deepSeekConfigured) {
-            OutlinedTextField(
-                value = officialKey, onValueChange = { officialKey = it.take(512) },
-                label = { Text("API Key") }, visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                singleLine = true, modifier = Modifier.fillMaxWidth(),
-            )
-            FishButton(onClick = { repository.saveDeepSeekKey(officialKey); officialKey = "" },
-                enabled = officialKey.isNotBlank() && !repository.deepSeekConfigurationBusy && !repository.isResponding,
-                modifier = Modifier.fillMaxWidth()) { Text("安全保存") }
-        } else {
-            OnlineValueRow("API Key", "已加密保存")
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FishButton(onClick = repository::refreshDeepSeekModels,
-                    enabled = !repository.deepSeekConfigurationBusy,
-                    modifier = Modifier.weight(1f)) {
-                    FishGlyph("refresh", Modifier.size(18.dp))
-                    Text(if (repository.deepSeekConfigurationBusy) "读取中…" else "获取模型")
+    if (online) repository.remoteDshState.error?.let { Hint(it) }
+    if (showDeepSeekKey && !online) AlertDialog(
+        onDismissRequest = { showDeepSeekKey = false },
+        title = { Text("DeepSeek API Key") },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Hint(if (repository.deepSeekConfigured) "API Key 已加密保存；输入新值可以替换。" else "DeepSeek 官方无需模型运行组件。")
+            OutlinedTextField(key, { key = it.take(512) }, label = { Text("API Key") },
+                visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
+            if (repository.deepSeekConfigured) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextButton(onClick = repository::refreshDeepSeekModels, enabled = !repository.deepSeekConfigurationBusy) {
+                    Text(if (repository.deepSeekConfigurationBusy) "读取模型中…" else "获取官方模型")
                 }
-                TextButton(onClick = { showClearKeyConfirm = true },
-                    enabled = !repository.deepSeekConfigurationBusy,
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("清除 Key") }
-            }
-            repository.modelChoices.filter { !it.isExample }.forEach { model ->
-                SelectionRow(model.name, model.id, repository.selectedModel.id == model.id, "model") {
-                    repository.selectModel(model.id)
+                TextButton(onClick = { confirmClearKey = true }, enabled = !repository.deepSeekConfigurationBusy) {
+                    Text("清除 Key", color = MaterialTheme.colorScheme.error)
                 }
             }
-        }
-        repository.deepSeekModelError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-    }
-    DetailCard {
-        TinyLabel("模型目录", primary = true)
-        Text("模型提供商顺序", style = MaterialTheme.typography.titleLarge)
-        Hint("DeepSeek 目录由官方接口读取；提供商顺序和启用状态保存在本机。")
-    }
-
-    providers.forEachIndexed { index, providerId ->
-        val provider = providerNames[providerId] ?: providerId
-        val connected = providerId == "deepseek"
-        val enabled = connected && repository.isModelProviderEnabled(providerId)
-        DetailCard {
-            ToggleRow(
-                title = "${index + 1}. $provider${if (connected) "" else "（预留）"}",
-                description = when (providerId) {
-                    "deepseek" -> "官方文本对话"
-                    "dsh" -> "DSH 聚合入口尚未接入，暂不可启用"
-                    "lite" -> "手机本地运行器尚未接入，暂不可启用"
-                    else -> "提供商运行器尚未接入，暂不可启用"
-                },
-                checked = enabled,
-                enabled = connected,
-                onCheckedChange = if (connected) {
-                    { value -> repository.updateModelProviderEnabled(providerId, value) }
-                } else null,
-            )
-            FishDivider()
-            // DeepSeek refresh lives in the card above ("获取模型"); other providers have no remote check yet.
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                TextButton(
-                    onClick = { moveProvider(index, index - 1) },
-                    enabled = index > 0,
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                ) { Text("上移") }
-                TextButton(
-                    onClick = { moveProvider(index, index + 1) },
-                    enabled = index < providers.lastIndex,
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                ) { Text("下移") }
-            }
-        }
-    }
-
-    FishButton(onClick = { showForm = true }, modifier = Modifier.fillMaxWidth()) {
-        FishGlyph("add", Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text("添加提供商")
-    }
-    Hint("新增提供商只保存名称、排序和启用状态；endpoint 与密钥不会写入设置，也不会发送。")
-
-    if (showForm) {
-        AlertDialog(
-            onDismissRequest = { clearForm() },
-            title = { Text("添加提供商") },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Hint("这里只建立本地目录条目，不验证或保存真实 API Key。")
-                    OutlinedTextField(value = providerName, onValueChange = { providerName = it.take(60) }, label = { Text("提供商名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = endpoint, onValueChange = { endpoint = it.take(200) }, label = { Text("示例接口地址") }, placeholder = { Text("https://example.com/v1") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = apiKey, onValueChange = { apiKey = it.take(200) }, label = { Text("演示 API Key") }, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), singleLine = true, modifier = Modifier.fillMaxWidth())
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        haptics.confirm()
-                        val id = SettingsRuntimeStore.normalizeProviderId(providerName)
-                        if (id != null) {
-                            repository.updateModelProviderEnabled(id, true)
-                            clearForm()
-                            notify("已添加 $providerName · 只保存本地目录状态")
-                        }
-                    },
-                    enabled = SettingsRuntimeStore.normalizeProviderId(providerName) != null,
-                    modifier = Modifier.heightIn(min = 48.dp),
-                ) { Text("添加") }
-            },
-            dismissButton = { TextButton(onClick = { haptics.confirm(); clearForm() }, modifier = Modifier.heightIn(min = 48.dp)) { Text("取消") } },
-        )
-    }
-
-    if (showClearKeyConfirm) {
-        AlertDialog(
-            onDismissRequest = { showClearKeyConfirm = false },
-            title = { Text("清除 API Key") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("确定要清除已保存的 API Key 吗？", style = MaterialTheme.typography.bodyLarge)
-                    Text("此操作会中止当前回复、中止所有子任务，并移除已缓存的模型列表。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        repository.clearDeepSeekKey()
-                        showClearKeyConfirm = false
-                    },
-                    modifier = Modifier.heightIn(min = 48.dp),
-                ) { Text("继续清除", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { showClearKeyConfirm = false }, modifier = Modifier.heightIn(min = 48.dp)) { Text("取消") } },
-        )
-    }
+            repository.deepSeekModelError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        } },
+        confirmButton = { TextButton(enabled = key.isNotBlank() && !repository.deepSeekConfigurationBusy, onClick = {
+            repository.saveDeepSeekKey(key); key = ""; showDeepSeekKey = false
+        }) { Text("安全保存") } },
+        dismissButton = { TextButton(onClick = { showDeepSeekKey = false }) { Text("取消") } },
+    )
+    if (confirmClearKey && !online) AlertDialog(onDismissRequest = { confirmClearKey = false },
+        title = { Text("清除 DeepSeek API Key？") },
+        text = { Text("会停止使用此凭据的任务，并清除官方模型目录；已有对话会保留。") },
+        confirmButton = { TextButton(onClick = {
+            repository.clearDeepSeekKey(); confirmClearKey = false; showDeepSeekKey = false
+        }) { Text("清除", color = MaterialTheme.colorScheme.error) } },
+        dismissButton = { TextButton(onClick = { confirmClearKey = false }) { Text("取消") } })
 }
+
 
 @Composable
 private fun AppearanceContent(repository: DemoRepository) {
@@ -753,33 +683,28 @@ private fun AppearanceContent(repository: DemoRepository) {
     }
     DetailCard {
         Text("材质与动效", style = MaterialTheme.typography.titleMedium)
-        ToggleRow("液态玻璃材质", "使用实时模糊、折射和边缘高光", repository.glassMaterial) { repository.updateGlassMaterial(it) }
-        FishDivider()
-        ToggleRow("页面切换效果", "设置详情从来源行展开并返回", repository.pageTransitions) { repository.updatePageTransitions(it) }
-        FishDivider()
-        ToggleRow("按钮 Q 弹效果", "保留按压缩小与缓出反馈", repository.springButtons) { repository.updateSpringButtons(it) }
-        FishDivider()
-        ToggleRow("减少透明度", "使用更实的表面，提高内容可读性", repository.reduceTransparency) { repository.updateReduceTransparency(it) }
-        FishDivider()
-        ToggleRow("减少动态效果", "减少页面和玻璃面板的移动", repository.reduceMotion) { repository.updateReduceMotion(it) }
-    }
-    DetailCard {
-        Text("字体", style = MaterialTheme.typography.titleMedium)
-        Hint("快速调整；完整预览在设置首页「常规 · 字体」")
-        Column(Modifier.selectableGroup()) {
-            com.dafeiyu.mobile.ui.theme.APP_FONT_FAMILIES.forEachIndexed { index, option ->
-                if (index > 0) FishDivider()
-                SelectionRow(option.title, option.description, repository.fontFamily == option.key,
-                    if (index == 0) "settings" else "terminal") { repository.updateFontFamily(option.key) }
-            }
+        ToggleRow("省电模式", "关闭界面动效；后台暂停常驻连接和自动下载", repository.powerSavingMode) {
+            repository.updatePowerSavingMode(it)
         }
-        Slider(value = repository.fontSizeScale, onValueChange = { repository.updateFontSizeScale(it) }, valueRange = .85f..1.2f, steps = 6)
-        OnlineValueRow("字体大小", "${(repository.fontSizeScale * 100).toInt()}%")
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("轻", "标准", "粗").forEach { weight ->
-                FishButton(onClick = { repository.updateFontWeight(weight) }, accent = repository.fontWeight == weight, modifier = Modifier.weight(1f)) { Text(weight) }
-            }
-        }
+        FishDivider()
+        ToggleRow("液态玻璃材质", "关闭后使用更实的表面，提高可读性",
+            checked = repository.glassMaterial && !repository.reduceTransparency && !repository.powerSavingMode,
+            enabled = !repository.powerSavingMode,
+            onCheckedChange = {
+                repository.updateGlassMaterial(it)
+                repository.updateReduceTransparency(!it)
+            })
+        FishDivider()
+        ToggleRow("页面切换效果", "设置详情从来源行展开并返回",
+            checked = repository.pageTransitions && !repository.powerSavingMode,
+            enabled = !repository.powerSavingMode,
+            onCheckedChange = repository::updatePageTransitions)
+        FishDivider()
+        ToggleRow("按钮 Q 弹效果", "按压、回弹与柔和的形变反馈",
+            checked = repository.springButtons && !repository.powerSavingMode,
+            enabled = !repository.powerSavingMode,
+            onCheckedChange = repository::updateSpringButtons)
+        if (repository.powerSavingMode) Hint("关闭省电模式后，恢复此前的三项效果设置。")
     }
     DetailCard {
         Text("界面缩放", style = MaterialTheme.typography.titleMedium)
@@ -790,7 +715,7 @@ private fun AppearanceContent(repository: DemoRepository) {
     DetailCard {
         TinyLabel("即时预览", primary = true)
         Text("让想法，轻轻展开。", style = MaterialTheme.typography.headlineSmall)
-        Hint("材质：${if (repository.glassMaterial) "液态玻璃" else "简化表面"} · 页面切换：${if (repository.pageTransitions) "开启" else "关闭"} · 字重：${repository.fontWeight}")
+        Hint("材质：${if (repository.glassMaterial && !repository.reduceTransparency && !repository.powerSavingMode) "液态玻璃" else "简化表面"} · 页面切换：${if (repository.pageTransitions && !repository.powerSavingMode) "开启" else "关闭"}")
     }
 }
 
@@ -822,7 +747,7 @@ private data class NotificationSystemState(
 
 private fun readNotificationSystemState(context: Context): NotificationSystemState {
     val requestedPermissions = runCatching {
-        context.packageManager.getPackageInfo(context.packageName, 0).requestedPermissions.orEmpty().toSet()
+        context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions.orEmpty().toSet()
     }.getOrDefault(emptySet())
     val declared = Manifest.permission.POST_NOTIFICATIONS in requestedPermissions
     val granted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
@@ -852,43 +777,55 @@ private fun notificationSettingsIntent(context: Context): Intent? {
 @Composable
 private fun NotificationsContent(repository: DemoRepository, notify: (String) -> Unit) {
     val context = LocalContext.current
+    val permissionBridge = remember(context) { ApplicationPermissionBridge.get(context) }
+    val scope = rememberCoroutineScope()
     var statusRevision by remember { mutableIntStateOf(0) }
     val systemState = remember(context, statusRevision) { readNotificationSystemState(context) }
-    val notificationStore = remember(context) { NotificationSettingsStore(context) }
-    val channelState = remember(context, statusRevision) { notificationStore.readState(ensureChannels = true) }
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { statusRevision++ }
     val settingsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { statusRevision++ }
     val settingsIntent = remember(context) { notificationSettingsIntent(context) }
+    LaunchedEffect(repository) { repository.refreshPushNotificationStatus() }
 
     DetailCard {
-        TinyLabel("Android 系统", primary = systemState.appNotificationsEnabled && systemState.permissionGranted)
-        Text("通知权限与系统开关", style = MaterialTheme.typography.titleMedium)
-        Text(notificationSystemStatus(systemState), style = MaterialTheme.typography.bodyLarge)
-        OnlineValueRow("运行时权限", when {
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU -> "当前系统无需单独授权"
-            !systemState.permissionDeclared -> "应用未声明"
-            systemState.permissionGranted -> "已授予"
-            else -> "未授予"
-        })
-        OnlineValueRow("应用通知开关", if (systemState.appNotificationsEnabled) "已开启" else "已关闭")
-        OnlineValueRow(
-            "任务通知渠道",
-            channelState.channels.firstOrNull { it.id == NotificationChannelIds.TASKS }?.let {
-                when {
-                    !it.exists -> "未创建"
-                    it.blockedByUser -> "已被系统关闭"
-                    else -> "可用"
-                }
-            } ?: "当前系统不支持渠道",
-        )
+        ToggleRow("总通知开关", "控制 Dafeiyu-GO 的全部通知", repository.notificationsEnabled) {
+            repository.updateNotificationsEnabled(it)
+        }
+        FishDivider()
+        ToggleRow("实时动态通知", "以安卓实时动态通知来反馈任务运行中／完成状态",
+            checked = repository.liveIslandNotifications, onCheckedChange = repository::updateLiveIslandNotifications)
+        FishDivider()
+        ToggleRow("Aries 设备状态通知", "配对设备上线、离线或关系变化时提醒",
+            checked = repository.deviceNotifications, onCheckedChange = repository::updateDeviceNotifications)
+        FishDivider()
+        ToggleRow("公告推送", "接收手机端产品公告",
+            checked = repository.announcementNotifications, onCheckedChange = repository::updateAnnouncementNotifications)
+        FishDivider()
+        ToggleRow("通知推送", "接收任务完成提醒；远程推送通道配置后支持后台反馈提醒",
+            checked = repository.messageNotifications, onCheckedChange = repository::updateMessageNotifications)
+        FishDivider()
+        ToggleRow("后端服务器状态通知", "服务可用性发生变化时提醒",
+            checked = repository.backendStatusNotifications, onCheckedChange = repository::updateBackendStatusNotifications)
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Hint("应用运行期间接收实时更新；后台推送需完成推送平台注册配置。省电模式退到后台后暂停常驻连接。")
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(repository.pushSettingsState.detail, Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = repository::refreshPushNotificationStatus,
+                enabled = !repository.pushSettingsState.busy) { Text("刷新状态") }
+        }
+        Hint(notificationSystemStatus(systemState))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (systemState.canRequestRuntimePermission) {
                 FishButton(
-                    onClick = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
+                    onClick = {
+                        scope.launch {
+                            permissionBridge.request("notifications", "用于提醒任务状态、反馈回复、公告和已配对设备状态。拒绝后仍可在应用内查看内容。")
+                            statusRevision++
+                        }
+                    },
                     modifier = Modifier.weight(1f),
                 ) {
                     FishGlyph("bell", Modifier.size(18.dp))
@@ -912,17 +849,7 @@ private fun NotificationsContent(repository: DemoRepository, notify: (String) ->
                 Text("系统通知设置")
             }
         }
-        Hint("这里读取的是 Android 当前系统状态；下面的开关只保存大肥鱼的功能偏好。")
-    }
-    DetailCard {
-        Text("通知偏好", style = MaterialTheme.typography.titleMedium)
-        ToggleRow("灵动岛通知（预留）", "进行中状态通知尚未接入", checked = false, enabled = false)
-        FishDivider()
-        ToggleRow("公告推送（预留）", "公告推送服务尚未接入", checked = false, enabled = false)
-        FishDivider()
-        ToggleRow("通知推送（预留）", "回复与任务通知尚未接入", checked = false, enabled = false)
-        FishDivider()
-        ToggleRow("连接的设备推送（预留）", "设备状态推送尚未接入", checked = false, enabled = false)
+        Hint("系统通知权限由你授权。预留的通知分类会在对应服务接通后开放。")
     }
 }
 
@@ -930,115 +857,169 @@ private fun NotificationsContent(repository: DemoRepository, notify: (String) ->
 private fun BackupContent(repository: DemoRepository, notify: (String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val backupStore = remember { AndroidBackupStore() }
+    val backupStore = remember(context) { DymBackupCoordinator(context) }
     var conversations by rememberSaveable { mutableStateOf(true) }
-    var skills by rememberSaveable { mutableStateOf(true) }
-    var settings by rememberSaveable { mutableStateOf(false) }
-    var busy by rememberSaveable { mutableStateOf(false) }
+    var providers by rememberSaveable { mutableStateOf(true) }
+    var resources by rememberSaveable { mutableStateOf(true) }
+    var settings by rememberSaveable { mutableStateOf(true) }
+    var busy by remember { mutableStateOf(false) }
     var backupMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var backupMessageIsError by rememberSaveable { mutableStateOf(false) }
-    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+    var backupMessageIsPartial by rememberSaveable { mutableStateOf(false) }
+    var retainedRevision by remember { mutableStateOf(0) }
+    var pendingImport by remember { mutableStateOf<PreparedDymBackup?>(null) }
+    var showOverwriteConfirm by remember { mutableStateOf(false) }
+    val tasks = repository.backgroundTasks?.tasks?.collectAsState()?.value.orEmpty()
+    val canRestore = !busy && repository.connectionMode == "local" && !repository.isResponding &&
+        !repository.sendPending && !repository.deepSeekConfigurationBusy && tasks.none {
+            it.status in setOf(BackgroundTaskStatus.QUEUED, BackgroundTaskStatus.RUNNING, BackgroundTaskStatus.STOPPING)
+        }
+    val currentPending by rememberUpdatedState(pendingImport)
+    // Leaving or cancelling the preview releases only app-owned staged files.
+    DisposableEffect(backupStore) {
+        onDispose {
+            currentPending?.let { prepared ->
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO).launch {
+                    runCatching { backupStore.discard(prepared) }
+                }
+            }
+        }
+    }
+    fun discardPending() {
+        val prepared = pendingImport ?: return
+        pendingImport = null
+        scope.launch { backupStore.discard(prepared) }
+    }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/x-7z-compressed")) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             busy = true
-            runCatching {
-                val bytes = withContext(Dispatchers.IO) { backupStore.export(backupStore.capture(repository, context)) }
-                withContext(Dispatchers.IO) {
-                    val output = context.contentResolver.openOutputStream(uri) ?: error("无法打开备份目标")
-                    output.use { it.write(bytes) }
-                }
+            try {
+                val report = backupStore.exportReport(uri, repository, DymBackupSelection(conversations, providers, resources, settings))
                 backupMessageIsError = false
-                backupMessage = "已导出真实 Android 备份：${bytes.size / 1024} KB"
-                notify(backupMessage!!)
-            }.onFailure {
+                backupMessageIsPartial = report.warnings.isNotEmpty()
+                backupMessage = buildString {
+                    append("已导出 .dym 备份：${report.bytes / 1024} KB")
+                    if (report.warnings.isNotEmpty()) append("\n" + report.warnings.joinToString("\n"))
+                }
+                notify(if (backupMessageIsPartial) "备份已导出，详情见黄色提示" else "备份已导出")
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) {
                 backupMessageIsError = true
-                backupMessage = "备份导出失败：${it.message ?: "无法写入文件"}"
+                backupMessageIsPartial = false
+                backupMessage = "备份导出失败，请检查目标存储空间和备份范围"
                 notify(backupMessage!!)
-            }
-            busy = false
+            } finally { busy = false }
         }
     }
     // Step 1: read + validate only. Nothing is restored until the user confirms the preview.
-    var pendingImport by remember { mutableStateOf<AndroidBackupStore.ValidatedBackup?>(null) }
-    var showOverwriteConfirm by remember { mutableStateOf(false) }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             busy = true
+            val previous = pendingImport
             pendingImport = null
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { backupStore.import(it) }
-                        ?: error("无法读取备份文件")
+            try {
+                previous?.let { backupStore.discard(it) }
+                val prepared = backupStore.prepare(uri)
+                if (!prepared.canImport) {
+                    backupStore.discard(prepared)
+                    error("没有可导入内容")
                 }
-            }.onSuccess {
-                pendingImport = it
+                pendingImport = prepared
                 backupMessage = null
-            }.onFailure {
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) {
                 backupMessageIsError = true
-                backupMessage = "备份校验失败：${it.message ?: "格式无效"}"
+                backupMessageIsPartial = false
+                backupMessage = "备份校验失败，文件可能损坏、超出限制或没有可导入内容"
                 notify(backupMessage!!)
-            }
-            busy = false
+            } finally { busy = false }
         }
     }
     // Step 2: overwrite only after the red confirmation.
     fun restorePending() {
         val validated = pendingImport ?: return
-        busy = true
-        repository.restoreBackup(validated)
-            .onSuccess {
+        scope.launch {
+            busy = true
+            try {
+                val report = backupStore.restore(validated, repository)
+                retainedRevision++
                 backupMessageIsError = false
-                backupMessage = "备份已恢复：${validated.workspaces.size} 个工作区、${validated.conversations.size} 个会话"
-                pendingImport = null
-            }
-            .onFailure {
+                backupMessageIsPartial = report.warnings.isNotEmpty()
+                backupMessage = buildString {
+                    append(if (backupMessageIsPartial) "已导入有效内容，部分项目未完成：" else "备份已导入：")
+                    append(report.descriptions.joinToString("；"))
+                    if (report.warnings.isNotEmpty()) append("\n" + report.warnings.joinToString("\n"))
+                }
+                notify(if (backupMessageIsPartial) "备份部分导入，详情见黄色提示" else "备份已导入")
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) {
                 backupMessageIsError = true
-                backupMessage = "备份导入失败：${it.message ?: "无法恢复"}"
+                backupMessageIsPartial = false
+                backupMessage = "备份导入失败，请先停止当前任务，再检查本机存储状态"
+                notify(backupMessage!!)
+            } finally {
+                pendingImport = null
+                withContext(kotlinx.coroutines.NonCancellable) { backupStore.discard(validated) }
+                busy = false
             }
-        notify(backupMessage!!)
-        busy = false
+        }
     }
     DetailCard {
         Text("选择备份范围", style = MaterialTheme.typography.titleMedium)
-        ToggleRow("对话记录", "导出工作区、会话和消息", conversations) { conversations = it }
+        ToggleRow("对话记录", "工作区、手机会话、消息与归档来源", conversations) { conversations = it }
         FishDivider()
-        ToggleRow("技能与拓展清单", "导出非敏感清单选择", skills) { skills = it }
+        ToggleRow("提供商配置与凭据", "包括 API Key 等凭据，请妥善保管备份", providers) { providers = it }
         FishDivider()
-        ToggleRow("偏好设置", "导出主题、动效和下载源", settings) { settings = it }
+        ToggleRow("技能、插件与 DSH 资源", "保留的 PC 原始资源；不包含运行环境与依赖缓存", resources) { resources = it }
+        FishDivider()
+        ToggleRow("偏好设置", "手机设置与 PC 设置分别保存", settings) { settings = it }
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        FishButton(onClick = { exportLauncher.launch("dafeiyu-backup.json") }, enabled = !busy && (conversations || skills || settings), modifier = Modifier.weight(1f)) {
+        FishButton(onClick = { exportLauncher.launch("dafeiyu-backup.dym") }, enabled = !busy && (conversations || providers || resources || settings), modifier = Modifier.weight(1f)) {
             FishGlyph("download", Modifier.size(18.dp)); Text(if (busy) "处理中…" else "导出")
         }
-        FishButton(onClick = { importLauncher.launch(arrayOf("application/json")) }, enabled = !busy, accent = false, modifier = Modifier.weight(1f)) {
+        FishButton(onClick = { importLauncher.launch(arrayOf("application/x-7z-compressed", "application/octet-stream", "application/json")) }, enabled = !busy, accent = false, modifier = Modifier.weight(1f)) {
             FishGlyph("folder", Modifier.size(18.dp)); Text("选择备份导入")
         }
     }
     pendingImport?.let { preview ->
-        val messageCount = preview.messages.values.sumOf { it.size }
-        val archivedCount = preview.conversations.count { it.archivedAtMillis != null }
+        val conversationBackup = preview.conversations
+        val messageCount = conversationBackup?.messages?.values?.sumOf { it.size } ?: 0
+        val archivedCount = conversationBackup?.conversations?.count { it.archivedAtMillis != null } ?: 0
         DetailCard {
             TinyLabel("导入预览 · 已校验", primary = true)
             Text("即将恢复的备份", style = MaterialTheme.typography.titleMedium)
-            OnlineValueRow("导出时间", formatInstalledTime(preview.exportedAtEpochMillis))
-            FishDivider()
-            OnlineValueRow("工作区", "${preview.workspaces.size} 个")
-            FishDivider()
-            OnlineValueRow("会话", if (archivedCount > 0) "${preview.conversations.size} 个（归档 $archivedCount）" else "${preview.conversations.size} 个")
+            conversationBackup?.let {
+                OnlineValueRow("导出时间", formatInstalledTime(it.exportedAtEpochMillis))
+                FishDivider()
+                OnlineValueRow("工作区", "${it.workspaces.size} 个")
+                FishDivider()
+                OnlineValueRow("会话", if (archivedCount > 0) "${it.conversations.size} 个（归档 $archivedCount）" else "${it.conversations.size} 个")
+            }
             FishDivider()
             OnlineValueRow("消息", "$messageCount 条")
             FishDivider()
-            OnlineValueRow("格式版本", "${preview.schema} v${preview.schemaVersion}")
-            Hint("导入会覆盖当前全部工作区、会话和备份内的偏好；API Key 不受影响。")
+            OnlineValueRow("格式", if (preview.legacy) "旧 Android JSON" else ".dym · 7z")
+            FishDivider()
+            OnlineValueRow("凭据", if (preview.containsCredentials) "包括 API Key，确认后覆盖" else "未包含")
+            FishDivider()
+            OnlineValueRow("PC DSH 资源", "${preview.resourceCount} 个文件")
+            if (preview.resourceCount > 0) Hint("原始资源只持久保留，当前不会加载插件、执行技能或重放历史。")
+            Hint("备份中的手机对话会替换本机历史；手机偏好按有效分组恢复，PC 偏好独立保留。")
+            if (preview.warnings.isNotEmpty()) {
+                Text(preview.warnings.joinToString("\n"), color = Color(0xFFAA7A00), style = MaterialTheme.typography.bodySmall)
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                TextButton(onClick = { pendingImport = null }, enabled = !busy,
+                TextButton(onClick = { discardPending() }, enabled = !busy,
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("取消") }
-                TextButton(onClick = { showOverwriteConfirm = true }, enabled = !busy,
+                TextButton(onClick = { showOverwriteConfirm = true }, enabled = canRestore,
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
                     Text("导入并覆盖", color = MaterialTheme.colorScheme.error)
                 }
             }
+            if (!canRestore && !busy) Hint("请切换到本地模式并停止当前任务后再恢复备份。")
         }
     }
     if (showOverwriteConfirm && pendingImport != null) {
@@ -1048,12 +1029,13 @@ private fun BackupContent(repository: DemoRepository, notify: (String) -> Unit) 
             title = { Text("覆盖当前数据？") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("将用备份中的 ${preview.workspaces.size} 个工作区、${preview.conversations.size} 个会话替换当前内容。", style = MaterialTheme.typography.bodyLarge)
+                    Text("确认导入已校验内容。手机对话、对应偏好及凭据可能覆盖当前内容。", style = MaterialTheme.typography.bodyLarge)
                     Text("当前未备份的对话会丢失，且无法撤销。建议先导出一份当前备份。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (preview.containsCredentials) Text("此备份包含凭据，确认后在本机重新安全保存。")
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showOverwriteConfirm = false; restorePending() },
+                TextButton(onClick = { showOverwriteConfirm = false; restorePending() }, enabled = canRestore,
                     modifier = Modifier.heightIn(min = 48.dp)) {
                     Text("导入并覆盖", color = MaterialTheme.colorScheme.error)
                 }
@@ -1065,15 +1047,16 @@ private fun BackupContent(repository: DemoRepository, notify: (String) -> Unit) 
     }
     if (backupMessage != null) {
         DetailCard {
-            TinyLabel(if (backupMessageIsError) "备份错误" else "备份状态", primary = !backupMessageIsError)
+            TinyLabel(if (backupMessageIsError) "备份错误" else if (backupMessageIsPartial) "部分项目需留意" else "备份状态", primary = !backupMessageIsError && !backupMessageIsPartial)
             Text(
                 backupMessage!!,
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (backupMessageIsError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                color = if (backupMessageIsError) MaterialTheme.colorScheme.error else if (backupMessageIsPartial) Color(0xFFAA7A00) else MaterialTheme.colorScheme.onSurface,
             )
         }
     }
-    Hint("备份使用版本化 Android JSON；不包含 API Key、附件 URI、设备标识或外部 SAF 文件。导入先校验，不直接覆盖现有数据。")
+    DymRetainedResourcesContent(backupStore, retainedRevision)
+    Hint(".dym 使用真实 7z。设备私钥、配对关系、系统权限、推送身份和外部 SAF 文件不导出。仍支持读取旧 Android JSON。")
 }
 
 
@@ -1882,20 +1865,12 @@ private fun formatBytes(bytes: Long): String {
 
 @Composable
 private fun OfficialEngineContent(repository: DemoRepository, notify: (String) -> Unit) {
-    val strategy = repository.officialEngineStrategy
     DetailCard {
         TinyLabel("官方轻引擎", primary = true)
-        Text("手机本地的响应方式", style = MaterialTheme.typography.titleLarge)
-        Hint("响应策略暂保存为偏好；实际思考模式由会话中的模型菜单控制。")
-        Column(Modifier.selectableGroup()) {
-            listOf(
-                Triple("quick", "快速", "优先缩短等待时间，适合简单问答"),
-                Triple("balanced", "平衡", "在响应速度与回答长度之间取平衡"),
-                Triple("deep", "深思", "为复杂问题预留更多思考空间"),
-            ).forEachIndexed { index, (value, title, subtitle) ->
-                SelectionRow(title, subtitle, strategy == value, "model") { repository.updateOfficialEngineStrategy(value) }
-                if (index < 2) FishDivider()
-            }
+        Text("推理与任务偏好", style = MaterialTheme.typography.titleLarge)
+        Hint("推理方式在对话中的「模型与推理」菜单选择，档位取自当前模型。")
+        ToggleRow("节流模式", "要求助手节省 token、减少重复探索，回答简洁", repository.tokenSavingMode) {
+            repository.updateTokenSavingMode(it)
         }
     }
     DetailCard {
@@ -1905,38 +1880,126 @@ private fun OfficialEngineContent(repository: DemoRepository, notify: (String) -
         FishDivider()
         ToggleRow("默认全部展开", "思考、命令、子 Agent 与搜索活动", repository.officialEngineExpandActivities) { repository.updateOfficialEngineExpandActivities(it) }
     }
-    Hint("开关会立即保存，下次回复生效。")
+    Hint("偏好会立即保存。流式输出和节流模式在下一次任务生效。")
 }
 
 @Composable
 private fun DshEngineContent(repository: DemoRepository, notify: (String) -> Unit) {
     val version = repository.dshVersionChannel
     val updatePolicy = repository.dshUpdatePolicy
+    val installation = repository.dshInstallation?.state?.collectAsState()?.value
+    var confirmInterruption by remember { mutableStateOf(false) }
+    LaunchedEffect(repository.dshInstallation, version) { repository.checkDshRelease() }
+    val status = when (repository.runtimeStatus) {
+        RuntimeStatus.Running -> "正在运行 · 端口 ${repository.runtimePort ?: "未知"}"
+        RuntimeStatus.Starting -> "正在启动…"
+        RuntimeStatus.Stopping -> "正在停止…"
+        RuntimeStatus.Stopped -> "已停止"
+    }
     DetailCard {
-        TinyLabel("服务状态", primary = true)
-        Text("尚未连接", style = MaterialTheme.typography.headlineSmall)
-        Hint("DSH 引擎尚未接入 · 不会启动、停止或探测真实 DSH 服务。")
+        TinyLabel("服务状态")
+        Text(status, style = MaterialTheme.typography.headlineSmall)
+        Hint(repository.runtimeStep)
+        repository.runtimeVersion?.let { Hint("运行包 $it") }
+        repository.runtimePort?.let { Hint("本机地址 http://127.0.0.1:$it/") }
+        repository.runtimeLastError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        AnimatedVisibility(repository.dshSharedConfigurationError != null,
+            enter = fadeIn(GlassMotion.scalar(GlassMotion.MorphMillis, LocalReduceGlassMotion.current)),
+            exit = fadeOut(GlassMotion.scalar(GlassMotion.MorphMillis, LocalReduceGlassMotion.current))) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(repository.dshSharedConfigurationError.orEmpty(), color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall)
+                FishButton(onClick = repository::retryLocalProviderSynchronization, accent = false,
+                    enabled = repository.runtimeStatus == RuntimeStatus.Running && !repository.localEngineSwitchBusy,
+                    modifier = Modifier.fillMaxWidth()) { Text("重新同步提供商设置") }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            val working = repository.runtimeStatus == RuntimeStatus.Starting || repository.runtimeStatus == RuntimeStatus.Stopping
+            val running = repository.runtimeStatus == RuntimeStatus.Running
+            FishButton(
+                onClick = { if (running || working) repository.restartRuntime() else repository.startRuntime() },
+                enabled = repository.runtimeStatus != RuntimeStatus.Stopping && installation?.installing != true && !repository.localEngineSwitchBusy,
+                modifier = Modifier.weight(1f),
+            ) {
+                FishGlyph(if (running || working) "refresh" else "play", Modifier.size(18.dp))
+                Text(if (running || working) "重启服务" else "启动服务")
+            }
+            FishButton(
+                onClick = { repository.stopRuntime() },
+                enabled = running || working,
+                accent = false,
+                modifier = Modifier.weight(1f),
+            ) {
+                FishGlyph("stop", Modifier.size(18.dp))
+                Text("停止服务")
+            }
+        }
     }
     DetailCard {
         Text("DSH 版本", style = MaterialTheme.typography.titleMedium)
+        Hint("当前版本：${installation?.installedVersion ?: repository.runtimeVersion ?: "尚未安装"}")
+        installation?.available?.let { manifest ->
+            Text(if (installation.updateAvailable) "可安装版本 ${manifest.dshVersion}" else "已是当前通道版本",
+                style = MaterialTheme.typography.bodyLarge)
+            Hint("完整运行包 ${manifest.archiveSize / (1024 * 1024)} MiB；安装前需准备 Ubuntu 和 Node.js。")
+        }
         Column(Modifier.selectableGroup()) {
-            SelectionRow("稳定版", "适合日常使用的预览选项", version == "stable", "download") { repository.updateDshVersionChannel("stable") }
+            SelectionRow("稳定版", "使用服务端签名的稳定运行包", version == "stable", "download") { repository.updateDshVersionChannel("stable") }
             FishDivider()
-            SelectionRow("测试版", "体验新功能的预览选项", version == "preview", "model") { repository.updateDshVersionChannel("preview") }
+            SelectionRow("测试版", "仅在你明确选择时使用预览运行包", version == "preview", "model") { repository.updateDshVersionChannel("preview") }
+        }
+        FishButton(onClick = repository::checkDshRelease,
+            enabled = installation?.checking != true && installation?.installing != true,
+            accent = false, modifier = Modifier.fillMaxWidth()) {
+            FishGlyph("refresh", Modifier.size(18.dp))
+            Text(if (installation?.checking == true) "检查中…" else "检查版本")
+        }
+        installation?.progress?.let { progress ->
+            Hint(progress.phase)
+            if (installation.installing) {
+                if ((progress.totalBytes ?: 0L) > 0L) {
+                    LinearProgressIndicator(progress = {
+                        (progress.receivedBytes.toFloat() / requireNotNull(progress.totalBytes)).coerceIn(0f, 1f)
+                    }, modifier = Modifier.fillMaxWidth())
+                    Hint("${progress.receivedBytes / (1024 * 1024)} / ${progress.totalBytes!! / (1024 * 1024)} MiB · ${progress.threads} 线程")
+                } else LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+        }
+        installation?.error?.let { Text(it, color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall) }
+        if (installation?.installing == true) {
+            FishButton(onClick = repository::cancelDshInstall, accent = false, modifier = Modifier.fillMaxWidth()) {
+                Text("取消安装")
+            }
+        } else {
+            FishButton(onClick = {
+                if (repository.dshUpdateNeedsInterruption()) confirmInterruption = true
+                else repository.installDshRelease()
+            }, enabled = installation?.updateAvailable == true && !installation.checking,
+                modifier = Modifier.fillMaxWidth()) { Text(if (installation?.installedVersion == null) "下载并安装" else "立即更新") }
         }
     }
     DetailCard {
         Text("自动更新", style = MaterialTheme.typography.titleMedium)
         Column(Modifier.selectableGroup()) {
-            SelectionRow("自动下载并更新", "后端接入后自动完成更新", updatePolicy == "auto", "download") { repository.updateDshUpdatePolicy("auto") }
+            SelectionRow("自动下载并更新", "任务运行期间由你选择立即中断或稍后更新", updatePolicy == "auto", "download") { repository.updateDshUpdatePolicy("auto") }
             FishDivider()
             SelectionRow("仅提醒", "有新版本时显示提醒", updatePolicy == "remind", "bell") { repository.updateDshUpdatePolicy("remind") }
             FishDivider()
             SelectionRow("关闭", "不主动检查新版本", updatePolicy == "off", "close") { repository.updateDshUpdatePolicy("off") }
         }
-        FishDivider()
-        ToggleRow("自动启动 DSH 服务（预留）", "服务尚未接入，暂时无法自动启动", checked = false, enabled = false)
     }
+    if (confirmInterruption) AlertDialog(
+        onDismissRequest = { confirmInterruption = false },
+        title = { Text("更新 DSH 运行包") },
+        text = { Text("本机 DSH 服务或任务正在运行。立即更新会先停止这些任务和服务，确认停止后再切换版本；选择稍后可继续当前任务。") },
+        confirmButton = { TextButton(onClick = {
+            confirmInterruption = false
+            repository.installDshRelease(interruptConfirmed = true)
+        }) { Text("立即中断并更新", color = MaterialTheme.colorScheme.error) } },
+        dismissButton = { TextButton(onClick = { confirmInterruption = false; notify("已保留当前运行版本，稍后可再次更新") }) { Text("稍后更新") } },
+    )
 }
 
 private enum class ComponentAvailability(val label: String) {
@@ -1958,7 +2021,7 @@ private data class ComponentCapability(
 private fun readComponentCapabilities(context: Context): List<ComponentCapability> {
     val packageManager = context.packageManager
     val requestedPermissions = runCatching {
-        packageManager.getPackageInfo(context.packageName, 0).requestedPermissions.orEmpty().toSet()
+        packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions.orEmpty().toSet()
     }.getOrDefault(emptySet())
     val cameraDeclared = Manifest.permission.CAMERA in requestedPermissions
     val cameraPresent = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
@@ -2295,7 +2358,7 @@ private fun readInstalledPackageSnapshot(context: Context): InstalledPackageSnap
         InstalledPackageSnapshot(
             packageName = info.packageName,
             versionName = info.versionName ?: "未设置",
-            versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode else info.versionCode.toLong(),
+            versionCode = info.longVersionCode,
             firstInstallTime = info.firstInstallTime,
             lastUpdateTime = info.lastUpdateTime,
         )
@@ -2320,78 +2383,129 @@ private fun formatInstalledTime(epochMillis: Long): String {
 private fun UpdateContent(repository: DemoRepository, notify: (String) -> Unit) {
     val context = LocalContext.current
     val installedPackage = remember(context) { readInstalledPackageSnapshot(context) }
-    val policy = repository.updatePolicy
-    val developerCenter = remember { DeveloperCenterClient() }
+    val releaseClient = remember(context) { AndroidReleaseClient(context) }
     val scope = rememberCoroutineScope()
-    var bundleVersion by rememberSaveable { mutableStateOf(if (repository.dshVersionChannel == "preview") "0.2.1-alpha.1" else "0.2.0-rc.2") }
-    var bundleManifest by remember { mutableStateOf<DeveloperCenterClient.DshBundleManifest?>(null) }
-    var bundleError by remember { mutableStateOf<String?>(null) }
-    var bundleBusy by remember { mutableStateOf(false) }
-    val localReadStatus = installedPackage.error?.let { "读取失败：$it" } ?: "已读取当前安装包信息"
+    val policy = repository.updatePolicy
+    var manifest by remember { mutableStateOf<AndroidReleaseManifest?>(null) }
+    var checking by remember { mutableStateOf(true) }
+    var downloadBusy by remember { mutableStateOf(false) }
+    var downloadedApk by remember { mutableStateOf<File?>(null) }
+    val progressFlow = remember { kotlinx.coroutines.flow.MutableStateFlow<ArtifactDownloadProgress?>(null) }
+    val downloadProgress by progressFlow.collectAsState()
+    var downloadJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var refreshRevision by remember { mutableIntStateOf(0) }
+    var installBusy by remember { mutableStateOf(false) }
+    var updateError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(releaseClient, refreshRevision) {
+        checking = true
+        try {
+            releaseClient.getCurrent("stable")
+                .onSuccess { value ->
+                    manifest = value
+                    updateError = null
+                    downloadedApk = releaseClient.findVerifiedDownload(value).getOrNull()
+                }
+                .onFailure { error -> updateError = error.message ?: "检查更新失败" }
+        } finally { checking = false }
+    }
+
+    val availableUpdate = manifest?.takeIf { it.versionCode > installedPackage.versionCode }
+    fun downloadUpdate() {
+        val target = availableUpdate ?: return
+        if (downloadBusy) return
+        downloadBusy = true
+        updateError = null
+        downloadJob = scope.launch {
+            try {
+                releaseClient.download(target, source = repository.downloadSource) { value -> progressFlow.value = value }
+                    .onSuccess { file ->
+                        downloadedApk = file
+                        notify("${target.version} 已下载并通过校验，请点击立即更新")
+                    }
+                    .onFailure { error -> updateError = error.message ?: "下载更新失败" }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                updateError = "下载已暂停，可重新下载以继续。"
+                throw cancelled
+            } finally { downloadBusy = false; downloadJob = null }
+        }
+    }
+
+    fun installUpdate() {
+        val target = availableUpdate ?: return
+        if (downloadedApk == null || installBusy) return
+        installBusy = true
+        scope.launch {
+            try {
+                releaseClient.launchUserConfirmedInstall(target)
+                    .onSuccess { result ->
+                        if (result == AndroidInstallLaunch.SOURCE_PERMISSION_OPENED) {
+                            notify("在系统中允许安装后，请返回并再次点击立即更新。")
+                        }
+                    }
+                    .onFailure { error -> updateError = error.message ?: "无法打开系统安装确认" }
+            } finally { installBusy = false }
+        }
+    }
 
     DetailCard {
-        TinyLabel("软件更新", primary = true)
-        Text("保持大肥鱼 Go 最新", style = MaterialTheme.typography.titleLarge)
-        Hint("更新策略保存在当前页面；Android 安装仍由系统包管理器确认，应用不能静默替换自身。")
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            FishGlyph("app-icon", Modifier.size(54.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("大肥鱼 GO", style = MaterialTheme.typography.titleLarge)
+                Hint("当前版本 ${installedPackage.versionName}")
+            }
+        }
+        Text("更新详情", style = MaterialTheme.typography.titleMedium)
+        when {
+            checking -> Hint("正在检查正式更新清单…")
+            updateError != null -> Text(updateError.orEmpty(), color = MaterialTheme.colorScheme.error)
+            availableUpdate != null -> {
+                Text("有新版本 ${availableUpdate.version}", style = MaterialTheme.typography.titleMedium)
+                Hint(availableUpdate.releaseNotes.ifBlank { "本次更新没有附加说明。" })
+            }
+            else -> Hint("当前已是最新版本（${installedPackage.versionName}）。")
+        }
+        installedPackage.error?.let { Text("无法读取当前版本：$it", color = MaterialTheme.colorScheme.error) }
+        if (availableUpdate != null) {
+            FishButton(
+                onClick = if (downloadedApk != null) ::installUpdate else ::downloadUpdate,
+                enabled = !downloadBusy && !installBusy,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                FishGlyph(if (downloadedApk == null) "download" else "check", Modifier.size(18.dp))
+                val buttonLabel = when {
+                    installBusy -> "正在校验…"
+                    downloadBusy -> "正在下载…"
+                    downloadedApk != null -> "立即更新"
+                    else -> "下载更新"
+                }
+                Text(buttonLabel)
+            }
+            downloadProgress?.let { progress ->
+                val total = progress.totalBytes
+                Hint(if (total != null && total > 0L) "${formatBytes(progress.receivedBytes)} / ${formatBytes(total)}" else "正在校验下载…")
+            }
+            if (downloadBusy) FishButton(onClick = { downloadJob?.cancel() }, accent = false) { Text("暂停下载") }
+        }
+        FishButton(onClick = { refreshRevision++ }, enabled = !checking && !downloadBusy && !installBusy, accent = false) {
+            Text("检查更新")
+        }
+    }
+    DetailCard {
+        Text("保持大肥鱼 GO 最新", style = MaterialTheme.typography.titleLarge)
         Column(Modifier.selectableGroup()) {
-            SelectionRow("自动下载并更新", "有可用版本时自动处理下载", policy == "auto", "download") { repository.updateUpdatePolicy("auto") }
+            SelectionRow("自动下载", "有新版本时下载并校验，由你确认安装", policy == "auto", "download") { repository.updateUpdatePolicy("auto") }
             FishDivider()
             SelectionRow("仅提醒", "由你决定何时下载和安装", policy == "remind", "bell") { repository.updateUpdatePolicy("remind") }
             FishDivider()
             SelectionRow("关闭", "不主动检查更新", policy == "off", "close") { repository.updateUpdatePolicy("off") }
         }
         FishDivider()
-        ToggleRow("仅在 Wi-Fi 下下载（预留）", "应用更新下载服务尚未接入", checked = false, enabled = false)
-    }
-    DetailCard {
-        TinyLabel("当前安装包", primary = installedPackage.error == null)
-        Text(localReadStatus, style = MaterialTheme.typography.titleMedium,
-            color = if (installedPackage.error == null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error)
-        OnlineValueRow("包名", installedPackage.packageName)
-        OnlineValueRow("版本", "${installedPackage.versionName} · versionCode ${if (installedPackage.versionCode >= 0) installedPackage.versionCode else "未知"}")
-        OnlineValueRow("首次安装", formatInstalledTime(installedPackage.firstInstallTime))
-        OnlineValueRow("最近更新", formatInstalledTime(installedPackage.lastUpdateTime))
-        if (installedPackage.error != null) {
-            Hint("无法读取完整安装包信息；请稍后重试。")
-        }
-    }
-    Hint("Android 更新服务尚未接入：当前不发起网络请求、不下载文件，也不触发安装。")
-    DetailCard {
-        TinyLabel("Windows DSH bundle", primary = true)
-        Text("读取已发布的 Windows bundle manifest", style = MaterialTheme.typography.titleMedium)
-        Hint("此接口只描述 Windows x64 / Node 22 的 DSH bundle，不是 Android APK，也不会自动下载或安装。")
-        OutlinedTextField(
-            value = bundleVersion,
-            onValueChange = { bundleVersion = it.take(80); bundleError = null },
-            label = { Text("精确版本") },
-            singleLine = true,
-            enabled = !bundleBusy,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        FishButton(
-            onClick = {
-                scope.launch {
-                    bundleBusy = true
-                    bundleError = null
-                    bundleManifest = null
-                    developerCenter.getDshBundleManifest(bundleVersion)
-                        .onSuccess { bundleManifest = it }
-                        .onFailure { bundleError = it.message ?: "暂时无法读取 bundle manifest" }
-                    bundleBusy = false
-                }
-            },
-            enabled = !bundleBusy && bundleVersion.isNotBlank(),
-            accent = false,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(if (bundleBusy) "读取中…" else "读取 bundle manifest") }
-        bundleManifest?.let { manifest ->
-            FishDivider()
-            OnlineValueRow("平台", "${manifest.platform} · Node ${manifest.nodeMajor}")
-            OnlineValueRow("文件", manifest.fileName)
-            OnlineValueRow("大小", formatBytes(manifest.sizeBytes))
-            OnlineValueRow("SHA-256", manifest.sha256)
-        }
-        bundleError?.let { Hint("读取失败：$it") }
+        ToggleRow("仅在 Wi-Fi 下下载", "自动下载只在 Wi-Fi 可用时开始；安装仍需你确认",
+            checked = repository.updateWifiOnly, enabled = true, onCheckedChange = repository::updateUpdateWifiOnly)
+        Hint("安装始终需要你点击「立即更新」并在系统页面确认。")
     }
 }
 
@@ -2411,6 +2525,11 @@ private fun FeedbackContent(notify: (String) -> Unit) {
     var myFeedback by remember { mutableStateOf<List<DeveloperCenterClient.FeedbackItem>?>(null) }
     var feedbackLoaded by remember { mutableStateOf(false) }
     var feedbackLoadError by remember { mutableStateOf<String?>(null) }
+    var feedbackRefreshRevision by remember { mutableIntStateOf(0) }
+    var feedbackOffset by rememberSaveable { mutableIntStateOf(0) }
+    var feedbackNextOffset by remember { mutableStateOf<Int?>(null) }
+    var listCategory by rememberSaveable { mutableStateOf("mine") }
+    var listStatus by rememberSaveable { mutableStateOf("all") }
     var expandedFeedbackId by rememberSaveable { mutableStateOf<String?>(null) }
     var supplementCache by remember { mutableStateOf<Map<String, List<DeveloperCenterClient.FeedbackSupplement>>>(emptyMap()) }
     var supplementNextOffset by remember { mutableStateOf<Map<String, Int?>>(emptyMap()) }
@@ -2433,10 +2552,13 @@ private fun FeedbackContent(notify: (String) -> Unit) {
             .onFailure { feedbackBanCheckError = it.message ?: "无法检查反馈权限" }
     }
 
-    LaunchedEffect(developerCenter, machineId, installationId) {
-        developerCenter.getFeedback(machineId = machineId, installationId = installationId)
+    LaunchedEffect(developerCenter, machineId, installationId, feedbackOffset, feedbackRefreshRevision) {
+        feedbackLoaded = false
+        feedbackLoadError = null
+        developerCenter.getFeedback(machineId = machineId, installationId = installationId, offset = feedbackOffset, limit = 10)
             .onSuccess { page ->
                 myFeedback = page.feedback
+                feedbackNextOffset = page.nextOffset
                 feedbackLoaded = true
                 feedbackLoadError = null
                 supplementCache = page.feedback.associate { item -> item.id.toString() to item.supplements }
@@ -2444,6 +2566,7 @@ private fun FeedbackContent(notify: (String) -> Unit) {
             }
             .onFailure {
                 myFeedback = emptyList()
+                feedbackNextOffset = null
                 feedbackLoaded = true
                 feedbackLoadError = it.message ?: "暂时无法读取反馈"
                 supplementCache = emptyMap()
@@ -2514,7 +2637,7 @@ private fun FeedbackContent(notify: (String) -> Unit) {
 
     DetailCard {
         TinyLabel("反馈与建议", primary = true)
-        Text("让下一版更贴近你的工作方式", style = MaterialTheme.typography.titleLarge)
+        Text("把你的想法留给 Dafeiyu-GO", style = MaterialTheme.typography.titleLarge)
         Hint("提交时只使用随机安装 UUID、应用版本和你填写的正文；诊断摘要不会上传。")
         feedbackBanStatus?.takeIf { it.banned }?.let { ban ->
             Text(
@@ -2597,12 +2720,8 @@ private fun FeedbackContent(notify: (String) -> Unit) {
                                 ).onSuccess {
                                     submitted = true
                                     notify("反馈已提交 · 感谢你的建议")
-                                    developerCenter.getFeedback(machineId, installationId)
-                                        .onSuccess { page ->
-                                            myFeedback = page.feedback
-                                            feedbackLoaded = true
-                                            supplementCache = page.feedback.associate { item -> item.id.toString() to item.supplements }
-                                        }
+                                    feedbackOffset = 0
+                                    feedbackRefreshRevision++
                                 }.onFailure {
                                     notify("反馈提交失败：${it.message?.take(80) ?: "服务暂不可用"}")
                                 }
@@ -2620,12 +2739,31 @@ private fun FeedbackContent(notify: (String) -> Unit) {
         }
     }
     DetailCard {
-        TinyLabel("我的反馈", primary = true)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("现有反馈与建议", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+            TextButton(onClick = { feedbackRefreshRevision++ }, enabled = feedbackLoaded) { Text("刷新") }
+        }
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("all" to "全部反馈（预留）", "Suggestion" to "需求建议", "Bug" to "漏洞反馈", "mine" to "我的提交").forEach { (id, label) ->
+                FilterChip(selected = listCategory == id, enabled = id != "all", onClick = { listCategory = id }, label = { Text(label) })
+            }
+        }
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("all" to "全部状态", "Submitted" to "已提交", "Processing" to "处理中", "Completed" to "已完成", "Deferred" to "暂不处理").forEach { (id, label) ->
+                FilterChip(selected = listStatus == id, onClick = { listStatus = id }, label = { Text(label) })
+            }
+        }
+        Hint("当前读取我的提交，筛选应用于当前页。手机独立的全部反馈列表将在服务接通后开放。")
+        val filteredFeedback = myFeedback.orEmpty().filter {
+            (listCategory == "mine" || it.category == listCategory) && (listStatus == "all" || it.status == listStatus)
+        }
         when {
             !feedbackLoaded -> Hint("正在读取你的反馈…")
+            feedbackLoadError != null -> Text("读取失败：$feedbackLoadError", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             myFeedback.isNullOrEmpty() -> Hint("暂无反馈记录；网络不可用或你还没有提交反馈。")
+            filteredFeedback.isEmpty() -> Hint("此页暂无符合筛选的反馈。")
             else -> {
-                myFeedback.orEmpty().forEachIndexed { index, item ->
+                filteredFeedback.forEachIndexed { index, item ->
                     if (index > 0) FishDivider()
                     val id = item.id.toString()
                     val expanded = expandedFeedbackId == id
@@ -2767,12 +2905,17 @@ private fun FeedbackContent(notify: (String) -> Unit) {
                 }
             }
         }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = { feedbackOffset = (feedbackOffset - 10).coerceAtLeast(0) }, enabled = feedbackLoaded && feedbackOffset > 0) { Text("上一页") }
+            Hint("第 ${feedbackOffset / 10 + 1} 页")
+            TextButton(onClick = { feedbackNextOffset?.let { feedbackOffset = it } }, enabled = feedbackLoaded && feedbackNextOffset != null) { Text("下一页") }
+        }
     }
 }
 
 private fun feedbackCategoryLabel(category: String): String = when (category) {
-    "Bug" -> "问题反馈"
-    "Suggestion" -> "功能建议"
+    "Bug" -> "漏洞反馈"
+    "Suggestion" -> "需求建议"
     else -> category
 }
 
@@ -2782,7 +2925,7 @@ private fun FeedbackStatusLabel(status: String) {
         "Submitted" -> "已提交"
         "Processing" -> "处理中"
         "Completed" -> "已完成"
-        "Deferred" -> "已延期"
+        "Deferred" -> "暂不处理"
         else -> status
     }
     Text(
@@ -2797,18 +2940,18 @@ private fun formatFeedbackTime(raw: String): String {
 }
 
 @Composable
-private fun AboutContent() {
+private fun AboutContent(repository: DemoRepository, onDeveloper: () -> Unit) {
     val context = LocalContext.current
     val packageInfo = remember(context) {
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
     }
     val versionName = packageInfo?.versionName ?: "未知版本"
-    val versionCode = packageInfo?.let {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) it.longVersionCode else it.versionCode.toLong()
-    } ?: 0L
+    val versionCode = packageInfo?.longVersionCode ?: 0L
     val developerCenter = remember { DeveloperCenterClient() }
     var acknowledgements by remember { mutableStateOf<List<DeveloperCenterClient.Acknowledgement>?>(null) }
     var acknowledgementsLoaded by remember { mutableStateOf(false) }
+    var versionTaps by remember { mutableIntStateOf(0) }
+    var lastVersionTap by remember { mutableStateOf(0L) }
 
     LaunchedEffect(developerCenter) {
         developerCenter.getAcknowledgements()
@@ -2826,16 +2969,25 @@ private fun AboutContent() {
         FishGlyph("app-icon", Modifier.size(64.dp))
         Text("大肥鱼 Go", style = MaterialTheme.typography.headlineMedium)
         Text("把想法，带到更远的地方。", style = MaterialTheme.typography.bodyLarge)
-        TinyLabel("$versionName · versionCode $versionCode", primary = true)
-        Hint("版本信息来自 Android PackageManager；当前材质：${GlassRendererDiagnostics.status}")
+        TextButton(onClick = {
+            val now = android.os.SystemClock.elapsedRealtime()
+            versionTaps = if (now - lastVersionTap <= 4_000L) versionTaps + 1 else 1
+            lastVersionTap = now
+            if (versionTaps >= 5) { repository.updateDeveloperMode(true); versionTaps = 0 }
+        }) { TinyLabel("$versionName · versionCode $versionCode", primary = true) }
+        AnimatedVisibility(repository.developerMode,
+            enter = fadeIn(GlassMotion.scalar(GlassMotion.MorphMillis, LocalReduceGlassMotion.current)),
+            exit = fadeOut(GlassMotion.scalar(GlassMotion.MorphMillis, LocalReduceGlassMotion.current))) {
+            FishButton(onClick = onDeveloper, accent = false, modifier = Modifier.fillMaxWidth()) { Text("打开开发者页面") }
+        }
     }
     DetailCard {
         Text("为手机重新设计", style = MaterialTheme.typography.titleMedium)
         Hint("导航与浮动操作采用通透材料，设置列表与详情采用清晰的分组表面。点开设置项时从原圆角组展开，返回时收回原位置。")
         Hint("按钮使用弹性按压反馈，支持拖动的面板有独立握柄，松手回弹；真实运动与材质效果以当前 Android 设备呈现为准。")
         FishDivider()
-        Text("接下来", style = MaterialTheme.typography.titleMedium)
-        Hint("对话界面提供独立的手机工作空间；真实 DSH 接入将继续讨论。优先验证手机本地运行，电脑连接预留 Dafeiyu-GO-Aries。")
+        Text("引擎与连接", style = MaterialTheme.typography.titleMedium)
+        Hint("官方轻引擎提供原生聊天；本机 DSH 使用已安装的运行环境。在线模式由配对电脑处理任务，可用能力以电脑和节点的实际声明为准。")
     }
     DetailCard {
         TinyLabel("公开致谢", primary = true)
@@ -2916,7 +3068,7 @@ private fun formatMetricRate(value: Double?): String {
 
 @Composable
 private fun RuntimeContent(repository: DemoRepository) {
-    LinuxComponentsContent(repository)
+    LinuxRuntimeDetailsContent(repository)
 }
 
 @Composable

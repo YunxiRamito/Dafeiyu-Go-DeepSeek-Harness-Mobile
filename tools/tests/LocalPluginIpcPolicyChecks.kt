@@ -63,6 +63,19 @@ fun main() {
     test("keeps the runtime binding single-use") {
         invalid { session.bindRuntime(LocalPluginIpcPolicy.RuntimeIdentity(2346, 1234, 10123)) }
     }
+    test("PRoot binding admits exactly the verified launcher child with the app UID") {
+        val traced = LocalPluginIpcPolicy.Session(10123, 1234, "01234567-89ab-cdef-0123-456789abcdef", capability())
+        val node = LocalPluginIpcPolicy.RuntimeIdentity(3456, 2345, 10123)
+        val launcher = LocalPluginIpcPolicy.RuntimeIdentity(2345, 1234, 10123)
+        invalid { traced.bindRuntime(node, launcher.copy(parentPid = 9999)) }
+        invalid { traced.bindRuntime(node, launcher.copy(uid = 10124)) }
+        invalid { traced.bindRuntime(node.copy(parentPid = 7777), launcher) }
+        invalid { traced.bindRuntime(node.copy(uid = 10124), launcher) }
+        traced.bindRuntime(node, launcher)
+        check(traced.acceptsPeer(10123, 3456))
+        check(!traced.acceptsPeer(10123, 2345) && !traced.acceptsPeer(10124, 3456))
+        traced.close()
+    }
 
     fun request(nonce: String = "a".repeat(24)): JSONObject =
         JSONObject()
@@ -78,6 +91,17 @@ fun main() {
         val accepted = session.validate(request())
         check(accepted.id == "req_001" && accepted.method == "get_connection_state")
         check(accepted.params.length() == 0)
+    }
+    test("preserves a validated remote scope for serialized native admission") {
+        val scope = JSONObject().put("node_id", "node_1").put("group_id", "group_1")
+            .put("local_device_id", "phone_1").put("remote_device_id", "pc_1")
+        val result = session.validate(request("s".repeat(24)).put("remote_scope", scope))
+        scope.put("group_id", "changed")
+        check(result.remoteScope?.getString("group_id") == "group_1")
+        for (value in listOf(JSONObject.NULL, JSONArray(), "bad", JSONObject(scope.toString()).put("extra", true),
+                JSONObject(scope.toString()).put("node_id", 1), JSONObject(scope.toString()).put("remote_device_id", "phone_1"))) {
+            check(rejected { session.validate(request().put("remote_scope", value)) }.code == "protocol_error")
+        }
     }
     test("rejects non-object params instead of coercing to an empty object") {
         for (value in listOf(JSONArray(), "wrong", 1, JSONObject.NULL)) {
@@ -186,13 +210,13 @@ fun main() {
         replacement.close()
         permits.drop(1).forEach { it.close() }
     }
-    test("concurrent peer admission never exceeds four live permits") {
-        val pool = Executors.newFixedThreadPool(16)
+    test("concurrent peer admission reserves sixteen bounded slots for data and control") {
+        val pool = Executors.newFixedThreadPool(32)
         val start = CountDownLatch(1)
-        val tried = CountDownLatch(16)
+        val tried = CountDownLatch(32)
         val release = CountDownLatch(1)
         try {
-            val attempts = (0 until 16).map {
+            val attempts = (0 until 32).map {
                 pool.submit<Boolean> {
                     start.await()
                     val permit = session.acquirePeer(10123, 2345)
@@ -220,10 +244,170 @@ fun main() {
         check(rejected { bounded.validate(request("0".repeat(24))) }.code == "permission_denied")
         bounded.close()
     }
+    test("tracer identity has one exact nonnegative kernel field") {
+        check(LocalPluginIpcPolicy.runtimeTracerPid("Pid: 2345\nTracerPid:\t3456\n") == 3456)
+        check(LocalPluginIpcPolicy.runtimeTracerPid("TracerPid: 0\n") == 0)
+        for (value in listOf("", "TracerPid: -1\n", "TracerPid: 3456\nTracerPid: 3456\n", "TracerPid: 12 34\n"))
+            check(runCatching { LocalPluginIpcPolicy.runtimeTracerPid(value) }.isFailure)
+    }
+    val expectedNode = "/data/user/0/example/files/linux-runtime/slots/frozen/usr/local/bin/node"
+    val nodeMaps = "00400000-00741000 r--p 00000000 fe:06 377477 $expectedNode\n" +
+        "00741000-0300b000 r-xp 00341000 fe:06 377477 $expectedNode\n" +
+        "600000000000-600000001000 r-xp 00004000 fe:06 101190 /data/app/frozen/lib/x86_64/liblinux_prootloader.so\n"
+    test("PRoot node evidence binds exact immutable kernel mappings") {
+        val evidence = LocalPluginIpcPolicy.mappedExecutableEvidence(nodeMaps, expectedNode, 65030L, 377477L)
+        check(evidence.size == 2 && evidence.last().contains("r-xp"))
+        check(evidence == LocalPluginIpcPolicy.mappedExecutableEvidence(nodeMaps, expectedNode, 65030L, 377477L))
+    }
+    test("mapped Node rejects another device or inode") {
+        check(runCatching { LocalPluginIpcPolicy.mappedExecutableEvidence(nodeMaps, expectedNode, 65031L, 377477L) }.isFailure)
+        check(runCatching { LocalPluginIpcPolicy.mappedExecutableEvidence(nodeMaps, expectedNode, 65030L, 377478L) }.isFailure)
+    }
+    test("loader mapping alone cannot impersonate Node") {
+        check(runCatching { LocalPluginIpcPolicy.mappedExecutableEvidence(nodeMaps.substringAfterLast("377477 $expectedNode\n"), expectedNode, 65030L, 377477L) }.isFailure)
+    }
+    test("data-only or writable executable mappings cannot bind a Node runtime") {
+        for (permission in listOf("r--p", "rwxp", "r-xs"))
+            check(runCatching { LocalPluginIpcPolicy.mappedExecutableEvidence(nodeMaps.replace("r-xp 00341000", "$permission 00341000"), expectedNode, 65030L, 377477L) }.isFailure)
+    }
+    test("changed path or deleted executable is rejected") {
+        for (suffix in listOf("-other", " (deleted)", "/injected"))
+            check(runCatching { LocalPluginIpcPolicy.mappedExecutableEvidence(nodeMaps.replace(expectedNode, expectedNode + suffix), expectedNode, 65030L, 377477L) }.isFailure)
+    }
+    test("malformed executable mapping rejects before binding") {
+        check(runCatching { LocalPluginIpcPolicy.mappedExecutableEvidence(nodeMaps.replace("fe:06", "invalid"), expectedNode, 65030L, 377477L) }.isFailure)
+        check(runCatching { LocalPluginIpcPolicy.mappedExecutableEvidence(nodeMaps.replace("00400000-00741000", "bogus"), expectedNode, 65030L, 377477L) }.isFailure)
+    }
     test("closing the session invalidates credentials and peers") {
         session.close()
         check(!session.acceptsPeer(10123, 2345))
         check(rejected { session.validate(request()) }.code == "permission_denied")
+    }
+    fun bulkParams(operation: String = "artifact.read"): JSONObject = JSONObject().put("kind", "dsh_remote_request")
+        .put("group_id", "group-a").put("idempotency_key", "dsh-remote-android-r1")
+        .put("body", JSONObject().put("protocol", "dafeiyu-go.remote-dsh.v1").put("request_id", "android-r1")
+            .put("target_device_id", "computer").put("operation", operation)
+            .put("payload", JSONObject().put("ticketId", "ticket-a").put("offset", 0).put("size", 48 * 1024)))
+    fun bulkScope(): JSONObject = JSONObject().put("node_id", "node-a").put("group_id", "group-a")
+        .put("local_device_id", "phone").put("remote_device_id", "computer")
+    test("a claimed IPC scope alone cannot enter the native bulk path") {
+        LocalPluginIpcPolicy.NativeAdmissions().use { admissions ->
+            check(admissions.consume("send_encrypted_message", bulkParams(), bulkScope()) == null)
+        }
+    }
+    test("native admission freezes every business field and exact typed scope") {
+        LocalPluginIpcPolicy.NativeAdmissions().use { admissions ->
+            val params = bulkParams()
+            val scope = bulkScope()
+            val frozen = JSONObject(params.toString())
+            val token = admissions.register("send_encrypted_message", params, scope) ?: error("missing ticket")
+            params.getJSONObject("body").getJSONObject("payload").put("offset", 48 * 1024)
+            check(admissions.consume("send_encrypted_message", params, bulkScope()) == null)
+            scope.put("remote_device_id", "other-computer")
+            check(admissions.consume("send_encrypted_message", frozen, scope) == null)
+            check(admissions.consume("acknowledge_message", frozen, bulkScope()) == null)
+            check(admissions.consume("send_encrypted_message", frozen, bulkScope())?.getString("remote_device_id") == "computer")
+            check(admissions.consume("send_encrypted_message", frozen, bulkScope()) == null)
+            admissions.revoke(token)
+        }
+    }
+    test("native fingerprint accepts reordered JSON and returns a detached scope once") {
+        LocalPluginIpcPolicy.NativeAdmissions().use { admissions ->
+            val original = bulkParams()
+            admissions.register("send_encrypted_message", original, bulkScope())
+            val reordered = JSONObject().put("body", original.getJSONObject("body"))
+                .put("idempotency_key", original.getString("idempotency_key")).put("group_id", "group-a").put("kind", "dsh_remote_request")
+            val result = admissions.consume("send_encrypted_message", reordered, bulkScope()) ?: error("missing admission")
+            result.put("remote_device_id", "changed")
+            check(admissions.consume("send_encrypted_message", original, bulkScope()) == null)
+        }
+    }
+    test("task intents and opaque plugin calls never get native bulk admission") {
+        LocalPluginIpcPolicy.NativeAdmissions().use { admissions ->
+            for (operation in listOf("session.prompt", "attachment.prepare", "attachment.commit", "attachment.cancel", "artifact.prepare", "workspace.files.delete", "web.http")) {
+                check(admissions.register("send_encrypted_message", bulkParams(operation), bulkScope()) == null)
+            }
+            check(admissions.register("get_connection_state", bulkParams(), bulkScope()) == null)
+        }
+    }
+    test("timed out or revoked app requests cannot reuse native admission") {
+        var now = 1L
+        LocalPluginIpcPolicy.NativeAdmissions { now }.use { admissions ->
+            val token = admissions.register("send_encrypted_message", bulkParams(), bulkScope())
+            admissions.revoke(token)
+            check(admissions.consume("send_encrypted_message", bulkParams(), bulkScope()) == null)
+            admissions.register("send_encrypted_message", bulkParams(), bulkScope())
+            now += TimeUnit.MILLISECONDS.toNanos(LocalPluginIpcPolicy.DEADLINE_MILLIS)
+            check(admissions.consume("send_encrypted_message", bulkParams(), bulkScope()) == null)
+        }
+    }
+    test("admission capacity is bounded and a new bridge cannot inherit old leases") {
+        val old = LocalPluginIpcPolicy.NativeAdmissions()
+        repeat(LocalPluginIpcPolicy.MAX_CLIENTS) { old.register("send_encrypted_message", bulkParams(), bulkScope()) }
+        check(runCatching { old.register("send_encrypted_message", bulkParams(), bulkScope()) }.isFailure)
+        old.close()
+        check(old.consume("send_encrypted_message", bulkParams(), bulkScope()) == null)
+        check(runCatching { old.register("send_encrypted_message", bulkParams(), bulkScope()) }.isFailure)
+        LocalPluginIpcPolicy.NativeAdmissions().use { replacement ->
+            check(replacement.consume("send_encrypted_message", bulkParams(), bulkScope()) == null)
+        }
+    }
+    fun webAck(): JSONObject = JSONObject().put("group_id", "group-a").put("kind", "dsh_remote_ack")
+        .put("idempotency_key", "web-ack-android-r1-0").put("body", JSONObject().put("protocol", "dafeiyu-go.remote-dsh.v1")
+            .put("request_id", "android-r1").put("target_device_id", "computer").put("sequence", 0))
+    test("scoped sideband is single use and plugin JSON alone never admits a call") {
+        LocalPluginIpcPolicy.NativeScopedAdmissions().use { admissions ->
+            val params = bulkParams("web.http")
+            check(admissions.consume("send_encrypted_message", params, bulkScope()) == null)
+            admissions.register("send_encrypted_message", params, bulkScope(), "remote_web_tunnel", null)
+            check(admissions.consume("send_encrypted_message", params, bulkScope())?.capability == "remote_web_tunnel")
+            check(admissions.consume("send_encrypted_message", params, bulkScope()) == null)
+        }
+    }
+    test("scoped metadata cannot substitute method, body, exact scope or required capability") {
+        LocalPluginIpcPolicy.NativeScopedAdmissions().use { admissions ->
+            val params = bulkParams("web.http")
+            admissions.register("send_encrypted_message", params, bulkScope(), "remote_web_tunnel", null)
+            val changed = JSONObject(params.toString()).also { it.getJSONObject("body").getJSONObject("payload").put("offset", 1) }
+            check(admissions.consume("send_encrypted_message", changed, bulkScope()) == null)
+            check(admissions.consume("acknowledge_message", params, bulkScope()) == null)
+            check(admissions.consume("send_encrypted_message", params, bulkScope().put("group_id", "foreign")) == null)
+            check(runCatching { admissions.register("send_encrypted_message", params, bulkScope(), "remote_task", null) }.isFailure)
+            check(admissions.consume("send_encrypted_message", params, bulkScope())?.scope?.getString("group_id") == "group-a")
+        }
+    }
+    test("web combined ACK sideband fixes one exact local message and cannot be ambiguous") {
+        LocalPluginIpcPolicy.NativeScopedAdmissions().use { admissions ->
+            admissions.register("send_encrypted_message", webAck(), bulkScope(), "remote_web_tunnel", "msg-exact")
+            check(runCatching { admissions.register("send_encrypted_message", webAck(), bulkScope(), "remote_web_tunnel", "msg-foreign") }.isFailure)
+            val proof = admissions.consume("send_encrypted_message", webAck(), bulkScope()) ?: error("missing proof")
+            check(proof.acknowledgeMessageId == "msg-exact")
+            proof.scope.put("group_id", "changed")
+            check(admissions.consume("send_encrypted_message", webAck(), bulkScope()) == null)
+        }
+    }
+    test("combined ACK cannot be applied to task, malformed envelope or absent local message") {
+        LocalPluginIpcPolicy.NativeScopedAdmissions().use { admissions ->
+            check(runCatching { admissions.register("send_encrypted_message", bulkParams("session.prompt"), bulkScope(), "remote_task", "msg") }.isFailure)
+            check(runCatching { admissions.register("send_encrypted_message", webAck(), bulkScope(), "remote_web_tunnel", null) }.isFailure)
+            val malformed = webAck().also { it.getJSONObject("body").put("sequence", 0.5) }
+            check(runCatching { admissions.register("send_encrypted_message", malformed, bulkScope(), "remote_web_tunnel", "msg") }.isFailure)
+        }
+    }
+    test("expired, cancelled and closed scoped admissions cannot cross runtime generations") {
+        var now = 1L
+        val old = LocalPluginIpcPolicy.NativeScopedAdmissions { now }
+        val token = old.register("send_encrypted_message", bulkParams("web.http"), bulkScope(), "remote_web_tunnel", null)
+        old.revoke(token)
+        check(old.consume("send_encrypted_message", bulkParams("web.http"), bulkScope()) == null)
+        old.register("send_encrypted_message", bulkParams("web.http"), bulkScope(), "remote_web_tunnel", null)
+        now += TimeUnit.MILLISECONDS.toNanos(LocalPluginIpcPolicy.DEADLINE_MILLIS)
+        check(old.consume("send_encrypted_message", bulkParams("web.http"), bulkScope()) == null)
+        old.close()
+        check(runCatching { old.register("send_encrypted_message", bulkParams("web.http"), bulkScope(), "remote_web_tunnel", null) }.isFailure)
+        LocalPluginIpcPolicy.NativeScopedAdmissions().use { replacement ->
+            check(replacement.consume("send_encrypted_message", bulkParams("web.http"), bulkScope()) == null)
+        }
     }
     println("Local plugin IPC policy checks: $checks PASS (offline, no Android socket/runtime)")
 }

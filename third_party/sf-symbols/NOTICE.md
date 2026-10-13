@@ -1,5 +1,7 @@
 # SF Symbols converted assets — local frontend preview
 
+Historical provenance only. As of formal-package development 0.1.25, the Android `sf_*.xml` resources have been replaced by fixed Microsoft Fluent SVG paths under MIT; their resource IDs remain for compatibility. See `../fluent-system-icons/NOTICE.md`. This document records the earlier local preview source and grants no redistribution rights to those earlier assets.
+
 Source repository: https://github.com/UsePreside/sf-symbols
 Baseline commit: 9c12b2ea060e397ac6c554338599ae13d8578666
 Data version: SF Symbols 4.0; available downloaded weight: bold.

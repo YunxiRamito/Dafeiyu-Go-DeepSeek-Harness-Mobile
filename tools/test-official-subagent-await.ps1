@@ -26,6 +26,7 @@ $compileClasspath = @($stdlib, $coroutines, $annotations, $jsonJar, $androidJar)
 $compilerClasspath = @($compiler, $stdlib, $coroutines, $annotations, $reflect, $trove) -join ';'
 $dataRoot = Join-Path $projectRoot 'app\src\main\java\com\dafeiyu\mobile\data'
 $sources = @('AssistantStreamProtocol.kt', 'BalanceStore.kt', 'DeepSeekChatProtocol.kt', 'DeepSeekChatClient.kt',
+    'DeepSeekThinkingPolicy.kt', 'DeepSeekModelCatalog.kt',
     'BackgroundTaskModels.kt', 'BackgroundTaskEngine.kt', 'BackgroundTaskJson.kt',
     'OfficialToolSession.kt', 'OfficialToolDispatcher.kt', 'OfficialToolContract.kt', 'OfficialToolOutputStore.kt') |
     ForEach-Object { Join-Path $dataRoot $_ }

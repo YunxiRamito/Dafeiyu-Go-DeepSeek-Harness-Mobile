@@ -1,0 +1,5 @@
+SnakeYAML org.yaml:snakeyaml:2.4
+https://github.com/snakeyaml/snakeyaml
+Apache License 2.0. Full license: LICENSE.txt.
+Reviewed source commit: 7b8b171c0dbfa8af665c24a63d91f2b185b8701b.
+Used for bounded safe YAML skill frontmatter; no Java object or script construction.

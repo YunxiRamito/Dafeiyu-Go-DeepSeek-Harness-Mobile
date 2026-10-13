@@ -23,18 +23,18 @@ if (-not (Test-Path -LiteralPath $jsonJar)) { throw 'Missing cached org.json tes
 $classpath = @($stdlib, $annotations, $jsonJar) -join ';'
 $outputJar = Join-Path $testRoot 'local-plugin-ipc-policy-checks.jar'
 $dataRoot = Join-Path $projectRoot 'app\src\main\java\com\dafeiyu\mobile\data'
-& (Join-Path $javaRoot 'bin\java.exe') -cp $compilerClasspath org.jetbrains.kotlin.cli.jvm.K2JVMCompiler `
-    -no-stdlib -no-reflect -jvm-target 17 -classpath $classpath -d $outputJar `
+& (Join-Path $javaRoot 'bin\java.exe') "-Djava.io.tmpdir=$testRoot" -Xmx256m -cp $compilerClasspath org.jetbrains.kotlin.cli.jvm.K2JVMCompiler `
+    -Werror -no-stdlib -no-reflect -jvm-target 17 -classpath $classpath -d $outputJar `
     (Join-Path $dataRoot 'LocalPluginIpcPolicy.kt') `
     (Join-Path $PSScriptRoot 'tests\LocalPluginIpcPolicyChecks.kt')
 if ($LASTEXITCODE -ne 0) { throw 'Local plugin IPC policy checks compilation failed' }
-& (Join-Path $javaRoot 'bin\java.exe') -cp "$outputJar;$classpath" com.dafeiyu.mobile.data.LocalPluginIpcPolicyChecksKt
+& (Join-Path $javaRoot 'bin\java.exe') "-Djava.io.tmpdir=$testRoot" -Xmx256m -cp "$outputJar;$classpath" com.dafeiyu.mobile.data.LocalPluginIpcPolicyChecksKt
 if ($LASTEXITCODE -ne 0) { throw 'Local plugin IPC policy checks failed' }
 $androidJar = Join-Path $tempRoot 'toolchains\android-sdk\platforms\android-35\android.jar'
 if (-not (Test-Path -LiteralPath $androidJar)) { throw 'Missing cached Android 35 API jar for compile-only bridge verification' }
 $bridgeClasspath = @($classpath, $coroutines, $androidJar) -join ';'
-& (Join-Path $javaRoot 'bin\java.exe') -cp $compilerClasspath org.jetbrains.kotlin.cli.jvm.K2JVMCompiler `
-    -no-stdlib -no-reflect -jvm-target 17 -classpath $bridgeClasspath `
+& (Join-Path $javaRoot 'bin\java.exe') "-Djava.io.tmpdir=$testRoot" -Xmx256m -cp $compilerClasspath org.jetbrains.kotlin.cli.jvm.K2JVMCompiler `
+    -Werror -no-stdlib -no-reflect -jvm-target 17 -classpath $bridgeClasspath `
     -d (Join-Path $testRoot 'local-plugin-bridge-compile-only.jar') `
     (Join-Path $dataRoot 'LocalPluginIpcPolicy.kt') `
     (Join-Path $dataRoot 'LocalPluginBridge.kt') `

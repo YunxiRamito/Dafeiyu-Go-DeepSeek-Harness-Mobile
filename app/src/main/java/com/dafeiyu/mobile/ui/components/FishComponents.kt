@@ -197,6 +197,7 @@ fun FishGlyph(name: String, modifier: Modifier = Modifier, tint: Color = LocalCo
         "sun" -> com.dafeiyu.mobile.R.drawable.sf_sun
         "link" -> com.dafeiyu.mobile.R.drawable.sf_link
         "play" -> com.dafeiyu.mobile.R.drawable.sf_play
+        "refresh" -> com.dafeiyu.mobile.R.drawable.fluent_refresh
         "chat" -> com.dafeiyu.mobile.R.drawable.sf_chat
         "groupchat" -> com.dafeiyu.mobile.R.drawable.sf_groupchat
         "info", "info-circle" -> com.dafeiyu.mobile.R.drawable.sf_info_circle

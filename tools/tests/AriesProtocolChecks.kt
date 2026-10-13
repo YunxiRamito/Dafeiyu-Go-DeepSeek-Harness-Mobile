@@ -3,6 +3,8 @@ package com.dafeiyu.mobile.data
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.util.concurrent.CancellationException
+import org.json.JSONArray
+import org.json.JSONObject
 
 fun main() {
     var checks = 0
@@ -166,6 +168,53 @@ fun main() {
         check(runCatching {
             AriesProtocolPolicy.readResponse(input, 10) { if (cancelled) throw CancellationException("cancelled") }
         }.exceptionOrNull() is CancellationException)
+    }
+    fun control(sequence: Long, epoch: Long, completed: Any? = null) = JSONObject()
+        .put("sequence", sequence).put("type", "control").put("event", JSONObject()
+            .put("sequence", sequence).put("required_epoch", epoch).also {
+                if (completed != null) it.put("completed_at", completed)
+            })
+    fun page(cursor: Any, vararg values: JSONObject) = JSONObject().put("items", JSONArray(values.toList()))
+        .put("next_cursor", cursor)
+    test("empty event page preserves the persistent decimal cursor and terminates") {
+        for (cursor in listOf("0", "42", "18446744073709551615")) {
+            val result = AriesProtocolPolicy.controlEventPage(page(cursor), cursor, 1uL)
+            check(result.finished && result.nextCursor == cursor && !result.rotationRequired)
+        }
+    }
+    test("control rotation is read from the event envelope and prevents stale key publishing") {
+        val result = AriesProtocolPolicy.controlEventPage(page("5", control(5, 2)), "0", 1uL)
+        check(result.rotationRequired && !result.finished && result.nextCursor == "5")
+        check(!AriesProtocolPolicy.controlEventPage(page("5", control(5, 2, "2026-10-13T00:00:00Z")), "0", 1uL).rotationRequired)
+        check(!AriesProtocolPolicy.controlEventPage(page("5", control(5, 1)), "0", 1uL).rotationRequired)
+    }
+    test("mixed message and control pages maintain the exact last processed sequence") {
+        val message = JSONObject().put("sequence", 6).put("type", "message").put("message", JSONObject().put("sequence", 6))
+        val result = AriesProtocolPolicy.controlEventPage(page("9", message, control(9, 3, JSONObject.NULL)), "5", 2uL)
+        check(result.rotationRequired && result.nextCursor == "9" && !result.finished)
+        check(AriesProtocolPolicy.controlEventPage(page("9"), result.nextCursor, 2uL).finished)
+    }
+    test("event cursor rejects regressions, unexplained jumps and opaque application cursors") {
+        for (cursor in listOf<Any>("4", "6", "", "null", "-1", "1.0", "opaque", "18446744073709551616", 5)) {
+            rejected { AriesProtocolPolicy.controlEventPage(page(cursor), "5", 1uL) }
+        }
+        rejected { AriesProtocolPolicy.controlEventPage(page("8", control(7, 1)), "5", 1uL) }
+        rejected { AriesProtocolPolicy.controlEventPage(JSONObject().put("items", JSONArray()), "0", 1uL) }
+    }
+    test("malformed control records and duplicate sequences cannot bypass rotation checks") {
+        rejected { AriesProtocolPolicy.controlEventPage(page("7", control(7, 1), control(7, 1)), "0", 1uL) }
+        rejected { AriesProtocolPolicy.controlEventPage(page("7", control(8, 1), control(7, 1)), "0", 1uL) }
+        for (mutation in listOf<(JSONObject) -> Unit>(
+            { it.remove("event") },
+            { it.getJSONObject("event").put("sequence", 6) },
+            { it.getJSONObject("event").remove("required_epoch") },
+            { it.getJSONObject("event").put("required_epoch", "2") },
+            { it.getJSONObject("event").put("completed_at", false) },
+            { it.put("sequence", 7.5) },
+            { it.put("type", "unknown") },
+        )) rejected { AriesProtocolPolicy.controlEventPage(page("7", control(7, 2).also(mutation)), "0", 1uL) }
+        val excessive = page("0").put("items", JSONArray((1..201).map { control(it.toLong(), 1) }))
+        rejected { AriesProtocolPolicy.controlEventPage(excessive, "0", 1uL) }
     }
     println("Aries protocol checks: $checks PASS (offline, production policy/parser)")
 }

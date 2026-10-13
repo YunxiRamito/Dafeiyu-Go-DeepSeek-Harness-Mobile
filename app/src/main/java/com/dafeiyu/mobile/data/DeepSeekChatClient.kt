@@ -55,6 +55,8 @@ class DeepSeekChatClient internal constructor(
         val streaming: Boolean = true,
         val tools: List<FunctionTool> = emptyList(),
         val sequenceStart: Long = 0L,
+        val reasoningEffort: String? = null,
+        val modelCapabilities: Model? = null,
     )
     data class Turn(val snapshot: AssistantStreamSnapshot) {
         val completed: Boolean get() = snapshot.messages.isNotEmpty() &&
@@ -132,6 +134,11 @@ class DeepSeekChatClient internal constructor(
         val frozen = request.copy(
             history = request.history.map { it.copy(toolCalls = it.toolCalls.toList(), images = it.images.toList()) },
             tools = request.tools.map { it.copy(parameters = JSONObject(it.parameters.toString())) },
+            modelCapabilities = request.modelCapabilities?.let { it.copy(
+                inputModalities = it.inputModalities.toList(),
+                outputModalities = it.outputModalities.toList(),
+                supportedEffortLevels = it.supportedEffortLevels.toList(),
+            ) },
         )
         val protocol = DeepSeekChatProtocol(startSequenceNumber = frozen.sequenceStart,
             toolsConnected = frozen.tools.isNotEmpty())
@@ -289,6 +296,12 @@ class DeepSeekChatClient internal constructor(
     }
 
     private fun encodeRequest(request: Request): ByteArray {
+        val reasoning = try {
+            DeepSeekThinkingPolicy.validateRequest(request.model, request.thinking, request.reasoningEffort,
+                request.modelCapabilities)
+        } catch (_: IllegalArgumentException) {
+            throw DeepSeekChatException("INVALID_REASONING", "Selected reasoning level is not supported by this model; refresh the model catalog")
+        }
         if (request.model.isBlank() || request.model.length > 512 || request.model.any { it.isISOControl() } ||
             request.history.isEmpty() || request.history.size > 4096 ||
             request.history.any { it.role !in setOf("system", "user", "assistant", "tool") } ||
@@ -336,9 +349,10 @@ class DeepSeekChatClient internal constructor(
         }
         val root = JSONObject().put("model", request.model).put("messages", messages)
             .put("stream", request.streaming)
-        request.thinking?.let {
+        reasoning.thinking?.let {
             root.put("thinking", JSONObject().put("type", if (it) "enabled" else "disabled"))
         }
+        reasoning.reasoningEffort?.let { root.put("reasoning_effort", it) }
         if (request.streaming) root.put("stream_options", JSONObject().put("include_usage", true))
         if (request.tools.isNotEmpty()) {
             root.put("tools", JSONArray().also { tools ->
@@ -388,44 +402,13 @@ class DeepSeekChatClient internal constructor(
             .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(output.toByteArray())).toString()
     }
 
-    private fun parseModels(root: JSONObject): List<Model> {
-        if (root.optString("object") != "list") throw IOException()
-        val data = root.optJSONArray("data") ?: throw IOException()
-        if (data.length() > 1024) throw IOException()
-        val ids = mutableSetOf<String>()
-        return List(data.length()) { index ->
-            val item = data.optJSONObject(index) ?: throw IOException()
-            val id = item.optionalString("id") ?: throw IOException()
-            if (id.isBlank() || id.length > 512 || id.any { it.isISOControl() } || !ids.add(id)) throw IOException()
-            val effort = item.optJSONObject("effort")
-            Model(id, item.optionalString("name"), item.optionalString("owned_by"), item.optionalLong("context_window"),
-                item.optionalLong("max_output_tokens"), item.strings("input_modalities"), item.strings("output_modalities"),
-                effort?.strings("supported_levels").orEmpty(), effort?.optionalString("default_level"))
-        }
-    }
-
-    private fun JSONObject.optionalString(name: String): String? {
-        val value = opt(name)
-        if (value == null || value === JSONObject.NULL) return null
-        return value as? String ?: throw IOException()
-    }
-    private fun JSONObject.optionalLong(name: String): Long? {
-        val value = opt(name)
-        if (value == null || value === JSONObject.NULL) return null
-        val result = (value as? Number)?.toString()?.toLongOrNull() ?: throw IOException()
-        if (result < 0) throw IOException()
-        return result
-    }
-    private fun JSONObject.strings(name: String): List<String> {
-        if (!has(name) || isNull(name)) return emptyList()
-        val array = optJSONArray(name) ?: throw IOException()
-        return List(array.length()) { array.opt(it) as? String ?: throw IOException() }
-    }
+    private fun parseModels(root: JSONObject): List<Model> = DeepSeekModelCatalog.decode(root)
     private fun safeError(error: Exception): DeepSeekChatException = when (error) {
         is DeepSeekChatException -> error
         is SocketTimeoutException -> DeepSeekChatException("TIMEOUT", "DeepSeek request timed out")
         is SSLException -> DeepSeekChatException("TLS", "DeepSeek TLS verification failed")
         is org.json.JSONException -> DeepSeekChatException("PROTOCOL", "Invalid DeepSeek JSON response")
+        is IllegalArgumentException, is IllegalStateException -> DeepSeekChatException("PROTOCOL", "Invalid DeepSeek model capability")
         is IOException -> DeepSeekChatException("NETWORK_OR_PROTOCOL", "DeepSeek connection or response failed")
         else -> DeepSeekChatException("REQUEST_FAILED", "DeepSeek request failed")
     }

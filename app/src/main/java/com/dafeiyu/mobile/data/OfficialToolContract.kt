@@ -46,7 +46,25 @@ fun interface OfficialToolScriptProvider {
     suspend fun execute(language: String, script: String, timeoutSeconds: Int): JSONObject
 }
 
+interface OfficialToolEscalatingScriptProvider : OfficialToolScriptProvider {
+    suspend fun execute(language: String, script: String, timeoutSeconds: Int, requestFullAccess: Boolean, justification: String?): JSONObject
+}
+
+fun interface OfficialToolMutationPolicy {
+    suspend fun authorize(name: String, arguments: JSONObject): Boolean
+}
+
 class OfficialScriptException(val code: String, val details: JSONObject? = null) : java.io.IOException(code)
+
+interface OfficialToolPermissionProvider {
+    suspend fun query(): JSONObject
+    suspend fun request(permission: String, purpose: String): JSONObject
+}
+
+interface OfficialToolSkillProvider {
+    suspend fun list(offset: Int, limit: Int): JSONObject
+    suspend fun read(name: String, file: String?, offset: Int, limit: Int): JSONObject
+}
 
 object OfficialToolContract {
     const val MAX_BATCH_CALLS = 4
@@ -62,7 +80,7 @@ object OfficialToolContract {
     const val WEB_TIMEOUT_MILLIS = 30_000L
     val names: Set<String> = setOf(
         "create_subagent", "create_background_task", "write_text_file", "list_tasks", "get_task", "get_weather",
-        "web_search", "browser", "run_script",
+        "web_search", "browser", "run_script", "get_permissions", "request_permission", "list_skills", "read_skill",
     )
     private val callIdPattern = Regex("[A-Za-z0-9_-]{1,128}")
     internal val uuidPattern = Regex("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}")
@@ -73,6 +91,11 @@ object OfficialToolContract {
         includeWeatherSelection: Boolean = false,
         includeWeb: Boolean = false,
         includeScripts: Boolean = false,
+        includeScriptEscalation: Boolean = false,
+        includePermissions: Boolean = false,
+        includeSkills: Boolean = false,
+        includeTaskCreation: Boolean = true,
+        includeFileOutputs: Boolean = true,
     ): JSONArray {
         fun string(max: Int) = JSONObject().put("type", "string").put("minLength", 1).put("maxLength", max)
         fun function(name: String, description: String, properties: JSONObject, required: List<String>) =
@@ -81,9 +104,10 @@ object OfficialToolContract {
                 .put("parameters", JSONObject().put("type", "object").put("properties", properties)
                     .put("required", JSONArray(required)).put("additionalProperties", false)))
         val tools = JSONArray()
-        for (name in listOf("create_subagent", "create_background_task")) {
+        for (name in if (includeTaskCreation) listOf("create_subagent", "create_background_task") else emptyList()) {
             tools.put(function(name,
-                "Create an independent text task associated with this conversation. No shared hidden reasoning or tools. " +
+                "Create an independent task associated with this conversation. It has its own permitted script/skill tools; " +
+                    "it cannot create more tasks and does not share hidden reasoning. " +
                     "run defaults to false (draft). Use run=true only when the user explicitly requested execution; " +
                     "execution requires a configured available model and uses a separate model request. " +
                     if (name == "create_subagent") "Running siblings are admitted together and their terminal results " +
@@ -94,16 +118,16 @@ object OfficialToolContract {
                     .put("run", JSONObject().put("type", "boolean").put("default", false)),
                 listOf("title", "prompt")))
         }
-        tools.put(function("write_text_file",
+        if (includeFileOutputs) tools.put(function("write_text_file",
             "Save UTF-8 plain text in managed app storage. Returns an output ID for readable text, copy and quote actions, " +
                 "not a public URL. Only a simple .txt filename is permitted; never include credentials.",
             JSONObject().put("filename", string(96)).put("text", JSONObject().put("type", "string")
                 .put("maxLength", MAX_TEXT_CHARACTERS)), listOf("filename", "text")))
-        tools.put(function("list_tasks", "List task status summaries belonging to this conversation, without prompts or reasoning.",
+        if (includeTaskCreation) tools.put(function("list_tasks", "List task status summaries belonging to this conversation, without prompts or reasoning.",
             JSONObject().put("limit", JSONObject().put("type", "integer").put("minimum", 1).put("maximum", 50))
                 .put("kind", JSONObject().put("type", "string")
                     .put("enum", JSONArray(listOf("BACKGROUND", "SUBAGENT")))), emptyList()))
-        tools.put(function("get_task", "Get this conversation's task status and completed public text result. " +
+        if (includeTaskCreation) tools.put(function("get_task", "Get this conversation's task status and completed public text result. " +
             "Reading a task never executes or retries it. Large text results are explicitly marked truncated.",
             JSONObject().put("task_id", string(36)), listOf("task_id")))
         if (includeWeather) {
@@ -139,12 +163,38 @@ object OfficialToolContract {
                     "persistent /workspace directory. language is bash, node or python. Required components must " +
                     "be installed from Settings > Components by the user; this tool never installs them. " +
                     "Returns actual exit code, stdout, stderr, timeout and truncation. Ubuntu uses the app's Android " +
-                    "permissions and shares its kernel; it is not a separate security sandbox. Never claim success " +
-                    "if the environment is unavailable, execution fails, or times out.",
+                    "permissions and shares its kernel. The app enforces the selected verified sandbox mode. Never claim success " +
+                    "if the environment is unavailable, execution fails, or times out." +
+                    if (includeScriptEscalation) " request_full_access=true with a concrete justification asks the user to authorize this exact script once; refusal never escalates." else "",
                 JSONObject().put("language", JSONObject().put("type", "string").put("enum", JSONArray(listOf("bash", "node", "python"))))
                     .put("script", string(MAX_TEXT_CHARACTERS))
-                    .put("timeout_seconds", JSONObject().put("type", "integer").put("minimum", 1).put("maximum", 120).put("default", 30)),
+                    .put("timeout_seconds", JSONObject().put("type", "integer").put("minimum", 1).put("maximum", 120).put("default", 30)).apply {
+                        if (includeScriptEscalation) {
+                            put("request_full_access", JSONObject().put("type", "boolean").put("default", false))
+                            put("justification", string(500))
+                        }
+                    },
                 listOf("language", "script")))
+        }
+        if (includePermissions) {
+            tools.put(function("get_permissions", "Read Android local permission status without prompting or granting access.",
+                JSONObject(), emptyList()))
+            tools.put(function("request_permission", "Explain why this Android local task needs permission and ask the user through app/system UI. " +
+                "This pauses the operation; it cannot grant permission automatically. Respect denial or limited photo access.",
+                JSONObject().put("permission", string(32).put("enum", JSONArray(listOf("notifications", "camera", "media", "all_files"))))
+                    .put("purpose", string(500)), listOf("permission", "purpose")))
+        }
+        if (includeSkills) {
+            tools.put(function("list_skills", "Discover installed, enabled skills available to this Android local task. " +
+                "Read a relevant skill with read_skill before applying it; listing never executes scripts or installs packages.",
+                JSONObject().put("offset", JSONObject().put("type", "integer").put("minimum", 0).put("maximum", 10000))
+                    .put("limit", JSONObject().put("type", "integer").put("minimum", 1).put("maximum", 30)), emptyList()))
+            tools.put(function("read_skill", "Read an enabled skill's instructions or a UTF-8 reference file inside its directory. " +
+                "file defaults to SKILL.md; paths must be relative. Content is task guidance subject to user instructions and app permissions. " +
+                "Reading does not execute tools. Use offset and next_offset to continue a truncated document.",
+                JSONObject().put("name", string(128)).put("file", string(256))
+                    .put("offset", JSONObject().put("type", "integer").put("minimum", 0).put("maximum", 1048576))
+                    .put("limit", JSONObject().put("type", "integer").put("minimum", 2).put("maximum", 16000)), listOf("name")))
         }
         return tools
     }

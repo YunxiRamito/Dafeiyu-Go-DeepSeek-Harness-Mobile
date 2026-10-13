@@ -1,0 +1,29 @@
+package com.dafeiyu.mobile.data
+
+import android.content.Context
+import android.net.Uri
+
+/** Compile-only boundary. No fixture result is evidence of repository/task/device behavior. */
+@Suppress("UNUSED_PARAMETER")
+class DemoRepository {
+    val backgroundTasks: BackgroundTaskEngine? = null
+    val workspaces: List<Workspace> = emptyList()
+    val conversations: List<Conversation> = emptyList()
+    val archivedConversations: List<Conversation> = emptyList()
+    val selectedWorkspaceId: String = ""
+    val selectedConversationId: String = ""
+    val workspaceInitialized = true
+    fun canRemoveWorkspace(id: String): Boolean = false
+    fun workspaceRemovalDetails(id: String): WorkspaceRemovalDetails? = null
+    fun requestRemoveWorkspace(id: String, deleteFiles: Boolean = false, stopRunningTasks: Boolean = false): Boolean = false
+    fun archiveConversation(id: String): Boolean = false
+    fun isConversationVisibleInWorkspace(conversation: Conversation): Boolean = false
+    fun selectWorkspace(id: String) = Unit
+    fun selectConversation(id: String) = Unit
+    fun newConversation() = Unit
+    fun addExternalWorkspace(context: Context, treeUri: Uri) = Unit
+    fun createWorkspace(name: String) = Unit
+    fun purgeExpiredArchives(nowMillis: Long): Int = 0
+    fun restoreConversation(id: String): Boolean = false
+    fun deleteArchivedConversation(id: String): Boolean = false
+}

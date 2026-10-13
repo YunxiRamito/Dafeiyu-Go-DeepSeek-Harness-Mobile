@@ -67,7 +67,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Workspace delete checks failed' }
 # Run all remaining storage checks unchanged in an isolated, generated fixture.
 if ($Stage -in @('Storage', 'All')) {
 $storageChecks = [IO.File]::ReadAllText((Join-Path $fixtures 'WorkspaceStorageChecks.kt'))
-$legacyStart = $storageChecks.IndexOf('    test("workspace load examines first 200 positions and creates default if absent")')
+$legacyStart = $storageChecks.IndexOf('    test("workspace load examines first 200 positions without recreating an absent default")')
 $legacyEnd = $storageChecks.IndexOf('    test("attachment and collection limits are enforced during load")', $legacyStart)
 if ($legacyStart -lt 0 -or $legacyEnd -lt 0) { throw 'Missing superseded default restoration check marker' }
 $storageChecks = $storageChecks.Remove($legacyStart, $legacyEnd - $legacyStart)

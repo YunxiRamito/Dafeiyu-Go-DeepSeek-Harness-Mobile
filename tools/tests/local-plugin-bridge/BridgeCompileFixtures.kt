@@ -10,7 +10,19 @@ internal object AriesCrypto {
 }
 
 internal class AriesConnectionProvider(context: Context) {
-    suspend fun call(method: String, params: JSONObject): JSONObject = error("compile_only")
+    internal data class Diagnostic(val stage: String)
+    fun setDiagnosticObserver(observer: ((Diagnostic) -> Unit)?) { }
+    fun diagnose(stage: String, failure: Throwable? = null) { }
+    suspend fun call(method: String, params: JSONObject, expectedRemoteScope: RemoteDshScope? = null): JSONObject = error("compile_only")
+    suspend fun callNativeBulk(params: JSONObject, expectedScope: RemoteDshScope): JSONObject = error("compile_only")
+    suspend fun callNativeScoped(method: String, params: JSONObject, scope: RemoteDshScope, capability: String,
+        acknowledgeMessageId: String?): JSONObject = error("compile_only")
+    suspend fun retireTransferReceipt(expectedScope: RemoteDshScope, requestId: String, operation: String): JSONObject = error("compile_only")
+}
+
+internal class RemoteDshScope {
+    fun toJson(): JSONObject = error("compile_only")
+    companion object { fun fromJson(value: JSONObject): RemoteDshScope = error("compile_only") }
 }
 
 internal class AriesProviderException(val code: String) : Exception()

@@ -1,9 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Original stopwatch.bold path from fixed UsePreside/sf-symbols dataset; see third_party/sf-symbols/provenance.json. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp" android:height="24dp"
-    android:viewportWidth="34.41953125" android:viewportHeight="34.41953125">
-    <group android:translateX="2.7722656249999993" android:translateY="1.1999999999999993">
-        <path android:fillColor="#FF000000" android:pathData="M14.4327 32.0195C22.3627 32.0195 28.8727 25.4995 28.8727 17.5695C28.8727 14.5295 27.9227 11.6895 26.2727 9.3495L27.4127 8.2295C27.8227 7.8295 28.0127 7.3795 28.0127 6.9195C28.0127 5.9595 27.2727 5.2095 26.3027 5.2095C25.7427 5.2095 25.3427 5.3695 24.9327 5.7595L23.9227 6.7295C21.8027 4.8695 19.1427 3.6095 16.2127 3.2395V1.7795C16.2127 0.7795 15.4227 -0.0005 14.4327 -0.0005C13.4827 -0.0005 12.6627 0.7795 12.6627 1.7795V3.2395C5.5627 4.1295 0.0027 10.2495 0.0027 17.5695C0.0027 25.4995 6.5227 32.0195 14.4327 32.0195ZM14.4327 28.4195C8.4327 28.4195 3.6127 23.5795 3.6127 17.5695C3.6127 11.5695 8.4227 6.7295 14.4327 6.7295C20.4427 6.7295 25.2827 11.5695 25.2827 17.5695C25.2927 23.5795 20.4527 28.4195 14.4327 28.4195ZM14.4327 20.1895C15.8827 20.1895 17.0527 19.0195 17.0527 17.5795C17.0527 16.6295 16.5427 15.8095 15.7527 15.3395V9.7995C15.7527 9.0595 15.1727 8.4895 14.4327 8.4895C13.7027 8.4895 13.1127 9.0595 13.1127 9.7995V15.3395C12.3327 15.8095 11.8227 16.6395 11.8227 17.5795C11.8227 19.0195 12.9927 20.1895 14.4327 20.1895Z" />
-    </group>
+<!--
+MIT License
+
+Copyright (c) 2020 Microsoft Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Microsoft Fluent UI System Icons a347af95478f989038cccbf085978865264c048a
+assets/Timer/SVG/ic_fluent_timer_24_regular.svg
+Original SVG path preserved; converted to Android VectorDrawable. Resource ID retained for app compatibility.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+  <path android:fillColor="#FF000000" android:pathData="M12 5C16.6944 5 20.5 8.80558 20.5 13.5C20.5 18.1944 16.6944 22 12 22C7.30558 22 3.5 18.1944 3.5 13.5C3.5 8.80558 7.30558 5 12 5ZM12 6.5C8.13401 6.5 5 9.63401 5 13.5C5 17.366 8.13401 20.5 12 20.5C15.866 20.5 19 17.366 19 13.5C19 9.63401 15.866 6.5 12 6.5ZM12 8C12.3797 8 12.6935 8.28215 12.7432 8.64823L12.75 8.75V13.25C12.75 13.6642 12.4142 14 12 14C11.6203 14 11.3065 13.7178 11.2568 13.3518L11.25 13.25V8.75C11.25 8.33579 11.5858 8 12 8ZM19.1472 5.11371L19.2298 5.17355L20.3882 6.13773C20.7066 6.40272 20.7498 6.87562 20.4849 7.19398C20.2419 7.48581 19.8243 7.54649 19.5112 7.35047L19.4286 7.29063L18.2702 6.32645C17.9518 6.06146 17.9086 5.58856 18.1735 5.2702C18.4165 4.97837 18.8341 4.91769 19.1472 5.11371ZM14.25 2.5C14.6642 2.5 15 2.83579 15 3.25C15 3.6297 14.7178 3.94349 14.3518 3.99315L14.25 4H9.75C9.33579 4 9 3.66421 9 3.25C9 2.8703 9.28215 2.55651 9.64823 2.50685L9.75 2.5H14.25Z" />
 </vector>

@@ -1,5 +1,5 @@
 param(
-    [string[]]$Tasks = @(':app:assembleDebug', ':app:lintDebug'),
+    [string[]]$Tasks = @(':app:assembleRelease', ':app:lintRelease'),
     [string]$TempRoot = (Join-Path (Split-Path $PSScriptRoot -Parent) '..\Temp_Android'),
     [ValidateRange(1, 4)][int]$MaxWorkers = 2,
     [ValidateRange(1024, 16384)][int]$MinimumFreeMemoryMiB = 1536
@@ -33,14 +33,16 @@ try {
     & (Join-Path $PSScriptRoot 'prepare-connection-plugin.ps1') -TempRoot $TempRoot
     & $gradle --no-daemon --no-parallel "--max-workers=$MaxWorkers" --project-cache-dir (Join-Path $TempRoot 'caches\project') "-Pmobile.outputRoot=$TempRoot/build" @Tasks --console plain
     if ($LASTEXITCODE -ne 0) { throw "Gradle 构建失败，退出码 $LASTEXITCODE" }
-    if ($Tasks -contains ':app:assembleDebug') {
+    if ($Tasks -contains ':app:assembleRelease' -or $Tasks -contains ':app:assembleDebug') {
         $delivery = Join-Path $TempRoot 'Dist'
         New-Item -ItemType Directory -Force -Path $delivery | Out-Null
-        $apk = Join-Path $delivery 'Dafeiyu-Go-Mobile-0.1.24.apk'
-        Copy-Item -LiteralPath (Join-Path $TempRoot 'build\app\outputs\apk\debug\app-debug.apk') -Destination $apk -Force
+        $isRelease = $Tasks -contains ':app:assembleRelease'
+        $apk = Join-Path $delivery ('Dafeiyu-Go-Mobile-0.1.25' + $(if ($isRelease) { '' } else { '-dev' }) + '.apk')
+        $variant = if ($isRelease) { 'release' } else { 'debug' }
+        Copy-Item -LiteralPath (Join-Path $TempRoot "build\app\outputs\apk\$variant\app-$variant.apk") -Destination $apk -Force
         ((Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + (Split-Path $apk -Leaf)) |
             Set-Content -LiteralPath "$apk.sha256" -Encoding ascii
-        Write-Output "前端预览包：$apk"
+        Write-Output "Android delivery: $apk"
     }
 } finally { Pop-Location }
 

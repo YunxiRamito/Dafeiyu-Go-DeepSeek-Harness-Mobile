@@ -91,7 +91,8 @@ fun main(args: Array<String>) = runBlocking {
     val frozenBytes = frozen.readBytes()
     val approved = ConnectionPackageValidator.manifest(frozenManifest.readBytes())
     pass("approved frozen archive SHA and extraction") {
-        check(approved.sha256 == "9df7085cd5fa9ecf0e6f9a31aace8d0272ef60c4a9aef12a2ea96efafdf6aa1b")
+        check(approved.sha256 == "4f3657730459197835a014b7f7433b44cc652e5b32480cdb37c061b160e75bf2" &&
+            approved.version == "0.3.0" && approved.sizeBytes == 200430L)
         val stage = File(fixtures, "frozen").apply { mkdir() }
         ConnectionPackageValidator.extract(approved, frozenBytes, stage)
         check(File(stage, "package/lib/index.js").isFile)
@@ -263,7 +264,7 @@ fun main(args: Array<String>) = runBlocking {
     val bundled = ConnectionPluginPackage(Context(bundledStore, assets))
     pass("ensureBundled prepares verified frozen assets") {
         val preparedPath = bundled.ensureBundled()
-        check(preparedPath.isDirectory && bundled.currentVersion() == "0.2.0")
+        check(preparedPath.isDirectory && bundled.currentVersion() == approved.version)
     }
     pass("ensureBundled reuses current immutable slot") {
         check(bundled.ensureBundled() == bundled.current())
@@ -276,7 +277,15 @@ fun main(args: Array<String>) = runBlocking {
     }
     pass("lifecycle failure retains old preparation receipt") {
         check(firstReceipt.contentEquals(File(bundledStore, "connection-plugin/prepared.json").readBytes()))
-        check(bundled.currentVersion() == "0.2.0")
+        check(bundled.currentVersion() == approved.version)
     }
+    pass("host exact bundled version replaces an old prepared package without confusing it with loaded state") {
+        bundled.install(v1, valid)
+        check(bundled.currentVersion() == "0.2.0")
+        val required = bundled.ensureBundled("0.3.0")
+        check(required.parentFile.name == approved.sha256 && bundled.currentVersion() == "0.3.0")
+        check(bundled.ensureBundled("0.3.0") == required)
+    }
+    rejects("host cannot load a different bundled protocol version") { runBlocking { bundled.ensureBundled("0.4.0") } }
     println("PASS $checks connection package checks (offline; no runtime load or TLS/E2E claim)")
 }

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>disable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors><NoWarn>SYSLIB0014</NoWarn></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/Backup/UserDataBackup.cs" Link="UserDataBackup.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/Backup/DymArchive.cs" Link="DymArchive.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/Backup/DymPortableData.cs" Link="DymPortableData.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/Backup/DymLauncherBackupContext.cs" Link="DymLauncherBackupContext.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/BackupFlow.cs" Link="BackupFlow.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/LauncherSettings.cs" Link="LauncherSettings.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/LauncherSettingsStore.cs" Link="LauncherSettingsStore.cs" />
+    <Compile Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/BalanceSupport.cs" Link="BalanceSupport.cs" />
+    <EmbeddedResource Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/Backup/7zr.exe" LogicalName="DeepSeekHarnessLauncher.Backup.7zr.exe" />
+    <EmbeddedResource Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/Backup/dym-portable.mjs" LogicalName="DeepSeekHarnessLauncher.Backup.dym-portable.mjs" />
+    <EmbeddedResource Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/Backup/dym-persistence.mjs" LogicalName="DeepSeekHarnessLauncher.Backup.dym-persistence.mjs" />
+    <EmbeddedResource Include="../../../../Dafeiyu-Go-DeepSeek-Harness-Click-To-Run/source/Backup/dym-configuration.mjs" LogicalName="DeepSeekHarnessLauncher.Backup.dym-configuration.mjs" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+</Project>

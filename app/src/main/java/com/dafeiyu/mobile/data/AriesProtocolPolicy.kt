@@ -18,6 +18,48 @@ internal object AriesProtocolPolicy {
 
     class ResponseTooLarge : IOException("Aries response exceeds the byte limit")
 
+    data class ControlEventPage(val nextCursor: String, val finished: Boolean, val rotationRequired: Boolean)
+
+    /** /events returns a persistent sequence, including the unchanged sequence on an empty page. */
+    fun controlEventPage(response: JSONObject, after: String, currentEpoch: ULong): ControlEventPage {
+        fun decimal(value: Any?, string: Boolean): ULong {
+            require(if (string) value is String else value is Number) { "Aries event sequence type is invalid" }
+            val text = value.toString()
+            require(text.isNotEmpty() && text.all { it in '0'..'9' }) { "Aries event sequence is invalid" }
+            return requireNotNull(text.toULongOrNull()) { "Aries event sequence exceeds uint64" }
+        }
+        val previous = decimal(after, true)
+        val nextText = response.opt("next_cursor")
+        val next = decimal(nextText, true)
+        val items = requireNotNull(response.optJSONArray("items")) { "Aries event items are missing" }
+        require(items.length() <= 200) { "Aries event page exceeds the requested limit" }
+        var sequence = previous
+        var rotation = false
+        for (index in 0 until items.length()) {
+            val item = requireNotNull(items.optJSONObject(index)) { "Aries event item is invalid" }
+            val itemSequence = decimal(item.opt("sequence"), false)
+            require(itemSequence > sequence) { "Aries events are not strictly ordered" }
+            sequence = itemSequence
+            when (item.opt("type")) {
+                "control" -> {
+                    val event = requireNotNull(item.optJSONObject("event")) { "Aries control event is missing" }
+                    require(decimal(event.opt("sequence"), false) == sequence) { "Aries control sequence does not match" }
+                    val requiredEpoch = decimal(event.opt("required_epoch"), false)
+                    val completed = event.opt("completed_at")
+                    require(completed == null || completed == JSONObject.NULL || completed is String) {
+                        "Aries control completion is invalid"
+                    }
+                    rotation = rotation || (completed == null || completed == JSONObject.NULL || completed == "") &&
+                        requiredEpoch > currentEpoch
+                }
+                "message" -> require(item.optJSONObject("message") != null) { "Aries event message is missing" }
+                else -> throw IllegalArgumentException("Aries event type is unsupported")
+            }
+        }
+        require(next == sequence) { "Aries event cursor does not match the processed sequence" }
+        return ControlEventPage(nextText as String, items.length() == 0, rotation)
+    }
+
     fun requireIdempotencyKey(value: String): String {
         require(value.length in 8..128 && value.none(Char::isISOControl)) { "Idempotency-Key 无效" }
         return value

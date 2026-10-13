@@ -19,6 +19,7 @@ data class Conversation(
     val title: String,
     val workspaceId: String,
     val archivedAtMillis: Long? = null,
+    val archiveOrigin: ConversationArchiveOrigin? = null,
 )
 internal data class WorkspaceSnapshot(
     val workspaces: List<Workspace>,
@@ -60,6 +61,8 @@ internal class WorkspaceStore(context: Context) {
     val root = File(context.filesDir, "Dafeiyu-Works")
     private val index = AtomicFile(File(root, "workspace-index.json"))
     private val recovery = AtomicFile(File(root, "workspace-recovery.json"))
+    private val deletionReceipts = RemoteDshJsonFile(File(root, "permanent-deletion-receipts.json"), 4 * 1024 * 1024)
+    private val historyDirectory = File(context.filesDir, "local-dsh-history")
 
     fun hasRecovery(): Boolean = synchronized(INDEX_LOCK) { recoverySnapshot() != null }
 
@@ -70,7 +73,7 @@ internal class WorkspaceStore(context: Context) {
                 if (!exists(file)) continue
                 val json = if (file === index) readJson(index, MAX_INDEX_BYTES)
                     else recoverySnapshot() ?: continue
-                check(json.optInt("version") in 1..2) { "无法读取此工作区索引版本" }
+                check(json.optInt("version") in 1..3) { "无法读取此工作区索引版本" }
                 val messages = json.optJSONObject("messages") ?: continue
                 for (key in messages.keys()) {
                     val items = messages.optJSONArray(key) ?: continue
@@ -94,7 +97,7 @@ internal class WorkspaceStore(context: Context) {
             return null
         }
         val version = json.optInt("version")
-        check(version == 1 || version == 2) { "无法读取此工作区索引版本" }
+        check(version in 1..3) { "无法读取此工作区索引版本" }
         val workspaces = buildList<Workspace> {
             val array = json.optJSONArray("workspaces") ?: JSONArray()
             for (i in 0 until minOf(array.length(), 200)) {
@@ -115,8 +118,12 @@ internal class WorkspaceStore(context: Context) {
                 val id = item.optString("id")
                 val workspaceId = item.optString("workspaceId")
                 val archivedAtMillis = item.archiveTimestamp(version)
-                if (id.isNotBlank() && workspaces.any { it.id == workspaceId } && none { it.id == id }) {
-                    add(Conversation(id, item.optString("title", "新对话").take(100), workspaceId, archivedAtMillis))
+                val origin = if (version >= 3 && archivedAtMillis != null)
+                    decodeArchiveOrigin(item.optJSONObject("archiveOrigin"), workspaceId) else null
+                if (id.isNotBlank() && (workspaces.any { it.id == workspaceId } || origin != null) &&
+                    none { it.id == id }) {
+                    add(Conversation(id, item.optString("title", "新对话").take(100), workspaceId,
+                        archivedAtMillis, origin))
                 }
             }
         }
@@ -146,11 +153,10 @@ internal class WorkspaceStore(context: Context) {
                 }
             }
         }
-        val expiredIds = conversations.asSequence()
-            .filter { isArchiveExpired(it, nowMillis) }
-            .map { it.id }
-            .toSet()
-        val retainedConversations = conversations.filterNot { it.id in expiredIds }
+        // Expiry is a candidate, never permission to lose the mapping before
+        // native deletion. Only durable successful receipts fence old saves.
+        val confirmedIds = confirmedDeletionIds()
+        val retainedConversations = conversations.filterNot { it.id in confirmedIds }
         val selectedWorkspaceId = json.optString("selectedWorkspaceId")
             .takeIf { id -> workspaces.any { it.id == id } }
             ?: workspaces.first().id
@@ -165,86 +171,68 @@ internal class WorkspaceStore(context: Context) {
             selectedWorkspaceId = selectedWorkspaceId,
             selectedConversationId = selectedConversationId,
         )
-        // Expired conversations and their messages are removed durably before initialization returns.
-        if (expiredIds.isNotEmpty()) saveWithRecoveryLocked(snapshot)
         return snapshot
     }
 
-    /**
-     * Purges expired archives directly from the persisted index. This can be invoked by a
-     * background worker without constructing a repository; only matching conversations and
-     * their message entries are removed, and the updated JSON is committed through AtomicFile.
-     */
-    fun purgeExpiredArchives(nowMillis: Long): Int = synchronized(INDEX_LOCK) {
-        val json = recoverySnapshot() ?: if (exists(index)) readJson(index, MAX_INDEX_BYTES)
-            else return@synchronized 0
-        val version = json.optInt("version")
-        check(version == 1 || version == 2) { "无法读取此工作区索引版本" }
-        if (version < 2) return@synchronized 0
-
-        val conversations = json.optJSONArray("conversations") ?: JSONArray()
-        val expiredIndexes = HashSet<Int>()
-        val expiredIds = HashSet<String>()
-        for (i in 0 until conversations.length()) {
-            val item = conversations.optJSONObject(i) ?: continue
-            val id = item.optString("id")
-            if (id.isBlank()) continue
-            val conversation = Conversation(
-                id = id,
-                title = item.optString("title", "新对话"),
-                workspaceId = item.optString("workspaceId"),
-                archivedAtMillis = item.archiveTimestamp(version),
-            )
-            if (isArchiveExpired(conversation, nowMillis)) {
-                expiredIndexes += i
-                expiredIds += id
-            }
-        }
-        if (expiredIndexes.isEmpty()) return@synchronized 0
-
-        val retained = JSONArray()
-        val retainedActiveIds = HashSet<String>()
-        val retainedConversationIds = HashSet<String>()
-        for (i in 0 until conversations.length()) {
-            val item = conversations.opt(i)
-            if (i in expiredIndexes) continue
-            retained.put(item)
-            val retainedConversation = item as? JSONObject ?: continue
-            val id = retainedConversation.optString("id")
-            retainedConversationIds += id
-            if (retainedConversation.archiveTimestamp(version) == null) retainedActiveIds += id
-        }
-        json.put("conversations", retained)
-        val messages = json.optJSONObject("messages") ?: JSONObject()
-        expiredIds.filterNot { it in retainedConversationIds }.forEach { messages.remove(it) }
-        json.put("messages", messages)
-
-        val selectedId = json.optString("selectedConversationId")
-        if (selectedId in expiredIds && selectedId !in retainedActiveIds) {
-            val selectedWorkspaceId = json.optString("selectedWorkspaceId", "default")
-            var replacementId = ""
-            for (i in 0 until retained.length()) {
-                val item = retained.optJSONObject(i) ?: continue
-                if (item.optString("workspaceId") == selectedWorkspaceId && item.archiveTimestamp(version) == null) {
-                    replacementId = item.optString("id")
-                    break
-                }
-            }
-            json.put("selectedConversationId", replacementId)
-        }
-        val bytes = json.toString().toByteArray(Charsets.UTF_8)
-        if (bytes.size <= MAX_INDEX_BYTES) {
-            writeAtomically(bytes)
-            clearRecovery()
-        } else {
-            writeRecovery(bytes)
-        }
-        expiredIndexes.size
+    fun expiredArchiveCandidates(nowMillis: Long): List<Conversation> = synchronized(INDEX_LOCK) {
+        initializeLocked(nowMillis)?.conversations.orEmpty().filter { isArchiveExpired(it, nowMillis) }
     }
 
+    /** Kept for old callers: a synchronous index purge cannot prove the DSH
+     * logs were deleted. The worker uses the receipt transaction below. */
+    fun purgeExpiredArchives(nowMillis: Long): Int {
+        expiredArchiveCandidates(nowMillis)
+        return 0
+    }
+
+    /** Publishes the anti-resurrection fence before replacing the snapshot.
+     * A crash between those writes is recovered by load and by the same
+     * receipt. No caller can remove app history with an uncommitted native
+     * operation, a changed conversation or a mismatched receipt. */
+    fun commitPermanentDeletion(receipt: LocalDshHistoryDeletionReceipt): WorkspaceSnapshot = synchronized(INDEX_LOCK) {
+        LocalDshHistoryController.requireDurableDeletionReceipt(historyDirectory, receipt)
+        val fences = deletionFenceJournal()
+        val values = fences.getJSONArray("receipts")
+        val existing = values.remoteObjects(10000).firstOrNull { it.getString("conversationId") == receipt.conversationId }
+        if (existing != null) {
+            check(existing.getString("requestId") == receipt.requestId &&
+                existing.getString("conversationSha256") == receipt.conversationSha256) { "永久删除收据冲突，原记录保留" }
+            val recovered = checkNotNull(initializeLocked(System.currentTimeMillis())) { "本地索引缺失，无法确认永久删除" }
+            saveWithRecoveryLocked(recovered)
+            return@synchronized recovered
+        }
+        val snapshot = checkNotNull(initializeLocked(System.currentTimeMillis())) { "本地索引缺失，原归档保留" }
+        val conversation = checkNotNull(snapshot.conversations.singleOrNull { it.id == receipt.conversationId }) { "原归档已变化，请刷新" }
+        check(conversation.archivedAtMillis != null && LocalDshHistoryController.deletionFingerprint(conversation,
+            snapshot.messages[conversation.id].orEmpty()) == receipt.conversationSha256) { "原归档内容已变化，请刷新" }
+        require(values.length() < 10000) { "永久删除收据已达容量上限，原归档保留" }
+        values.put(JSONObject().put("requestId", receipt.requestId).put("conversationId", receipt.conversationId)
+            .put("conversationSha256", receipt.conversationSha256).put("deletedAtMillis", receipt.deletedAtMillis))
+        deletionReceipts.write(fences)
+        val remaining = snapshot.conversations.filterNot { it.id == receipt.conversationId }
+        val selected = snapshot.selectedConversationId.takeIf { id -> remaining.any { it.id == id && it.archivedAtMillis == null } }
+            ?: remaining.firstOrNull { it.workspaceId == snapshot.selectedWorkspaceId && it.archivedAtMillis == null }?.id.orEmpty()
+        val next = snapshot.copy(conversations = remaining, messages = snapshot.messages - receipt.conversationId, selectedConversationId = selected)
+        saveWithRecoveryLocked(next)
+        next
+    }
+
+    private fun deletionFenceJournal(): JSONObject =
+        (deletionReceipts.read() ?: JSONObject().put("schema", 1).put("receipts", JSONArray())).also { state ->
+            require(state.getInt("schema") == 1)
+            val records = state.getJSONArray("receipts").remoteObjects(10000)
+            require(records.map { it.getString("conversationId") }.distinct().size == records.size)
+            records.forEach { value -> require(value.getString("requestId").matches(Regex("[A-Za-z0-9_-]{1,128}")) &&
+                value.getString("conversationId").matches(Regex("[A-Za-z0-9_-]{1,128}")) &&
+                value.getString("conversationSha256").matches(Regex("[0-9a-f]{64}")) && value.getLong("deletedAtMillis") >= 0) }
+        }
+
+    private fun confirmedDeletionIds(): Set<String> = deletionFenceJournal().getJSONArray("receipts").remoteObjects(10000)
+        .mapTo(HashSet()) { it.getString("conversationId") }
+
     fun createInternalWorkspace(id: String) {
-        require(id.matches(Regex("[a-zA-Z0-9-]+")))
-        val folder = File(root, id)
+        check(root.isDirectory || root.mkdirs()) { "无法创建工作区根目录" }
+        val folder = checkedInternalWorkspaceFolder(id)
         check(folder.isDirectory || folder.mkdirs()) { "无法创建工作目录" }
     }
 
@@ -349,7 +337,7 @@ internal class WorkspaceStore(context: Context) {
             }
         }
         reader.endObject()
-        check(version in 1..2 && foundWorkspaces) { "无法确认索引的工作区引用" }
+        check(version in 1..3 && foundWorkspaces) { "无法确认索引的工作区引用" }
         return referenced
     }
 
@@ -421,7 +409,7 @@ internal class WorkspaceStore(context: Context) {
 
     /** No message source is truncated to make a size check pass. */
     fun encode(snapshot: WorkspaceSnapshot): ByteArray {
-        val json = JSONObject().put("version", 2)
+        val json = JSONObject().put("version", 3)
             .put("selectedWorkspaceId", snapshot.selectedWorkspaceId)
         json.put("workspaces", JSONArray().apply {
             snapshot.workspaces.forEach { workspace ->
@@ -429,11 +417,19 @@ internal class WorkspaceStore(context: Context) {
                     .apply { workspace.uri?.let { put("uri", it) } })
             }
         })
-        // A foreground snapshot can have been captured before a worker's purge. Filter
-        // expired archives again while writing so that a delayed save cannot resurrect them.
+        // A delayed foreground save cannot resurrect an acknowledged deletion;
+        // the fence is independent of this snapshot and survives restarts.
+        val confirmedIds = confirmedDeletionIds()
         val persistedConversations = snapshot.conversations
-            .filterNot { isArchiveExpired(it, System.currentTimeMillis()) }
+            .filterNot { it.id in confirmedIds }
             .take(MAX_WORKSPACE_CONVERSATIONS)
+        persistedConversations.forEach { conversation ->
+            check(snapshot.workspaces.any { it.id == conversation.workspaceId } ||
+                conversation.archivedAtMillis != null &&
+                conversation.archiveOrigin?.workspace?.id == conversation.workspaceId) {
+                "对话缺少可恢复的工作区归属，已保留原索引"
+            }
+        }
         val persistedConversationIds = persistedConversations.mapTo(HashSet()) { it.id }
         val selectedConversationId = snapshot.selectedConversationId
             .takeIf { it in persistedConversationIds && persistedConversations.any { c ->
@@ -446,7 +442,12 @@ internal class WorkspaceStore(context: Context) {
             persistedConversations.forEach { conversation ->
                 put(JSONObject().put("id", conversation.id).put("title", conversation.title)
                     .put("workspaceId", conversation.workspaceId)
-                    .apply { conversation.archivedAtMillis?.let { put("archivedAtMillis", it) } })
+                    .apply {
+                        conversation.archivedAtMillis?.let { put("archivedAtMillis", it) }
+                        if (conversation.archivedAtMillis != null) {
+                            conversation.archiveOrigin?.let { put("archiveOrigin", encodeArchiveOrigin(it)) }
+                        }
+                    })
             }
         })
         val knownConversationIds = persistedConversationIds
@@ -466,6 +467,58 @@ internal class WorkspaceStore(context: Context) {
         })
         return json.toString().toByteArray(Charsets.UTF_8)
     }
+
+    private fun encodeArchiveOrigin(origin: ConversationArchiveOrigin): JSONObject = JSONObject()
+        .put("workspace", JSONObject().put("id", origin.workspace.id).put("name", origin.workspace.name)
+            .apply { origin.workspace.uri?.let { put("uri", it) } })
+        .put("workspaceOrder", origin.workspaceOrder.coerceAtLeast(0))
+        .put("conversationOrder", origin.conversationOrder.coerceAtLeast(0))
+        .put("directoryPaths", JSONArray(origin.directoryPaths.take(2)))
+
+    private fun decodeArchiveOrigin(item: JSONObject?, workspaceId: String): ConversationArchiveOrigin? {
+        if (item == null) return null
+        val workspaceJson = item.optJSONObject("workspace") ?: return null
+        val id = workspaceJson.optString("id")
+        val name = workspaceJson.optString("name").take(80)
+        if (id != workspaceId || name.isBlank() || !id.matches(Regex("[a-zA-Z0-9-]+"))) return null
+        val workspaceOrder = (item.opt("workspaceOrder") as? Number)?.toInt()?.takeIf { it >= 0 }
+            ?: return null
+        val conversationOrder = (item.opt("conversationOrder") as? Number)?.toInt()?.takeIf { it >= 0 }
+            ?: return null
+        val workspace = Workspace(id, name,
+            workspaceJson.optString("uri").takeIf { it.startsWith("content://") })
+        val approvedPaths = workspaceOwnedDirectories(root, workspace).mapTo(HashSet()) { it.absolutePath }
+        val paths = item.optJSONArray("directoryPaths")
+        val directoryPaths = buildList {
+            for (index in 0 until minOf(paths?.length() ?: 0, 2)) {
+                paths?.optString(index)?.takeIf { it in approvedPaths }?.let { add(it) }
+            }
+        }
+        return ConversationArchiveOrigin(workspace, workspaceOrder, conversationOrder, directoryPaths)
+    }
+
+    /** Confirmation paths and deletion targets are derived from owned roots, never from stored text. */
+    fun workspaceDirectoryPaths(workspace: Workspace): List<String> =
+        workspaceOwnedDirectories(root, workspace).map { it.absolutePath }
+
+    /** Explicit file deletion only after the removed record is durably absent in both snapshots. */
+    fun deleteRemovedWorkspaceFiles(workspace: Workspace): WorkspaceFileRemovalResult =
+        synchronized(INDEX_LOCK) {
+            check(!exists(recovery)) { "工作区恢复记录尚未合并，已保留文件" }
+            check(exists(index)) { "工作区索引尚未提交，已保留文件" }
+            val durable = readJson(index, MAX_INDEX_BYTES)
+            check(durable.optInt("version") in 1..3) { "无法确认工作区索引版本，已保留文件" }
+            val live = durable.optJSONArray("workspaces") ?: error("工作区索引缺少目录记录，已保留文件")
+            check((0 until live.length()).none { live.optJSONObject(it)?.optString("id") == workspace.id }) {
+                "工作区仍被当前索引引用，已保留文件"
+            }
+            val conversations = durable.optJSONArray("conversations") ?: JSONArray()
+            check((0 until conversations.length()).none { position ->
+                val item = conversations.optJSONObject(position)
+                item?.optString("workspaceId") == workspace.id && item.archiveTimestamp(durable.optInt("version")) == null
+            }) { "工作区仍有未归档对话，已保留文件" }
+            deleteOwnedWorkspaceDirectories(root, workspace)
+        }
 
     private fun writeAtomically(bytes: ByteArray) {
         writeFile(index, bytes, MAX_INDEX_BYTES)

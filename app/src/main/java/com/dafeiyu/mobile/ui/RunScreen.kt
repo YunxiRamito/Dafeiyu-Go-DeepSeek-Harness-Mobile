@@ -93,8 +93,8 @@ fun RunScreen(repository: DemoRepository, onChat: () -> Unit, onDetail: (String)
                 }
                 AnimatedVisibility(visible = working) {
                     Column(Modifier.padding(top = 13.dp)) {
-                        LinearProgressIndicator(progress = { repository.runtimeProgress / 100f }, modifier = Modifier.fillMaxWidth())
-                        Text("${repository.runtimeProgress}% · ${repository.runtimeStep}", fontSize = 11.sp,
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        Text(repository.runtimeStep, fontSize = 11.sp,
                             color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
                     }
                 }

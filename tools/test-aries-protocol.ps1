@@ -23,10 +23,10 @@ if (-not (Test-Path -LiteralPath $jsonJar)) { throw 'Missing cached org.json tes
 $classpath = @($stdlib, $annotations, $jsonJar) -join ';'
 $outputJar = Join-Path $testRoot 'aries-protocol-checks.jar'
 $dataRoot = Join-Path $projectRoot 'app\src\main\java\com\dafeiyu\mobile\data'
-& (Join-Path $javaRoot 'bin\java.exe') -cp $compilerClasspath org.jetbrains.kotlin.cli.jvm.K2JVMCompiler `
-    -no-stdlib -no-reflect -jvm-target 17 -classpath $classpath -d $outputJar `
+& (Join-Path $javaRoot 'bin\java.exe') "-Djava.io.tmpdir=$testRoot" -Xms32m -Xmx384m -XX:MaxMetaspaceSize=192m -cp $compilerClasspath org.jetbrains.kotlin.cli.jvm.K2JVMCompiler `
+    -Werror -no-stdlib -no-reflect -jvm-target 17 -classpath $classpath -d $outputJar `
     (Join-Path $dataRoot 'AriesProtocolPolicy.kt') (Join-Path $dataRoot 'SettingsContract.kt') `
     (Join-Path $PSScriptRoot 'tests\AriesProtocolChecks.kt')
 if ($LASTEXITCODE -ne 0) { throw 'Aries protocol checks compilation failed' }
-& (Join-Path $javaRoot 'bin\java.exe') -cp "$outputJar;$classpath" com.dafeiyu.mobile.data.AriesProtocolChecksKt
+& (Join-Path $javaRoot 'bin\java.exe') "-Djava.io.tmpdir=$testRoot" -Xmx128m -cp "$outputJar;$classpath" com.dafeiyu.mobile.data.AriesProtocolChecksKt
 if ($LASTEXITCODE -ne 0) { throw 'Aries protocol checks failed' }

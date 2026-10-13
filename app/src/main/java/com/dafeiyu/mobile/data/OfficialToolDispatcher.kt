@@ -17,7 +17,7 @@ import org.json.JSONObject
 
 /**
  * One dispatcher per user turn. Its ledger prevents replayed call IDs from creating duplicate paid work.
- * Background runners do not receive this dispatcher, so subagents cannot recursively spawn tasks.
+ * Delegated runners receive a restricted instance that rejects task creation.
  */
 class OfficialToolDispatcher(
     private val engineProvider: () -> BackgroundTaskEngine?,
@@ -29,6 +29,11 @@ class OfficialToolDispatcher(
     private val subagentWaitMillis: Long = 15 * 60_000L,
     private val webProvider: OfficialToolWebProvider? = null,
     private val scriptProvider: OfficialToolScriptProvider? = null,
+    private val permissionProvider: OfficialToolPermissionProvider? = null,
+    private val skillProvider: OfficialToolSkillProvider? = null,
+    private val allowTaskCreation: Boolean = true,
+    private val allowFileOutputs: Boolean = true,
+    private val mutationPolicy: OfficialToolMutationPolicy? = null,
 ) {
     init { require(subagentWaitMillis in 1..30 * 60_000L) }
     private val conversationId = OfficialToolContract.conversationId(conversationId)
@@ -42,7 +47,10 @@ class OfficialToolDispatcher(
 
     fun schemas(): JSONArray = OfficialToolContract.schemas(includeWeather = weatherProvider != null,
         includeWeatherSelection = weatherProvider is OfficialToolWeatherSelectionProvider,
-        includeWeb = webProvider != null, includeScripts = scriptProvider != null)
+        includeWeb = webProvider != null, includeScripts = scriptProvider != null,
+        includeScriptEscalation = scriptProvider is OfficialToolEscalatingScriptProvider,
+        includePermissions = permissionProvider != null, includeSkills = skillProvider != null,
+        includeTaskCreation = allowTaskCreation, includeFileOutputs = allowFileOutputs)
 
     suspend fun executeBatch(calls: List<OfficialToolCall>): List<OfficialToolResult> {
         require(calls.size in 1..OfficialToolContract.MAX_BATCH_CALLS)
@@ -98,6 +106,8 @@ class OfficialToolDispatcher(
         currentCoroutineContext().ensureActive()
         if (runCatching { OfficialToolContract.checkId(call.id) }.isFailure) return@withLock error(call, "invalid_call_id")
         if (call.name !in OfficialToolContract.names) return@withLock error(call, "unsupported_tool")
+        if (!allowTaskCreation && call.name in setOf("create_subagent", "create_background_task", "list_tasks", "get_task") ||
+            !allowFileOutputs && call.name == "write_text_file") return@withLock error(call, "unsupported_tool")
         val arguments = try {
             OfficialToolContract.arguments(call.arguments)
         } catch (_: Exception) {
@@ -111,12 +121,17 @@ class OfficialToolDispatcher(
         }
         if (ledger.size >= OfficialToolContract.MAX_SESSION_CALLS) return@withLock error(call, "tool_call_limit")
         val result = try {
+            if (call.name == "write_text_file" && mutationPolicy?.authorize(call.name, arguments) == false)
+                return@withLock error(call, "approval_denied").also { ledger[call.id] = Cached(fingerprint, it) }
+            currentCoroutineContext().ensureActive()
             // Once admitted, complete and remember bounded side effects even if the caller leaves.
             // These operations only enqueue work or commit a small local file, never wait for model I/O.
-            if (call.name in setOf("get_weather", "web_search", "browser", "run_script")) {
+            if (call.name in setOf("get_weather", "web_search", "browser", "run_script", "get_permissions", "request_permission", "list_skills", "read_skill")) {
                 when (call.name) {
                     "get_weather" -> weather(call, arguments)
                     "run_script" -> script(call, arguments)
+                    "get_permissions", "request_permission" -> permissions(call, arguments)
+                    "list_skills", "read_skill" -> skills(call, arguments)
                     else -> web(call, arguments)
                 }.also { ledger[call.id] = Cached(fingerprint, it) }
             } else withContext(NonCancellable) {
@@ -142,9 +157,44 @@ class OfficialToolDispatcher(
         result
     }
 
+    private suspend fun skills(call: OfficialToolCall, arguments: JSONObject): OfficialToolResult {
+        val provider = skillProvider ?: return error(call, "skills_unavailable")
+        val allowed = if (call.name == "list_skills") setOf("offset", "limit") else setOf("name", "file", "offset", "limit")
+        require(arguments.keys().asSequence().all { it in allowed })
+        fun integer(key: String, fallback: Int, maximum: Int): Int {
+            if (!arguments.has(key)) return fallback
+            val raw = arguments.get(key) as? Number ?: throw IllegalArgumentException()
+            require(raw.toDouble().isFinite() && raw.toDouble() == raw.toInt().toDouble())
+            return raw.toInt().also { require(it in 0..maximum) }
+        }
+        val offset = integer("offset", 0, if (call.name == "list_skills") 10000 else 1048576)
+        val limit = integer("limit", if (call.name == "list_skills") 20 else 12000,
+            if (call.name == "list_skills") 30 else 16000).also { require(it > 0) }
+        val data = if (call.name == "list_skills") provider.list(offset, limit)
+            else provider.read(string(arguments, "name", 128), arguments.opt("file")?.let { string(arguments, "file", 256) }, offset, limit)
+        require(data.toString().toByteArray().size <= OfficialToolContract.MAX_REPLY_BYTES)
+        return success(call, data)
+    }
+
+    private suspend fun permissions(call: OfficialToolCall, arguments: JSONObject): OfficialToolResult {
+        val provider = permissionProvider ?: return error(call, "permissions_unavailable")
+        val data = if (call.name == "get_permissions") {
+            require(arguments.length() == 0)
+            provider.query()
+        } else {
+            require(arguments.length() == 2)
+            val permission = arguments.getString("permission")
+            require(permission in listOf("notifications", "camera", "media", "all_files"))
+            provider.request(permission, OfficialToolContract.safeText(arguments.getString("purpose"), 500))
+        }
+        return OfficialToolResult(call.id, call.name, JSONObject().put("ok", true).put("data", data).toString())
+    }
+
     private suspend fun script(call: OfficialToolCall, args: JSONObject): OfficialToolResult {
         val provider = scriptProvider ?: return error(call, "linux_runtime_unavailable")
-        fields(args, setOf("language", "script", "timeout_seconds"), setOf("language", "script"))
+        val allowed = setOf("language", "script", "timeout_seconds") +
+            if (provider is OfficialToolEscalatingScriptProvider) setOf("request_full_access", "justification") else emptySet()
+        fields(args, allowed, setOf("language", "script"))
         val language = string(args, "language", 16)
         require(language in setOf("bash", "node", "python"))
         val body = string(args, "script", OfficialToolContract.MAX_TEXT_CHARACTERS)
@@ -153,7 +203,11 @@ class OfficialToolDispatcher(
             require(value is Int || value is Long)
             (value as Number).toLong().also { require(it in 1..120) }.toInt()
         } else 30
-        val data = provider.execute(language, body, timeout)
+        val fullAccess = if (args.has("request_full_access")) (args.get("request_full_access") as? Boolean ?: throw IllegalArgumentException()) else false
+        val justification = if (args.has("justification")) string(args, "justification", 500) else null
+        require(!fullAccess || !justification.isNullOrBlank())
+        val data = if (provider is OfficialToolEscalatingScriptProvider) provider.execute(language, body, timeout, fullAccess, justification)
+            else provider.execute(language, body, timeout)
         var truncated = data.optBoolean("output_truncated", false)
         for (field in listOf("stdout", "stderr")) {
             val output = data.optString(field, "")
