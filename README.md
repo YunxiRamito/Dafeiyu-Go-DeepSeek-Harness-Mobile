@@ -2,7 +2,7 @@
 
 Kotlin / Jetpack Compose Android 客户端，面向手机本机模型任务及通过 Aries 连接电脑 DSH。视觉采用 Liquid Glass 方向；电脑和手机共享 Connect 插件协议。
 
-当前源码版本为 **0.1.26 / code27**，正式包名 **com.dafeiyu.mobile**，调试包为 **com.dafeiyu.mobile.dev**。正式 0.1.26 已发布并安装 QA 模拟器与 PKB110，修复本机 DSH 网页生命周期问题，真实网页与更新专项通过，用户视觉待验收。整体功能对齐仍在分阶段实现和验证。版本历史、真实构建日志、APK 摘要及安装结果以 [HANDOVER.md](HANDOVER.md) 为准；编译、离线检查、设备验证和用户验收分别记录。
+当前源码版本为 **0.1.27 / code28**，正式包名 **com.dafeiyu.mobile**，调试包为 **com.dafeiyu.mobile.dev**。DSH 网页零高度约束和原生绘制层修复已通过独立实际窗口专项，并在 QA 模拟器的正式 MainActivity 验证主页面、设置往返与前后台恢复。正式构建和 Lint 已通过，真机本轮按用户决定不推送，真机稳定性与用户视觉仍待验收。整体功能对齐继续分阶段实现和验证。版本历史、真实构建日志、APK 摘要及安装结果以 [HANDOVER.md](HANDOVER.md) 为准；编译、离线检查、设备验证和用户验收分别记录。
 
 ## 开发基线
 

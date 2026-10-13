@@ -208,6 +208,13 @@ async function main() {
     boot.initProfile(profileDir, boot.PROFILE_TEMPLATES.web?.bundles ?? boot.DEFAULT_PROFILE_BUNDLES);
   }
   const manifest = boot.readProfileManifest('dsh', profileDir);
+  const mobileUiName = 'dafeiyu-mobile-ui';
+  const bundledMobileUi = /^link:\/dafeiyu-extension-packages\/mobile-ui\/[a-f0-9]{64}\/package$/
+    .test(manifest.dependencies?.[mobileUiName] ?? '');
+  // This source is verified and repaired by the signed APK launcher, not npm.
+  // Keep generic install/repair from replacing it with a registry package.
+  if (bundledMobileUi && frame.name === mobileUiName && ['enable', 'remove', 'repair'].includes(frame.operation))
+    throw new Error('application-ui-bundle-readonly');
   if (!['list', 'enable', 'exemption'].includes(frame.operation)) {
     profileDependencies(manifest, sourceRoot, true, profileDir);
     for (const filename of ['.npmrc', '.pnpmfile.cjs', '.pnpmfile.mjs']) {
@@ -263,8 +270,10 @@ async function main() {
     const exemptions = manager.listVersionExemptions();
     return { bundles: bundles.map(item => ({
       name: item.name, version: item.version ?? '', description: item.description ?? '', enabled: item.enabled,
-      installed: item.installed, optional: item.optional, removable: item.removable,
-      readOnlyReason: item.readOnlyReason, errorCode: item.error?.code,
+      installed: item.installed, optional: item.optional,
+      removable: bundledMobileUi && item.name === mobileUiName ? false : item.removable,
+      readOnlyReason: bundledMobileUi && item.name === mobileUiName ? '手机界面由应用更新维护' : item.readOnlyReason,
+      errorCode: item.error?.code,
       rows: item.rows.map(row => ({ id: row.rowId, name: row.moduleName })), source: item.source ?? ''
     })), exemptions: exemptions.exemptions, buildCandidates: await builds.catalog(), warnings: exemptions.warnings };
   }
@@ -292,6 +301,7 @@ async function main() {
   if (frame.operation === 'repair') {
     // Reinstall each explicit bundle through the actual manager; all selection states remain unchanged.
     const rows = (await manager.listBundles()).filter(item => item.installed && item.removable
+      && !(bundledMobileUi && item.name === mobileUiName)
       && (!frame.name || frame.name === item.name));
     check(rows.length > 0, 'no-repairable-bundle');
     for (const row of rows) {
@@ -314,10 +324,14 @@ async function main() {
     check(path.isAbsolute(source) && path.relative(sourceRoot, source) !== '' && !path.relative(sourceRoot, source).startsWith('..')
       && !path.isAbsolute(path.relative(sourceRoot, source)), 'foreign-install-source');
     const candidate = JSON.parse(await fs.readFile(path.join(source, 'package.json'), 'utf8'));
+    check(!bundledMobileUi || candidate.name !== mobileUiName, 'application-ui-bundle-readonly');
     profileDependencies(candidate, sourceRoot, true, source);
     const preparation = await builds.prepare(frame, source, candidate);
     if (preparation !== null) return preparation;
-  } else check(/^(?:@[a-z0-9._-]+\/)?[a-z0-9][a-z0-9._-]*(?:@[a-zA-Z0-9][a-zA-Z0-9.+_-]*)?$/.test(frame.spec), 'external-install-source');
+  } else {
+    check(/^(?:@[a-z0-9._-]+\/)?[a-z0-9][a-z0-9._-]*(?:@[a-zA-Z0-9][a-zA-Z0-9.+_-]*)?$/.test(frame.spec), 'external-install-source');
+    check(!bundledMobileUi || !/^dafeiyu-mobile-ui(?:@|$)/.test(frame.spec), 'application-ui-bundle-readonly');
+  }
   installId = crypto.randomUUID();
   const installed = await manager.installBundle(frame.spec, { enabled: frame.enabled !== false, saveExact: true,
     registry: registryUrl, requestId: installId });

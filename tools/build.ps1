@@ -31,13 +31,14 @@ if ($IsWindows -or $env:OS -eq 'Windows_NT') {
 Push-Location $projectRoot
 try {
     & (Join-Path $PSScriptRoot 'prepare-connection-plugin.ps1') -TempRoot $TempRoot
+    & (Join-Path $PSScriptRoot 'prepare-mobile-ui.ps1') -TempRoot $TempRoot
     & $gradle --no-daemon --no-parallel "--max-workers=$MaxWorkers" --project-cache-dir (Join-Path $TempRoot 'caches\project') "-Pmobile.outputRoot=$TempRoot/build" @Tasks --console plain
     if ($LASTEXITCODE -ne 0) { throw "Gradle 构建失败，退出码 $LASTEXITCODE" }
     if ($Tasks -contains ':app:assembleRelease' -or $Tasks -contains ':app:assembleDebug') {
         $delivery = Join-Path $TempRoot 'Dist'
         New-Item -ItemType Directory -Force -Path $delivery | Out-Null
         $isRelease = $Tasks -contains ':app:assembleRelease'
-        $apk = Join-Path $delivery ('Dafeiyu-Go-Mobile-0.1.26' + $(if ($isRelease) { '' } else { '-dev' }) + '.apk')
+        $apk = Join-Path $delivery ('Dafeiyu-Go-Mobile-0.1.27' + $(if ($isRelease) { '' } else { '-dev' }) + '.apk')
         $variant = if ($isRelease) { 'release' } else { 'debug' }
         Copy-Item -LiteralPath (Join-Path $TempRoot "build\app\outputs\apk\$variant\app-$variant.apk") -Destination $apk -Force
         ((Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + (Split-Path $apk -Leaf)) |

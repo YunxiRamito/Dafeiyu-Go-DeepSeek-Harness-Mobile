@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -57,12 +58,14 @@ fun rememberPageBackdropCapture(): PageBackdropCapture {
     return remember(layer) { PageBackdropCapture(layer) }
 }
 
-/** Record content once. Call outside the edge/toolbar subtree to prevent self-capture. */
-fun Modifier.capturePageBackdrop(capture: PageBackdropCapture): Modifier =
+/** Record outside the edge/toolbar subtree; native page content may also draw directly into the window. */
+fun Modifier.capturePageBackdrop(capture: PageBackdropCapture, directContent: Boolean = false): Modifier =
     this.onGloballyPositioned { capture.origin = it.localToRoot(Offset.Zero) }.drawWithContent {
         capture.layer.record { this@drawWithContent.drawContent() }
-        drawLayer(capture.layer)
-        capture.revision++
+        if (directContent) this@drawWithContent.drawContent() else drawLayer(capture.layer)
+        // The producer must not subscribe to its own publication. Reading the
+        // snapshot here would invalidate this draw again even on a static page.
+        Snapshot.withoutReadObservation { capture.revision++ }
     }
 
 enum class ScrollGlassEdge { Top, Bottom }

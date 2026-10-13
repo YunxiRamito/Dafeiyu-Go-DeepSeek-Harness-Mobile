@@ -1,0 +1,3010 @@
+/*
+ * Dafeiyu-GO mobile DSH surface.
+ *
+ * Only an explicit application marker or a deliberate desktop preview enables
+ * these rules. DSH slots are display:contents; material belongs on their real
+ * children, verified slot parents, or lifecycle-owned layout markers.
+ * This file does not replace DSH components or change their business callbacks.
+ */
+
+html[data-dafeiyu-surface="mobile"] {
+  --df-bg: #f2f2f7;
+  --df-surface: #ffffff;
+  --df-glass: rgb(255 255 255 / 0.62);
+  --df-glass-panel: rgb(255 255 255 / 0.82);
+  --df-glass-input: rgb(255 255 255 / 0.7);
+  --df-composer-fill: rgb(255 255 255 / 0.5);
+  --df-composer-tail: rgb(242 242 247 / 0.38);
+  --df-text: #1c1c1e;
+  --df-user-fill: #e2edfc;
+  --df-inline-code: rgb(255 255 255 / 0.72);
+  --df-code-surface: #f7f8fb;
+  --df-code-banner: #eef1f6;
+  --df-secondary: rgb(28 28 30 / 0.64);
+  --df-tertiary: rgb(28 28 30 / 0.45);
+  --df-line: rgb(28 28 30 / 0.08);
+  --df-rim: rgb(255 255 255 / 0.72);
+  --df-accent: var(--dafeiyu-mobile-accent, #007aff);
+  --df-hover: rgb(0 122 255 / 0.07);
+  --df-danger: #d93d47;
+  --df-archive: #b17800;
+  --df-button-shadow: 0 1px 4px rgb(0 0 0 / 0.09);
+  --df-panel-shadow: 0 6px 22px rgb(28 34 47 / 0.08);
+  --df-input-shadow: 0 2px 10px rgb(28 34 47 / 0.06);
+  --df-blur: 16px;
+  --df-nav-height: 64px;
+  --df-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --df-bounce: cubic-bezier(0.22, 1.7, 0.32, 1);
+  --df-fast: 150ms;
+  --df-settle: 360ms;
+  --df-enter: 380ms;
+  color-scheme: light;
+  background: var(--df-bg);
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-theme="dark"],
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-theme="system"]:has(body[data-ds-dark-theme]),
+html[data-dafeiyu-surface="mobile"]:not([data-dafeiyu-theme]):has(body[data-ds-dark-theme]) {
+  --df-bg: #0c0c0e;
+  --df-surface: #1c1c1e;
+  --df-glass: rgb(28 28 30 / 0.6);
+  --df-glass-panel: rgb(28 28 30 / 0.86);
+  --df-glass-input: rgb(28 28 30 / 0.74);
+  --df-composer-fill: rgb(28 28 30 / 0.54);
+  --df-composer-tail: rgb(12 12 14 / 0.42);
+  --df-text: #f5f5f7;
+  --df-user-fill: #293344;
+  --df-inline-code: rgb(255 255 255 / 0.08);
+  --df-code-surface: #171b23;
+  --df-code-banner: #202630;
+  --df-secondary: rgb(245 245 247 / 0.68);
+  --df-tertiary: rgb(245 245 247 / 0.47);
+  --df-line: rgb(255 255 255 / 0.11);
+  --df-rim: rgb(255 255 255 / 0.22);
+  --df-accent: var(--dafeiyu-mobile-accent, #64b5ff);
+  --df-hover: rgb(100 181 255 / 0.1);
+  --df-danger: #ff6972;
+  --df-archive: #ffd166;
+  --df-button-shadow: 0 1px 4px rgb(0 0 0 / 0.24);
+  --df-panel-shadow: 0 6px 22px rgb(0 0 0 / 0.22);
+  --df-input-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
+  color-scheme: dark;
+}
+
+html[data-dafeiyu-surface="mobile"] body {
+  --dsw-alias-bg-base: var(--df-bg);
+  --dsw-alias-bg-layer-1: var(--df-surface);
+  --dsw-alias-bg-layer-2: var(--df-glass-panel);
+  --dsw-alias-bg-layer-3: var(--df-glass-panel);
+  --dsw-alias-bg-overlay: var(--df-glass-panel);
+  --dsw-alias-label-primary: var(--df-text);
+  --dsw-alias-label-primary-foreground: #ffffff;
+  --dsw-alias-label-secondary: var(--df-secondary);
+  --dsw-alias-label-tertiary: var(--df-tertiary);
+  --dsw-alias-label-caption: var(--df-tertiary);
+  --dsw-alias-menu-icon: var(--df-secondary);
+  --dsw-alias-border-l1: var(--df-line);
+  --dsw-alias-border-l2: var(--df-line);
+  --dsw-alias-border-l3: var(--df-line);
+  --dsw-alias-button-primary-fill: var(--df-accent);
+  --dsw-alias-button-elevated-fill: var(--df-glass-panel);
+  --dsw-alias-button-floating-fill: var(--df-glass);
+  --dsw-alias-button-floating-hover: var(--df-hover);
+  --dsw-alias-button-ghost-active-fill: var(--df-hover);
+  --dsw-alias-button-ghost-active-hover: var(--df-hover);
+  --dsw-alias-button-ghost-active-border: var(--df-line);
+  --dsw-alias-interactive-bg-hover: var(--df-hover);
+  --dsw-alias-interactive-bg-hover-solid: var(--df-surface);
+  --dsw-alias-bg-module-platform: var(--df-glass-input);
+  --dsw-alias-settings-card-fill: var(--df-glass-input);
+  --dsw-alias-settings-card-stroke: var(--df-line);
+  --dsw-specific-sidebar-nav-item-hover: var(--df-hover);
+  --dsw-specific-sidebar-nav-item-active: var(--df-hover);
+  --dsw-alias-switch-thumb: #ffffff;
+  --dsw-alias-brand-primary: var(--df-accent);
+  --dsw-alias-link: var(--df-accent);
+  --dsw-alias-state-business-primary: var(--df-accent);
+  --dsw-specific-bubble: var(--df-user-fill);
+  --dsw-alias-markdown-inline-code: var(--df-inline-code);
+  --dsw-alias-markdown-code-block: var(--df-code-surface);
+  --dsw-alias-markdown-code-block-banner: var(--df-code-banner);
+  --dsw-alias-markdown-code-segment-selected: var(--df-glass-input);
+  --dsw-alias-markdown-code-segment-unselected: var(--df-code-surface);
+  --dsw-specific-selector: var(--df-glass);
+  --dsw-specific-menu: var(--df-glass-panel);
+  --dsw-menu-surface-fill: var(--df-glass-panel);
+  --dsw-specific-sidebar-fill: transparent;
+  --dsw-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ds-transition-duration-fast: var(--df-fast);
+  --ds-transition-duration-slow: var(--df-settle);
+  --ds-ease-in-out: var(--df-ease);
+  --dsh-content-font-size: 15px;
+  --dsh-content-font-size-secondary: 13px;
+  min-width: 0 !important;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  color: var(--df-text);
+  background: var(--df-bg);
+  font-family: var(--dsw-font-family);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Android WebView can resolve the inherited percentage chain to zero while
+ * the document is mounted in an Activity.  Give the mobile document and its
+ * React mount an explicit containing block before sizing the app frame. */
+html[data-dafeiyu-surface="mobile"] {
+  height: 100% !important;
+  min-height: 100% !important;
+  overflow: hidden;
+}
+
+html[data-dafeiyu-surface="mobile"] body,
+html[data-dafeiyu-surface="mobile"] #root {
+  height: 100% !important;
+  min-height: 100% !important;
+}
+
+html[data-dafeiyu-surface="mobile"],
+html[data-dafeiyu-surface="mobile"] body,
+html[data-dafeiyu-surface="mobile"] body *,
+html[data-dafeiyu-surface="mobile"] body *::before,
+html[data-dafeiyu-surface="mobile"] body *::after {
+  box-sizing: border-box;
+}
+
+html[data-dafeiyu-surface="mobile"] :is(button, [role="button"], input, textarea, select) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html[data-dafeiyu-surface="mobile"] :is(button, [role="button"], input, textarea, select):focus-visible {
+  outline: 2px solid var(--df-accent);
+  outline-offset: 2px;
+}
+
+/* The optional bridge yields its old navigation only inside our explicit gate. */
+html[data-dafeiyu-surface="mobile"] .dsh-mobile-app-header,
+html[data-dafeiyu-surface="mobile"] .dsh-mobile-drawer-backdrop {
+  display: none !important;
+}
+
+/* A single content column avoids a narrow desktop column behind a mobile drawer.
+ * Fixed edges use the actual window, including WebViews whose dvh resolves to
+ * zero despite a nonzero layout viewport. Keep the original grid and scrollport. */
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="frame"],
+html[data-dafeiyu-surface="mobile"] [data-slot="root"] > div:has(> div > [data-slot="main"]) {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) auto !important;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100%;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  padding: calc(var(--df-nav-height) + env(safe-area-inset-top)) 0 0 !important;
+  overflow: hidden;
+  background: var(--df-bg);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="center"],
+html[data-dafeiyu-surface="mobile"] div:has(> [data-slot="main"]) {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  width: 100%;
+  min-width: 0 !important;
+  min-height: 0;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="navigation"] {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 55;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 56px 44px;
+  align-items: center;
+  gap: 0;
+  height: calc(var(--df-nav-height) + env(safe-area-inset-top));
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  color: var(--df-text);
+  background: transparent;
+  border: 0;
+  isolation: isolate;
+  animation: dfMobileEnter var(--df-enter) var(--df-ease) both;
+  transition: grid-template-columns var(--df-fast) var(--df-ease);
+}
+
+/* Only the material layer fades; titles and hit targets stay fully visible. */
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="navigation"]::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 -24px;
+  z-index: -1;
+  background: linear-gradient(to bottom, var(--df-glass-panel), var(--df-glass));
+  backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  -webkit-backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 58%, #0000 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 58%, #0000 100%);
+  pointer-events: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="navigation"] > :not(button) {
+  grid-column: 2;
+  margin-inline: 12px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--df-text);
+  font-size: 16px;
+  font-weight: 600;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="navigation"][data-dafeiyu-has-activity="false"] {
+  grid-template-columns: 44px minmax(0, 1fr) 0px 44px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="navigation"] > button[data-dafeiyu-mobile-control="sidebar-toggle"] {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="navigation"] > button[data-dafeiyu-mobile-control="activity-hub"] {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="navigation"] > button[data-dafeiyu-mobile-control="new-session"] {
+  grid-column: 4;
+  grid-row: 1;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="navigation"] > button[data-dafeiyu-mobile-control="activity-hub"][hidden] {
+  display: none !important;
+}
+
+/* The inactive track is genuinely empty: the disabled hub cannot overlap the
+ * title or the new-session hit target while its short exit animation runs. */
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="navigation"][data-dafeiyu-has-activity="false"] > button[data-dafeiyu-mobile-control="activity-hub"] {
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  border-width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Keep the official command mounted as the top quick action's real source. */
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] button[data-dafeiyu-mobile-control="sidebar-new-session-source"] {
+  display: none !important;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="sidebar"],
+html[data-dafeiyu-surface="mobile"] div:has(> [data-slot="sidebar"]) {
+  position: fixed !important;
+  inset: calc(var(--df-nav-height) + env(safe-area-inset-top) + 8px) auto 12px 10px !important;
+  z-index: 60 !important;
+  width: min(350px, calc(100vw - 38px)) !important;
+  max-width: calc(100vw - 38px);
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  color: var(--df-text);
+  background: var(--df-glass-panel) !important;
+  border: 1px solid var(--df-rim) !important;
+  border-radius: 28px;
+  box-shadow: var(--df-panel-shadow);
+  backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  -webkit-backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  transform: translateX(calc(-100% - 20px)) !important;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform var(--df-settle) var(--df-ease),
+    visibility 0s linear var(--df-settle);
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-drawer="open"] [data-dafeiyu-mobile-layout="sidebar"],
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-drawer="open"] div:has(> [data-slot="sidebar"]) {
+  transform: translateX(0) !important;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    transform var(--df-settle) var(--df-ease),
+    visibility 0s;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] > div {
+  width: 100% !important;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  padding: 14px 12px;
+  gap: 10px;
+  background: transparent !important;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] :is(nav, [data-slot="sidebar.workspaces"] > div) {
+  min-width: 0;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] button {
+  min-height: 36px;
+  border-radius: 13px;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease);
+}
+
+/* Navigation stays in the app bar; the drawer contains the actual DSH controls. */
+html[data-dafeiyu-surface="mobile"] :is(
+  [data-dafeiyu-mobile-layout="sidebar-brand"],
+  [data-dafeiyu-mobile-layout="sidebar-brand-row"],
+  [data-dafeiyu-mobile-control="sidebar-toggle-original"],
+  [data-dafeiyu-mobile-control="rightbar-toggle"],
+  [data-dafeiyu-mobile-control="microphone"]
+) {
+  display: none !important;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] > div > button[aria-keyshortcuts="Control+Alt+N"] {
+  width: 100%;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 14px;
+  color: var(--df-text);
+  background: var(--df-glass-input);
+  border: 1px solid var(--df-rim);
+  border-radius: 18px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+html[data-dafeiyu-surface="mobile"] :is(
+  [data-dafeiyu-mobile-section="navigation"],
+  [data-dafeiyu-mobile-section="footer"],
+  [data-dafeiyu-mobile-section="devices"]
+),
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] nav:has([data-slot="sidebar.panellist"]),
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] > div > div:has(> div > [data-slot="sidebar.settings"]) {
+  min-width: 0;
+  margin: 0;
+  padding: 4px;
+  color: var(--df-text);
+  background: var(--df-glass);
+  border: 1px solid var(--df-line);
+  border-radius: 20px;
+  box-shadow: none;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease),
+    border-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] nav:has([data-slot="sidebar.panellist"]) {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 0;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] nav:has([data-slot="sidebar.panellist"]) > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: var(--df-text);
+  background: transparent;
+  border: 0;
+  border-radius: 16px;
+  font-size: 14px;
+  text-align: start;
+  white-space: nowrap;
+  position: relative;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] nav:has([data-slot="sidebar.panellist"]) > button + button {
+  border-top: 0;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] nav:has([data-slot="sidebar.panellist"]) > button:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  inset: auto 12px 0;
+  height: 1px;
+  background: var(--df-line);
+  pointer-events: none;
+}
+
+html[data-dafeiyu-surface="mobile"] div:has(> [data-slot="sidebar.workspaces"]) {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar.workspaces"] > div {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+html[data-dafeiyu-surface="mobile"] div:has(> [data-slot="sidebar.workspaces.directoryFlow"]) {
+  min-height: 46px;
+  margin: 0;
+  padding: 6px 10px;
+  gap: 6px;
+  color: var(--df-secondary);
+  font-size: 12px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] [role="tree"] {
+  min-width: 0;
+  padding: 2px 0 8px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] [role="tree"] > div:has([data-row-key^="workspace:"]) {
+  min-width: 0;
+  margin: 0 0 2px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] [role="tree"] > div:has([data-row-key^="session:"][aria-selected="true"]) {
+  margin: 4px 0 6px;
+  padding: 3px;
+  background: var(--df-glass);
+  border: 1px solid var(--df-line);
+  border-radius: 16px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] :is([data-row-key^="workspace:"], [data-row-key^="session:"]) {
+  min-width: 0;
+  min-height: 40px;
+  padding-block: 8px;
+  color: var(--df-text);
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 20px;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] [data-row-key^="session:"][aria-selected="true"] {
+  color: var(--df-text);
+  background: var(--df-hover);
+}
+
+/* The original rows retain their own FLIP transform and real click handlers. */
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar.workspaces"] [data-dafeiyu-touch-row] {
+  min-height: 44px;
+  touch-action: pan-y pinch-zoom;
+  -webkit-touch-callout: none;
+  translate: var(--df-sidebar-swipe-x, 0px) 0;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease),
+    translate var(--df-settle) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar.workspaces"] [data-dafeiyu-touch-row][data-dafeiyu-swipe-state="dragging"] {
+  transition: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="sidebar-swipe-action"] {
+  position: fixed;
+  z-index: 67;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 8px;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: var(--df-button-shadow);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  touch-action: manipulation;
+  animation: dfSidebarActionEnter var(--df-fast) var(--df-ease) both;
+  transition:
+    opacity var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="sidebar-swipe-action"][data-dafeiyu-mobile-control="sidebar-archive"] {
+  color: #382700;
+  background: #ffd75e;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="sidebar-swipe-action"][data-dafeiyu-mobile-control="sidebar-delete"] {
+  color: #ffffff;
+  background: var(--df-danger);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="sidebar-swipe-action"][data-dafeiyu-swipe-state="dragging"] {
+  pointer-events: none;
+  cursor: default;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="sidebar-swipe-action"][data-dafeiyu-swipe-state="closing"] {
+  opacity: 0;
+  pointer-events: none;
+  animation: dfSidebarActionExit var(--df-fast) var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="sidebar-swipe-action"]:is([hidden], [data-dafeiyu-swipe-state="closed"]) {
+  display: none !important;
+  pointer-events: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] [data-row-key^="overflow:"] {
+  min-height: 36px;
+  margin: 2px 0;
+  color: var(--df-secondary);
+  background: transparent;
+  font-size: 12px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar.settings"] > div {
+  min-width: 0;
+  padding: 0;
+  gap: 6px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.launcher"] > button {
+  min-height: 44px;
+  color: var(--df-text);
+  background: transparent;
+  border: 0;
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+html[data-dafeiyu-surface="mobile"] div:has(> [data-slot="sidebar.footer.action"]:empty:only-child) {
+  display: none;
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-drawer="open"] [data-dafeiyu-mobile-layout="sidebar-section"] {
+  animation: dfMobileEnter var(--df-enter) var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="backdrop"] {
+  position: fixed;
+  inset: calc(var(--df-nav-height) + env(safe-area-inset-top)) 0 0;
+  z-index: 58;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: rgb(0 0 0 / 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--df-settle) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-drawer="open"] [data-dafeiyu-mobile-layout="backdrop"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="rightbar"],
+html[data-dafeiyu-surface="mobile"] div:has(> [data-slot="rightbar"]) {
+  position: absolute !important;
+  inset: 0 0 0 auto !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-sidebar-right-panel] {
+  position: fixed !important;
+  inset: calc(var(--df-nav-height) + env(safe-area-inset-top)) 0 0 !important;
+  max-width: 100vw;
+  --dsh-sidebar-width: 100vw !important;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-shell-leading] {
+  display: none !important;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-shell-bottom] {
+  grid-column: 1 / -1 !important;
+  background: var(--df-glass-panel);
+}
+
+/* Keep unknown session contributions; only explicitly marked stock controls hide. */
+html[data-dafeiyu-surface="mobile"] [data-slot="main.conversation"] > div {
+  min-width: 0;
+  min-height: 0;
+  background: transparent;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.header"] > header {
+  flex: none;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+  padding: 6px 14px 0;
+  color: var(--df-text);
+  background: transparent;
+  border-bottom: 1px solid var(--df-line);
+  animation: dfMobileEnter var(--df-enter) var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.header"] > header:has(> [data-slot="conversation.session.header"] > div:empty) {
+  display: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.session.header"] > div:not([data-conversation-tabs]):not([role="tablist"]) {
+  grid-column: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  margin: 0;
+  padding: 0 0 4px;
+  gap: 8px;
+  overflow: visible;
+  container-type: normal;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-conversation-header-leading]:has(> [data-slot="conversation.header.leading"]:empty) {
+  display: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-conversation-header-corner]:has([data-dafeiyu-mobile-control="rightbar-toggle"]):not(:has(button:not([data-dafeiyu-mobile-control="rightbar-toggle"]))) {
+  display: none;
+}
+
+html[data-dafeiyu-surface="mobile"] div:has(> nav):has(> div > [data-slot="conversation.session.header.actions"]) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+html[data-dafeiyu-surface="mobile"] div:has(> nav):has(> div > [data-slot="conversation.session.header.actions"])::-webkit-scrollbar {
+  display: none;
+}
+
+html[data-dafeiyu-surface="mobile"] div:has(> [data-slot="conversation.session.header.actions"]),
+html[data-dafeiyu-surface="mobile"] div:has(> [data-slot="conversation.session.header.utilities"]) {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.session.header.actions"] > :is(div, span),
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.session.header.utilities"] > :is(div, span) {
+  flex: none;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.session.header.actions"] > span[title] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  width: 28px;
+  min-width: 28px;
+  min-height: 32px;
+  padding: 6px;
+  color: var(--df-secondary);
+  font-size: 0;
+  line-height: 20px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.session.header.actions"] > span[title] svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+html[data-dafeiyu-surface="mobile"] div:has(> [data-slot="conversation.session.header.utilities"]) {
+  grid-column: 2;
+  justify-self: end;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.session.header.utilities"] [data-open-target][data-size="compact"] > button {
+  min-width: 28px;
+  padding-inline: 6px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-conversation-tabs] {
+  grid-column: 1;
+  display: flex;
+  flex: none;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  margin: 2px 0 0;
+  padding: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-conversation-tabs] > [role="tab"] {
+  flex: none;
+  min-width: 56px;
+  min-height: 36px;
+  padding: 8px 12px;
+  color: var(--df-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 12px 12px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-conversation-tabs] > [role="tab"][aria-selected="true"] {
+  color: var(--df-accent);
+  background: var(--df-hover);
+}
+
+/* A blank hero needs no residual header after its rightbar launcher is hidden. */
+html[data-dafeiyu-surface="mobile"] [data-slot="main.conversation"] > div[data-phase="hero"] > [data-slot="conversation.header"] > header:not(:has(:is(
+  [data-slot="conversation.header.leading"],
+  [data-slot="conversation.session.header.actions"],
+  [data-slot="conversation.session.header.utilities"]
+) button)):not(:has([role="tab"])) {
+  display: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-conversation-content] {
+  --dsh-chat-content-width: calc(100% - 32px);
+  --dsh-composer-card-max-width: 100%;
+  --dsh-composer-side-clearance: 0px;
+  min-width: 0;
+  background: transparent;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-conversation-scroll] {
+  min-width: 0;
+  min-height: 0;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scrollbar-gutter: auto;
+  scrollbar-color: var(--df-line) transparent;
+  margin-right: 0;
+}
+
+/* Flex space belongs above the workspace/input group, never below the input. */
+html[data-dafeiyu-surface="mobile"] [data-content-phase="hero"] > [data-conversation-scroll] {
+  justify-content: flex-start !important;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-content-phase="hero"] [data-composer-seat] {
+  flex: 1 0 auto;
+  min-height: 100%;
+  margin-top: auto;
+  background: transparent !important;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-content-phase="hero"] [data-dafeiyu-mobile-layout="composer-stack"],
+html[data-dafeiyu-surface="mobile"] [data-content-phase="hero"] div:has(> [data-slot="conversation.composer.bar"]) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  gap: 8px;
+  padding-bottom: 0;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-content-phase="hero"] [data-dafeiyu-mobile-layout="hero"] {
+  display: flex;
+  flex: 1 0 112px;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  margin: 0;
+  padding: 24px 16px;
+  animation: dfMobileEnter var(--df-enter) var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] div:has(> [data-slot="conversation.hero.workspace"]) {
+  padding-inline: 16px;
+  gap: 8px;
+}
+
+html[data-dafeiyu-surface="mobile"] div:has(> [data-slot="conversation.hero.workspace"]) button {
+  color: var(--df-secondary);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+html[data-dafeiyu-surface="mobile"] div:has(> [data-slot="conversation.hero.workspace"]) button:hover {
+  color: var(--df-text);
+  background: var(--df-hover);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-chat-flow] {
+  --dsh-chat-content-width: calc(100% - 32px);
+  --dsh-chat-flow-gap: 12px;
+}
+
+html[data-dafeiyu-surface="mobile"] :is([data-chat-flow-kind="user"], [data-chat-flow-kind="steering"]) {
+  --dsw-specific-bubble: var(--df-user-fill);
+  --dsw-alias-label-primary: var(--df-text);
+  --dsw-radius-xl: 20px;
+  border-radius: 20px;
+}
+
+html[data-dafeiyu-surface="mobile"] :is([data-chat-flow-kind="user"], [data-chat-flow-kind="steering"]) [data-slot="conversation.chat.node"] > div {
+  color: var(--df-text);
+  border-radius: 20px;
+  box-shadow: none;
+}
+
+html[data-dafeiyu-surface="mobile"] :is([data-chat-flow-kind="user"], [data-chat-flow-kind="steering"]) [data-slot="conversation.chat.node"] > div > div:first-child {
+  min-width: 0;
+  max-width: 88%;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.chat.node"] > div {
+  min-width: 0;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease);
+}
+
+/* Only inline Markdown code is recolored; block syntax and diff tokens stay native. */
+html[data-dafeiyu-surface="mobile"] [data-conversation-content] :is(p, li, td, th, blockquote, summary, a, span) > code:not(pre code) {
+  color: var(--df-text);
+  background: var(--df-inline-code);
+  border: 1px solid var(--df-line);
+  border-radius: 6px;
+}
+
+/* These native cards define their fills locally, beyond the body theme aliases. */
+html[data-dafeiyu-surface="mobile"] [data-conversation-content] :is(
+  [data-after-changes],
+  [data-presented-files-row],
+  [data-presented-file]
+) {
+  --deliverable-fill: var(--df-glass-input);
+  --deliverable-hover: var(--df-glass-panel);
+  color: var(--df-text);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-conversation-content] [data-changed-files] {
+  --changes-fill: var(--df-glass-input);
+  --changes-hover: var(--df-glass-panel);
+  color: var(--df-text);
+}
+
+/* Hidden process records keep DSH's native disclosure and paging semantics. */
+html[data-dafeiyu-surface="mobile"] [data-step-process]:not([hidden]):not([hidden] *) {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--df-line);
+  border-radius: 18px;
+  background: var(--df-glass);
+  transition:
+    background-color var(--df-fast) var(--df-ease),
+    border-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-step-process] > div > button[data-process-activity] {
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px 2px;
+  color: var(--df-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-turn-process] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  max-width: 100%;
+  padding: 5px 10px;
+  color: var(--df-secondary);
+  background: var(--df-glass);
+  border: 1px solid var(--df-line);
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 20px;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.chat.node"] :is([data-variant="think"], [data-tool]) {
+  --dsw-alias-label-tertiary: var(--df-secondary);
+  min-width: 0;
+  color: var(--df-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.chat.node"] [data-disclosure-row] {
+  min-width: 0;
+  min-height: 34px;
+  padding: 5px 6px;
+  color: var(--df-secondary);
+  background: transparent;
+  border-radius: 12px;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.chat.node"] [data-disclosure-row]:is(:hover, :focus-visible),
+html[data-dafeiyu-surface="mobile"] [data-turn-process]:hover {
+  color: var(--df-text);
+  background: var(--df-hover);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-step-process-content],
+html[data-dafeiyu-surface="mobile"] [data-context-injection-body] {
+  color: var(--df-secondary);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-testid="todo-panel"] {
+  width: calc(100% - 28px);
+  max-width: none;
+  margin: 4px auto 6px;
+  color: var(--df-text);
+  background: var(--df-glass-input);
+  border: 1px solid var(--df-rim);
+  border-radius: 20px;
+  box-shadow: none;
+  backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  -webkit-backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  transition:
+    background-color var(--df-fast) var(--df-ease),
+    border-color var(--df-fast) var(--df-ease);
+  animation: dfMobileLift var(--df-enter) var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-testid="todo-panel"] > div {
+  padding: 8px 12px;
+  gap: 8px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-testid="todo-panel"] > div > button {
+  min-height: 36px;
+  padding: 0;
+  color: var(--df-text);
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  line-height: 20px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-testid="todo-panel"] > div > button > span:nth-child(3) {
+  color: var(--df-secondary);
+  font-size: 12px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-testid="todo-panel"] ul {
+  max-height: min(200px, 30dvh);
+  padding: 0 2px;
+  overscroll-behavior-y: contain;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-testid="todo-panel"] li[data-status] {
+  min-height: 30px;
+  color: var(--df-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-testid="todo-panel"] li[data-status] > span:last-child {
+  white-space: normal;
+}
+
+/* Only the inner input card is glass; the seat is a transparent positioning layer. */
+html[data-dafeiyu-surface="mobile"] [data-composer-seat] {
+  --dsh-composer-text-max-height: min(180px, 30dvh);
+  z-index: 7;
+  width: 100%;
+  min-width: 0;
+  padding: 12px 0 max(12px, env(safe-area-inset-bottom)) !important;
+  background: linear-gradient(transparent, var(--df-composer-tail) 82%) !important;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.composer.bar"] > div {
+  width: 100%;
+  min-width: 0;
+  padding-inline: 14px !important;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="composer-card"],
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.composer.bar"] > div > div:has(> [data-slot="conversation.input.attachments"]) {
+  min-width: 0;
+  padding: 14px 14px 8px !important;
+  color: var(--df-text);
+  background: var(--df-composer-fill) !important;
+  border: 1px solid var(--df-rim) !important;
+  border-radius: 28px !important;
+  box-shadow: var(--df-input-shadow) !important;
+  backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  -webkit-backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  transition:
+    border-color var(--df-fast) var(--df-ease),
+    box-shadow var(--df-fast) var(--df-ease);
+  animation: dfMobileLift var(--df-enter) var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="composer-card"]:focus-within,
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.composer.bar"] > div > div:has(> [data-slot="conversation.input.attachments"]):focus-within {
+  border-color: color-mix(in srgb, var(--df-accent) 28%, var(--df-rim)) !important;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="composer-actions"] {
+  min-width: 0;
+  height: auto !important;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 0 !important;
+  gap: 6px !important;
+  flex-wrap: wrap;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="composer-actions"] > div {
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+html[data-dafeiyu-surface="mobile"] div:has(> [data-slot="conversation.input.activity"]):has([data-dafeiyu-mobile-control="microphone"]):not(:has(button:not([data-dafeiyu-mobile-control="microphone"]))) {
+  display: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-composer-seat] :is(textarea, [contenteditable="true"]) {
+  min-width: 0;
+  padding-inline: 2px;
+  color: var(--df-text);
+  caret-color: var(--df-accent);
+  font-size: 16px;
+  line-height: 1.5;
+  background: transparent;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-composer-seat] textarea::placeholder {
+  color: var(--df-tertiary);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-composer-seat] :is(button, [role="button"]) {
+  min-height: 36px;
+  border-radius: 14px;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease),
+    transform var(--df-settle) var(--df-ease);
+}
+
+/* The stock files/commands trigger is outside the contribution slots. */
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.composer.bar"] button:is(
+  [aria-label="添加文件或调用指令"],
+  [aria-label="Add files or run commands"]
+) {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 9px;
+  color: var(--df-text) !important;
+  background: var(--df-glass) !important;
+  border: 1px solid var(--df-rim);
+  border-radius: 50%;
+  corner-shape: round;
+  box-shadow: var(--df-button-shadow);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.composer.bar"] button:is(
+  [aria-label="添加文件或调用指令"],
+  [aria-label="Add files or run commands"]
+):hover:not(:disabled) {
+  background: var(--df-glass-panel) !important;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="conversation.composer.bar"] button:is(
+  [aria-label="添加文件或调用指令"],
+  [aria-label="Add files or run commands"]
+):active:not(:disabled) {
+  background: var(--df-hover) !important;
+}
+
+/* Text-bearing actions are pills; only app navigation controls are circles. */
+html[data-dafeiyu-surface="mobile"] :is(
+  [data-dafeiyu-mobile-control="action"],
+  [data-dafeiyu-mobile-control="session-action"]
+) {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: auto;
+  min-width: 32px;
+  max-width: none;
+  height: 32px;
+  min-height: 32px;
+  padding: 5px 8px;
+  color: var(--df-secondary);
+  background: var(--df-glass);
+  border: 1px solid var(--df-rim);
+  border-radius: 12px;
+  corner-shape: round;
+  box-shadow: none;
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] :is(
+  [data-dafeiyu-mobile-control="action"],
+  [data-dafeiyu-mobile-control="session-action"]
+) svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+html[data-dafeiyu-surface="mobile"] :is(
+  [data-dafeiyu-mobile-control="action"],
+  [data-dafeiyu-mobile-control="session-action"]
+):is(:hover, :active) {
+  color: var(--df-text);
+  background: var(--df-hover);
+}
+
+html[data-dafeiyu-surface="mobile"] :is(
+  [data-dafeiyu-mobile-control="sidebar-toggle"],
+  [data-dafeiyu-mobile-control="new-session"]
+) {
+  display: inline-flex;
+  flex: none;
+  justify-content: center;
+  align-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  color: var(--df-text);
+  background: var(--df-glass);
+  border: 1px solid var(--df-rim);
+  border-radius: 50%;
+  corner-shape: round;
+  box-shadow: var(--df-button-shadow);
+  backdrop-filter: blur(8px) saturate(1.08);
+  -webkit-backdrop-filter: blur(8px) saturate(1.08);
+  cursor: pointer;
+  transition:
+    background-color var(--df-fast) var(--df-ease),
+    transform var(--df-settle) var(--df-ease),
+    border-radius var(--df-settle) var(--df-ease),
+    box-shadow var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] :is(
+  [data-dafeiyu-mobile-control="sidebar-toggle"],
+  [data-dafeiyu-mobile-control="new-session"]
+) svg {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  transition: rotate var(--df-settle) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] :is(
+  [data-dafeiyu-mobile-control="sidebar-toggle"],
+  [data-dafeiyu-mobile-control="new-session"]
+):active {
+  background: var(--df-glass-panel);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="new-session"][aria-expanded="true"] {
+  background: var(--df-glass-panel);
+  border-radius: 17px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="new-session"][aria-expanded="true"] > svg {
+  rotate: 45deg;
+}
+
+html[data-dafeiyu-surface="mobile"] :is(
+  [data-dafeiyu-mobile-control="model"],
+  [data-dafeiyu-mobile-control="permission"]
+) {
+  min-width: 36px;
+  min-height: 36px;
+  max-width: min(175px, 40vw);
+  padding-inline: 8px;
+  color: var(--df-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: none;
+  font-size: 13px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="activity"] {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  color: var(--df-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  corner-shape: round;
+  box-shadow: none;
+}
+
+html[data-dafeiyu-surface="mobile"] :is(
+  [data-dafeiyu-mobile-control="model"],
+  [data-dafeiyu-mobile-control="permission"],
+  [data-dafeiyu-mobile-control="activity"]
+):hover {
+  color: var(--df-text);
+  background: var(--df-hover);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="send"] {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  flex: none;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 9px;
+  color: #ffffff !important;
+  background: var(--df-accent) !important;
+  border: 1px solid rgb(255 255 255 / 0.3) !important;
+  border-radius: 50% !important;
+  corner-shape: round !important;
+  box-shadow: var(--df-button-shadow);
+  transition:
+    filter var(--df-fast) var(--df-ease),
+    transform var(--df-settle) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="send"]:active {
+  filter: brightness(1.08);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="send"]:disabled {
+  color: rgb(255 255 255 / 0.8) !important;
+  opacity: 0.42;
+  box-shadow: none;
+  transform: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="close"],
+html[data-dafeiyu-surface="mobile"] button:has([data-slot="settings.close"]) {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 8px;
+  color: var(--df-secondary);
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 50%;
+  corner-shape: round;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="close"]:active {
+  color: var(--df-text);
+  background: var(--df-hover) !important;
+}
+
+html[data-dafeiyu-surface="mobile"] :is([data-session-stats-usage], [data-composer-stat]) {
+  color: var(--df-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scoped overlay rules deliberately avoid generic data-state="open". */
+html[data-dafeiyu-surface="mobile"] :is([role="menu"], [role="listbox"], [role="dialog"]) {
+  max-width: calc(100vw - 24px);
+  color: var(--df-text);
+  background: var(--df-glass-panel);
+  border: 1px solid var(--df-rim);
+  border-radius: 24px;
+  box-shadow: var(--df-panel-shadow);
+  backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  -webkit-backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  animation: dfMobileLift var(--df-enter) var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] :is([role="menuitem"], [role="option"]) {
+  min-height: 40px;
+  border-radius: 12px;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] :is([role="menuitem"], [role="option"]):hover {
+  background: var(--df-hover);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="archive"] {
+  color: var(--df-archive);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="delete"] {
+  color: var(--df-danger);
+}
+
+/* The client marks exact built-in elements; unknown contributions remain usable. */
+html[data-dafeiyu-surface="mobile"] :is(
+  [data-dafeiyu-mobile-control="mobile-hidden"],
+  [data-dafeiyu-mobile-control="mobile-static-title"],
+  [data-dafeiyu-mobile-control="mobile-empty-header"],
+  [data-dafeiyu-mobile-control="activity-source-agents"],
+  [data-dafeiyu-mobile-control="activity-source-jobs"]
+) {
+  display: none !important;
+}
+
+/* One live activity entry invokes the original agents and background-job menus. */
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="activity-hub"] {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 10px;
+  color: var(--df-text);
+  background: var(--df-glass);
+  border: 1px solid var(--df-rim);
+  border-radius: 50%;
+  corner-shape: round;
+  box-shadow: var(--df-button-shadow);
+  backdrop-filter: blur(8px) saturate(1.08);
+  -webkit-backdrop-filter: blur(8px) saturate(1.08);
+  cursor: pointer;
+  transition:
+    opacity var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease),
+    transform var(--df-settle) var(--df-ease),
+    box-shadow var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="activity-hub"][data-dafeiyu-visibility="open"] {
+  animation: dfMobileEnter var(--df-fast) var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="activity-hub"][data-dafeiyu-visibility="closing"] {
+  opacity: 0;
+  pointer-events: none;
+  animation: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="activity-hub"] svg {
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="activity-hub"]:is(:hover, [aria-expanded="true"]) {
+  background: var(--df-glass-panel);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="activity-hub"]:active {
+  background: var(--df-glass-panel);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="activity-panel"] {
+  position: fixed !important;
+  inset: calc(var(--df-nav-height) + env(safe-area-inset-top) + 8px) 12px auto !important;
+  z-index: 85;
+  display: flex;
+  flex-direction: column;
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  min-height: 66px;
+  margin: 0;
+  padding: 10px;
+  gap: 10px;
+  color: var(--df-text);
+  background: var(--df-glass-panel);
+  border: 1px solid var(--df-rim);
+  border-radius: 24px;
+  box-shadow: var(--df-panel-shadow);
+  backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  -webkit-backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  animation: dfMobileLift var(--df-enter) var(--df-ease) both;
+  transition:
+    opacity var(--df-fast) var(--df-ease),
+    transform var(--df-settle) var(--df-ease),
+    display var(--df-fast) allow-discrete;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="activity-panel"][hidden] {
+  display: none !important;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="activity-panel"] > [role="tablist"] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+  margin-right: 44px;
+  gap: 6px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="activity-panel"] > [data-dafeiyu-mobile-control="close"] {
+  position: absolute;
+  inset: 12px 10px auto auto;
+  width: 40px;
+  height: 40px;
+  margin: 0;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="activity-panel"] [role="tab"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px;
+  color: var(--df-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease),
+    border-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="activity-panel"] [role="tab"][aria-selected="true"] {
+  color: var(--df-text);
+  background: var(--df-glass-input);
+  border-color: var(--df-line);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="activity-panel"] [role="tab"]:disabled {
+  color: var(--df-tertiary);
+  cursor: default;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="activity-panel"] [role="status"] {
+  margin: 0;
+  padding: 14px 8px;
+  color: var(--df-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* Native jobs are not portalled. Their full ancestor chain must release clipping. */
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-activity-ancestor="true"] {
+  overflow: visible !important;
+  container-type: normal !important;
+  contain: none !important;
+  transform: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  perspective: none !important;
+  will-change: auto !important;
+  animation: none !important;
+}
+
+/* A real menu can escape an otherwise empty toolbar without keeping its height. */
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="mobile-activity-only-header"] {
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  overflow: visible !important;
+}
+
+html[data-dafeiyu-surface="mobile"] :is(
+  [data-dafeiyu-mobile-layout="activity-native-agents"],
+  [data-dafeiyu-mobile-layout="activity-native-jobs"]
+) {
+  box-sizing: border-box !important;
+  position: fixed !important;
+  inset: calc(var(--df-nav-height) + env(safe-area-inset-top) + 76px) 12px auto !important;
+  z-index: 86 !important;
+  display: flex;
+  flex-direction: column;
+  width: calc(100vw - 24px) !important;
+  max-width: calc(100vw - 24px) !important;
+  min-width: 0 !important;
+  max-height: calc(var(--df-viewport-height, 100dvh) - var(--df-nav-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 100px) !important;
+  margin: 0 !important;
+  padding: 8px;
+  color: var(--df-text);
+  background: var(--df-glass-panel);
+  border: 1px solid var(--df-rim);
+  border-radius: 24px;
+  box-shadow: var(--df-panel-shadow);
+  backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  -webkit-backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--df-line) transparent;
+  animation: dfMobileLift var(--df-enter) var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] :is(
+  [data-dafeiyu-mobile-layout="activity-native-agents"],
+  [data-dafeiyu-mobile-layout="activity-native-jobs"]
+)::before {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: transparent;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="activity-native-agents"] [role="tree"] {
+  min-width: 0;
+  max-height: inherit;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="activity-native-jobs"] [data-dafeiyu-mobile-control="session-action"] {
+  width: auto;
+  height: auto;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  white-space: normal;
+}
+
+/* Workspaces own their scrolling area; presence and settings remain at the base. */
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="mobile-footer"] {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
+  margin-top: auto;
+  padding: 8px 0 0;
+  gap: 10px;
+  border-top: 1px solid var(--df-line);
+  background: transparent;
+  animation: dfMobileEnter var(--df-enter) var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="presence-panel"] {
+  min-width: 0;
+  margin: 0;
+  padding: 11px 12px;
+  color: var(--df-text);
+  background: var(--df-glass);
+  border: 1px solid var(--df-line);
+  border-radius: 18px;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="presence-heading"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="presence-heading"] strong {
+  flex: none;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="presence-panel"] > p {
+  min-width: 0;
+  margin: 4px 0 0;
+  color: var(--df-secondary);
+  font-size: 11px;
+  line-height: 17px;
+  overflow-wrap: anywhere;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="footer-actions"] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+  gap: 10px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="footer-actions"] > button {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 10px 8px;
+  color: var(--df-text);
+  background: var(--df-glass-input);
+  border: 1px solid var(--df-rim);
+  border-radius: 18px;
+  box-shadow: none;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: normal;
+  cursor: pointer;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease),
+    transform var(--df-settle) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="footer-actions"] > button:is(:hover, :focus-visible):not(:disabled) {
+  background: var(--df-glass-panel);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="footer-actions"] > button:active:not(:disabled) {
+  background: var(--df-glass-panel);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="footer-actions"] > button:disabled {
+  color: var(--df-tertiary);
+  cursor: default;
+}
+
+/* Forwarding still uses the native launcher; the mobile footer is its only UI. */
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] > div:has(> [data-dafeiyu-mobile-layout="mobile-footer"]) [data-slot="sidebar.settings"] > div {
+  display: none !important;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="sidebar"] > div:has(> [data-dafeiyu-mobile-layout="mobile-footer"]) > div:has(> div > [data-slot="sidebar.settings"]):has([data-slot="sidebar.footer.action"]:empty):not(:has([data-slot="sidebar.footer.action"]:not(:empty))) {
+  display: none !important;
+}
+
+/* The real settings shell has dynamic contributions, not a fixed category list. */
+html[data-dafeiyu-surface="mobile"] [role="dialog"][data-shortcut-modal="settings"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: 44px auto minmax(0, 1fr);
+  align-content: start;
+  width: calc(100vw - 20px);
+  max-width: 720px;
+  height: calc(var(--df-viewport-height, 100dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px);
+  max-height: 900px;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px 0;
+  gap: 8px 4px;
+  color: var(--df-text);
+  background: var(--df-glass-panel);
+  border: 1px solid var(--df-rim);
+  border-radius: 28px;
+  overflow: hidden;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-shortcut-modal="settings"] > :is(nav, div) {
+  display: contents;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-shortcut-modal="settings"] > nav > div:has(> [data-slot="settings.header"]) {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  min-width: 0;
+  padding: 0 8px;
+  color: var(--df-text);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-shortcut-modal="settings"] > nav > div:has(> button) {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  min-width: 0;
+  min-height: 44px;
+  width: 100%;
+  padding: 2px 0 6px;
+  gap: 6px;
+  border-bottom: 1px solid var(--df-line);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-shortcut-modal="settings"] > nav > div:has(> button)::-webkit-scrollbar {
+  display: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-shortcut-modal="settings"] > nav button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 36px;
+  height: auto;
+  margin: 0;
+  padding: 7px 10px;
+  gap: 6px;
+  color: var(--df-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 15px;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease),
+    border-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-shortcut-modal="settings"] > nav button > span {
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: visible;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-shortcut-modal="settings"] > nav button[aria-current="true"] {
+  color: var(--df-text);
+  background: var(--df-glass-input);
+  border-color: var(--df-line);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-shortcut-modal="settings"] > div > div:has([data-slot="settings.action"]) {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: auto;
+  min-width: 0;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  gap: 2px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-shortcut-modal="settings"] [data-slot="settings.action"] button {
+  min-width: 0;
+  min-height: 36px;
+  max-width: 150px;
+  height: auto;
+  padding: 6px 10px;
+  color: var(--df-secondary);
+  background: transparent;
+  border: 1px solid var(--df-line);
+  border-radius: 12px;
+  box-shadow: none;
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-shortcut-modal="settings"] > div > div:has(> [data-slot="settings.section"]) {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 2px 6px 20px;
+  color: var(--df-text);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-gutter: auto;
+  scrollbar-color: var(--df-line) transparent;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] > :is(div, section) {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+  color: var(--df-text);
+  font-size: 13px;
+  line-height: 20px;
+  animation: dfMobileEnter var(--df-enter) var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] :is(div, span, label, form, fieldset, li, section) {
+  min-width: 0;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] :is(h2, h3, p, label, legend) {
+  overflow-wrap: anywhere;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] h2 {
+  margin: 8px 0 2px;
+  color: var(--df-text);
+  font-size: 16px;
+  line-height: 22px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] h3 {
+  color: var(--df-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] p {
+  font-size: 12px;
+  line-height: 19px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] :is(label, legend) {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] :is(input, textarea, select):not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  max-width: 100%;
+  padding: 7px 10px;
+  color: var(--df-text);
+  background-color: var(--df-glass-input);
+  border: 1px solid var(--df-line);
+  border-radius: 12px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  transition:
+    background-color var(--df-fast) var(--df-ease),
+    border-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] :is(input, textarea)::placeholder {
+  color: var(--df-tertiary);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] :is(input, textarea, select):focus {
+  border-color: var(--df-accent);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] :is(input[type="checkbox"], input[type="radio"], input[type="range"]) {
+  accent-color: var(--df-accent);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] button:not([role="switch"]) {
+  min-width: 0;
+  min-height: 36px;
+  max-width: 100%;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease),
+    border-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] button[aria-haspopup] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  height: auto;
+  padding: 7px 10px;
+  gap: 6px;
+  color: var(--df-text);
+  background: var(--df-glass-input);
+  border: 1px solid var(--df-line);
+  border-radius: 13px;
+  box-shadow: none;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] button[aria-haspopup] svg {
+  flex: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] button[role="switch"] {
+  flex: 0 0 auto;
+  width: 48px;
+  min-width: 48px;
+  height: 30px;
+  min-height: 30px;
+  padding: 3px;
+  background: var(--df-line);
+  border: 0;
+  border-radius: 999px;
+  corner-shape: round;
+  transition: background-color var(--df-fast) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] button[role="switch"][aria-checked="true"] {
+  background: var(--df-accent);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] button[role="switch"] > span {
+  display: block;
+  width: 24px;
+  height: 24px;
+  background: #ffffff;
+  border-radius: 50%;
+  corner-shape: round;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+  transition: transform var(--df-settle) var(--df-ease);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] button[role="switch"][aria-checked="true"] > span {
+  transform: translateX(18px);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] button[role="switch"][aria-checked="false"] > span {
+  transform: translateX(0);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.general.item"] > div {
+  min-width: 0;
+  padding: 12px 0;
+  gap: 10px;
+  color: var(--df-text);
+  font-size: 13px;
+  line-height: 20px;
+  border-bottom-color: var(--df-line);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.general.item"] > div:has(> button, > span > button[aria-haspopup], > div > button[aria-haspopup]) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.general.item"] > div > div:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.general.item"] > div > div:first-child > div:first-child,
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.general.item"] > div > div:first-child:only-child {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.general.item"] > div:has(> button, > span > button[aria-haspopup]) > div:first-child {
+  flex: 1 1 140px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.general.item"] > div > div:first-child > :is(div + div, p) {
+  margin-top: 4px;
+  color: var(--df-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.general.item"] div:has(> span > button + button) {
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 2px 5px 2px 10px;
+  gap: 5px;
+  background: var(--df-glass-input);
+  border-color: var(--df-line);
+  border-radius: 13px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.general.item"] span:has(> button + button) {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.general.item"] span:has(> button + button) > button {
+  width: 32px;
+  min-width: 32px;
+  height: 36px;
+  min-height: 36px;
+  padding: 6px;
+  color: var(--df-secondary);
+}
+
+/* The native theme choices keep their aria-pressed state and fit in one row. */
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.general.item"] > div > div:has(> button[aria-pressed]) {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  min-width: 0;
+  gap: 8px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.general.item"] button[aria-pressed] {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 64px;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  padding: 10px 4px;
+  gap: 5px;
+  color: var(--df-text);
+  background: var(--df-glass-input);
+  border: 1px solid var(--df-line);
+  border-radius: 16px;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.general.item"] button[aria-pressed="true"] {
+  color: var(--df-accent);
+  background: var(--df-hover);
+  border-color: var(--df-accent);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] [role="tablist"] {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  gap: 6px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] [role="tab"] {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 8px 12px;
+  color: var(--df-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] [role="tab"][aria-selected="true"] {
+  color: var(--df-text);
+  background: var(--df-glass-input);
+  border-color: var(--df-line);
+}
+
+/* These stable contribution markers preserve model actions and plugin details. */
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] li:has(> [data-slot="settings.models.provider-card"]) {
+  min-width: 0;
+  padding: 10px;
+  background: var(--df-glass-input);
+  border-color: var(--df-line);
+  border-radius: 18px;
+}
+
+html[data-dafeiyu-surface="mobile"] li:has(> [data-slot="settings.models.provider-card"]) > div:first-child {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+html[data-dafeiyu-surface="mobile"] li:has(> [data-slot="settings.models.provider-card"]) > div:first-child > span:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+
+html[data-dafeiyu-surface="mobile"] li:has(> [data-slot="settings.models.provider-card"]) > div:first-child > span:first-child > span:first-child {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+html[data-dafeiyu-surface="mobile"] li:has(> [data-slot="settings.models.provider-card"]) > div:first-child > span:last-child {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+}
+
+html[data-dafeiyu-surface="mobile"] li:has(> [data-slot="settings.models.provider-card"]) > div:first-child button {
+  flex: none;
+  min-height: 36px;
+  height: auto;
+  padding: 8px;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] div:has(> input + input):has(> button[aria-expanded]) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px 36px;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] div:has(> input + input):has(> button[aria-expanded]) > button {
+  width: 36px;
+  height: 40px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.plugins.tab"] > div {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.plugins.tab"] label:has(> input[type="search"]) {
+  width: 100%;
+  max-width: 100%;
+  min-height: 44px;
+  background: var(--df-glass-input);
+  border-color: var(--df-line);
+  border-radius: 14px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.plugins.tab"] label:has(> input[type="search"]) input {
+  border: 0;
+  background: transparent;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-plugin-scope] > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-plugin-scope] > div:first-child > div {
+  min-width: 0;
+  max-width: 100%;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] ul:has(> [data-plugin-entry]) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  gap: 10px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-plugin-entry] {
+  min-width: 0;
+  width: 100%;
+  background: var(--df-glass-input);
+  border-color: var(--df-line);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-plugin-entry] > button {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+  min-height: 64px;
+  height: auto;
+  max-width: none;
+  padding: 10px;
+  color: var(--df-text);
+  background: transparent;
+  border: 0;
+  border-radius: 18px;
+  text-align: start;
+  white-space: normal;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-plugin-entry] > button > span:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  gap: 8px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-plugin-entry] > button strong {
+  min-width: 0;
+  color: var(--df-text);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-plugin-entry] > button > span:nth-child(2) {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+  color: var(--df-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-line-clamp: 3;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-plugin-entry] code {
+  max-width: 100%;
+  color: var(--df-secondary);
+  background: var(--df-inline-code);
+  border-radius: 6px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-agent-preset-id] {
+  min-width: 0;
+  width: 100%;
+  background: var(--df-glass-input);
+  border-color: var(--df-line);
+  border-radius: 18px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-agent-preset-id] > button {
+  min-width: 0;
+  min-height: 68px;
+  height: auto;
+  width: 100%;
+  padding: 10px;
+  color: var(--df-text);
+  background: transparent;
+  border-radius: 18px;
+  white-space: normal;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-agent-preset-id] > button[aria-pressed="true"] {
+  background: var(--df-hover);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-agent-preset-id] > button > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-agent-preset-id] > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+  padding: 4px 10px 10px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-agent-preset-id] > div button {
+  min-width: 0;
+  padding: 8px;
+  white-space: nowrap;
+}
+
+/* Preset actions retain full touch targets without inflating the flex row. */
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] [data-agent-preset-id] {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] [data-agent-preset-id] > div {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] [data-agent-preset-id] > div > div:has(> button) {
+  display: flex;
+  flex: 1 1 130px;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  gap: 6px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] [data-agent-preset-id] > div > div:has(> button) > button {
+  box-sizing: border-box;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] [data-agent-preset-id] > div > button:has(> svg:only-child) {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  gap: 0;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] [data-agent-preset-id] > div > button:has(> svg:only-child) > svg {
+  display: block;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-slot="settings.section"] [hidden] {
+  display: none !important;
+}
+
+/* A true press marker survives pointer capture; release settles with overshoot. */
+html[data-dafeiyu-surface="mobile"] :is(button, [role="button"])[data-dafeiyu-mobile-control]:not([role="switch"]) {
+  scale: 1;
+  transition:
+    color var(--df-fast) var(--df-ease),
+    background-color var(--df-fast) var(--df-ease),
+    border-color var(--df-fast) var(--df-ease),
+    border-radius var(--df-settle) var(--df-ease),
+    box-shadow var(--df-fast) var(--df-ease),
+    scale 480ms var(--df-bounce);
+}
+
+html[data-dafeiyu-surface="mobile"] :is(button, [role="button"])[data-dafeiyu-pressed="true"]:not(:disabled):not([aria-disabled="true"]):not([role="switch"]) {
+  scale: var(--df-press-scale, 1.055);
+  transition:
+    background-color var(--df-fast) var(--df-ease),
+    border-radius var(--df-settle) var(--df-ease),
+    scale 70ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="navigation"] > button {
+  --df-press-scale: 1.075;
+}
+
+/* Quick actions keep their original commands and any unavailable host gates. */
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="quick-actions"] {
+  position: fixed;
+  inset: calc(var(--df-nav-height) + env(safe-area-inset-top) + 8px) 12px auto auto;
+  z-index: 88;
+  display: flex;
+  flex-direction: column;
+  width: min(286px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(var(--df-viewport-height, 100dvh) - var(--df-nav-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 28px);
+  min-width: 0;
+  margin: 0;
+  padding: 7px;
+  gap: 3px;
+  color: var(--df-text);
+  background: var(--df-glass-panel);
+  border: 1px solid var(--df-rim);
+  border-radius: 24px;
+  box-shadow: var(--df-panel-shadow);
+  backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  -webkit-backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transform-origin: top right;
+  animation: dfQuickOpen var(--df-settle) var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="quick-actions"][data-dafeiyu-quick-state="closing"] {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.97);
+  pointer-events: none;
+  animation: dfQuickClose 180ms var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="quick-actions"]:is([hidden], [data-dafeiyu-quick-state="closed"]) {
+  display: none !important;
+  pointer-events: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="quick-actions"] > button {
+  --df-press-scale: 1.025;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 11px 12px;
+  color: var(--df-text);
+  background: transparent;
+  border: 0;
+  border-radius: 17px;
+  box-shadow: none;
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: start;
+  white-space: normal;
+  cursor: pointer;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="quick-actions"] > button:not(:disabled):is(:hover, :focus-visible) {
+  background: var(--df-hover);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="quick-actions"] > button:disabled {
+  color: var(--df-tertiary);
+  cursor: default;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="quick-actions"] > button > :is(svg, img) {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="quick-actions"] > button > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="quick-status"] {
+  margin: 0;
+  padding: 6px 12px 8px;
+  color: var(--df-secondary);
+  font-size: 11px;
+  line-height: 17px;
+  overflow-wrap: anywhere;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="presence-panel"]:is(button, [role="button"]) {
+  display: block;
+  width: 100%;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="presence-panel"]:is(button, [role="button"]):is(:hover, :focus-visible):not(:disabled) {
+  background: var(--df-glass-panel);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="presence-panel"]:is(:disabled, [aria-disabled="true"]) {
+  color: var(--df-text);
+  opacity: 1;
+  filter: none;
+  cursor: default;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="presence-panel"] > [data-dafeiyu-mobile-layout="presence-heading"] :is(svg, img) {
+  flex: none;
+  width: 17px;
+  height: 17px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="footer-actions"] > button > [data-dafeiyu-mobile-layout="footer-icon"] {
+  display: inline-flex;
+  flex: 0 0 20px;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="footer-actions"] > button > [data-dafeiyu-mobile-layout="footer-icon"] > :is(svg, img) {
+  display: block;
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="footer-actions"] > button > [data-dafeiyu-mobile-layout="footer-label"] {
+  min-width: 0;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+/* The host alone advances this overlay after actual connection and UI readiness. */
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-overlay"] {
+  --df-startup-duration: 700ms;
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  color: var(--df-text);
+  background: transparent;
+  isolation: isolate;
+  pointer-events: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-overlay"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(155deg, var(--df-glass-panel), var(--df-glass));
+  backdrop-filter: blur(var(--df-blur)) saturate(1.06);
+  -webkit-backdrop-filter: blur(var(--df-blur)) saturate(1.06);
+  opacity: 1;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-focus"] {
+  position: fixed;
+  left: 50vw;
+  top: 42vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  margin: -42px 0 0 -42px;
+  padding: 19px;
+  color: var(--df-text);
+  background: var(--df-glass-panel);
+  border: 1px solid var(--df-rim);
+  border-radius: 50%;
+  corner-shape: round;
+  box-shadow: var(--df-panel-shadow);
+  backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  -webkit-backdrop-filter: blur(var(--df-blur)) saturate(1.08);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 26px;
+  transform-origin: center;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-focus"] > :is(svg, img) {
+  flex: none;
+  width: 44px;
+  height: 44px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-focus"]::before {
+  content: "";
+  position: absolute;
+  inset: -56px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--df-accent) 19%, transparent), transparent 68%);
+  pointer-events: none;
+  animation: dfStartupGlow 2600ms ease-in-out infinite alternate;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-orbit"] {
+  position: fixed;
+  left: 50vw;
+  top: 42vh;
+  width: 124px;
+  height: 124px;
+  margin: -62px 0 0 -62px;
+  border: 1px solid var(--df-line);
+  border-radius: 50%;
+  corner-shape: round;
+  background: conic-gradient(from 45deg, transparent 65%, color-mix(in srgb, var(--df-accent) 34%, transparent) 90%, transparent);
+  mask-image: radial-gradient(circle, transparent 59px, #000 59.5px, #000 62px, transparent 62.5px);
+  -webkit-mask-image: radial-gradient(circle, transparent 59px, #000 59.5px, #000 62px, transparent 62.5px);
+  animation: dfStartupOrbit 5600ms linear infinite;
+  pointer-events: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-orbit"]::after {
+  content: "";
+  position: absolute;
+  inset: 1px auto auto 50%;
+  width: 4px;
+  height: 4px;
+  background: var(--df-accent);
+  border-radius: 50%;
+  corner-shape: round;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-title"],
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-detail"] {
+  position: fixed;
+  left: 50vw;
+  width: min(330px, calc(100vw - 40px));
+  margin: 0;
+  text-align: center;
+  overflow-wrap: anywhere;
+  transform: translateX(-50%);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-title"] {
+  top: calc(42vh + 80px);
+  color: var(--df-text);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 25px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-detail"] {
+  top: calc(42vh + 116px);
+  color: var(--df-secondary);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-actions"] {
+  position: fixed;
+  left: 50vw;
+  top: calc(42vh + 184px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  width: min(330px, calc(100vw - 40px));
+  gap: 8px;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-actions"] > button {
+  min-width: 80px;
+  min-height: 42px;
+  padding: 10px 14px;
+  color: var(--df-text);
+  background: var(--df-glass-input);
+  border: 1px solid var(--df-rim);
+  border-radius: 16px;
+  box-shadow: none;
+  font: inherit;
+  font-size: 12px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-actions"] > button:is(:hover, :focus-visible) {
+  background: var(--df-glass-panel);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-overlay"][data-dafeiyu-startup-state="revealing"]::before {
+  animation: dfStartupFade var(--df-startup-duration) var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-overlay"][data-dafeiyu-startup-state="revealing"] [data-dafeiyu-mobile-layout="startup-focus"] {
+  animation: dfStartupReveal var(--df-startup-duration) var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-overlay"][data-dafeiyu-startup-state="revealing"] [data-dafeiyu-mobile-layout="startup-focus"]::before {
+  animation: dfStartupFade 260ms var(--df-ease) both;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-overlay"][data-dafeiyu-startup-state="revealing"] :is(
+  [data-dafeiyu-mobile-layout="startup-orbit"],
+  [data-dafeiyu-mobile-layout="startup-title"],
+  [data-dafeiyu-mobile-layout="startup-detail"],
+  [data-dafeiyu-mobile-layout="startup-actions"]
+) {
+  animation: dfStartupFade 240ms var(--df-ease) both;
+  pointer-events: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-overlay"][data-dafeiyu-startup-state="failed"] [data-dafeiyu-mobile-layout="startup-orbit"] {
+  display: none;
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-overlay"][data-dafeiyu-startup-state="failed"] [data-dafeiyu-mobile-layout="startup-focus"] {
+  border-color: var(--df-line);
+  box-shadow: var(--df-button-shadow);
+}
+
+html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-overlay"]:is([hidden], [data-dafeiyu-startup-state="ready"]) {
+  display: none !important;
+  pointer-events: none;
+}
+
+/* The real navigation button takes over only after verified startup readiness. */
+html[data-dafeiyu-surface="mobile"]:is(
+  [data-dafeiyu-startup="waiting"],
+  [data-dafeiyu-startup="revealing"],
+  [data-dafeiyu-startup="failed"]
+) [data-dafeiyu-mobile-layout="navigation"] > button[data-dafeiyu-mobile-control="sidebar-toggle"] {
+  opacity: 0;
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-startup="ready"] [data-dafeiyu-mobile-layout="navigation"] > button[data-dafeiyu-mobile-control="sidebar-toggle"] {
+  opacity: 1;
+  animation: dfStartupHandoff 280ms var(--df-ease) 1 both;
+}
+
+/* Material/motion preferences are host-owned and do not alter hit targets. */
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material="false"] {
+  --df-glass: var(--df-surface);
+  --df-glass-panel: var(--df-surface);
+  --df-glass-input: var(--df-surface);
+  --df-composer-fill: var(--df-surface);
+  --df-composer-tail: var(--df-bg);
+  --df-blur: 0px;
+  --df-rim: var(--df-line);
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material="false"] body *,
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material="false"] body *::before,
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material="false"] body *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-material="false"] [data-dafeiyu-mobile-layout="navigation"]::before {
+  inset: 0;
+  background: var(--df-bg);
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-motion="false"] {
+  --df-fast: 0ms;
+  --df-settle: 0ms;
+  --df-enter: 0ms;
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-motion="false"] body *,
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-motion="false"] body *::before,
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-motion="false"] body *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Positioning transforms such as the closed drawer remain functional. */
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-motion="false"] :is(
+  [data-dafeiyu-mobile-layout="navigation"],
+  [data-dafeiyu-mobile-layout="composer-card"],
+  [data-dafeiyu-mobile-layout="hero"],
+  [data-dafeiyu-mobile-layout="mobile-footer"],
+  [data-dafeiyu-mobile-layout="activity-panel"],
+  [data-dafeiyu-mobile-layout="activity-native-agents"],
+  [data-dafeiyu-mobile-layout="activity-native-jobs"],
+  [data-dafeiyu-mobile-layout="quick-actions"],
+  [data-slot="conversation.header"] > header,
+  [data-slot="settings.section"] > :is(div, section)
+) {
+  transform: none !important;
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-motion="false"] :is(button, [role="button"])[data-dafeiyu-mobile-control] {
+  scale: none !important;
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-motion="false"] [data-dafeiyu-mobile-layout="startup-orbit"],
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-motion="false"] [data-dafeiyu-mobile-layout="startup-focus"]::before {
+  display: none;
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-motion="false"] [data-dafeiyu-mobile-layout="startup-focus"] {
+  transform: none !important;
+}
+
+html[data-dafeiyu-surface="mobile"][data-dafeiyu-motion="false"] :is(
+  [data-dafeiyu-mobile-control="action"],
+  [data-dafeiyu-mobile-control="sidebar-toggle"],
+  [data-dafeiyu-mobile-control="new-session"],
+  [data-dafeiyu-mobile-control="activity-hub"],
+  [data-dafeiyu-mobile-layout="footer-actions"] > button,
+  [data-dafeiyu-mobile-control="send"]
+):active {
+  transform: none;
+  filter: none;
+}
+
+@media (max-width: 390px) {
+  html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="navigation"] {
+    gap: 8px;
+    padding-inline: 12px;
+  }
+
+  html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="composer-card"] {
+    padding-inline: 10px !important;
+  }
+
+  html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="composer-actions"] {
+    gap: 4px !important;
+  }
+
+  html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-control="model"] {
+    max-width: 130px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-dafeiyu-surface="mobile"] {
+    --df-fast: 0ms;
+    --df-settle: 0ms;
+    --df-enter: 0ms;
+  }
+
+  html[data-dafeiyu-surface="mobile"] body *,
+  html[data-dafeiyu-surface="mobile"] body *::before,
+  html[data-dafeiyu-surface="mobile"] body *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  html[data-dafeiyu-surface="mobile"] :is(
+    [data-dafeiyu-mobile-layout="navigation"],
+    [data-dafeiyu-mobile-layout="composer-card"],
+    [data-dafeiyu-mobile-layout="hero"],
+    [data-dafeiyu-mobile-layout="mobile-footer"],
+    [data-dafeiyu-mobile-layout="activity-panel"],
+    [data-dafeiyu-mobile-layout="activity-native-agents"],
+    [data-dafeiyu-mobile-layout="activity-native-jobs"],
+    [data-dafeiyu-mobile-layout="quick-actions"],
+    [data-slot="conversation.header"] > header,
+    [data-slot="settings.section"] > :is(div, section)
+  ) {
+    transform: none !important;
+  }
+
+  html[data-dafeiyu-surface="mobile"] :is(button, [role="button"])[data-dafeiyu-mobile-control] {
+    scale: none !important;
+  }
+
+  html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-orbit"],
+  html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-focus"]::before {
+    display: none;
+  }
+
+  html[data-dafeiyu-surface="mobile"] [data-dafeiyu-mobile-layout="startup-focus"] {
+    transform: none !important;
+  }
+
+  html[data-dafeiyu-surface="mobile"] :is(
+    [data-dafeiyu-mobile-control="action"],
+    [data-dafeiyu-mobile-control="sidebar-toggle"],
+    [data-dafeiyu-mobile-control="new-session"],
+    [data-dafeiyu-mobile-control="activity-hub"],
+    [data-dafeiyu-mobile-layout="footer-actions"] > button,
+    [data-dafeiyu-mobile-control="send"]
+  ):active {
+    transform: none;
+    filter: none;
+  }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  html[data-dafeiyu-surface="mobile"] {
+    --df-glass: var(--df-glass-panel);
+  }
+}
+
+@keyframes dfMobileEnter {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes dfMobileLift {
+  from { opacity: 0; transform: translateY(6px) scale(0.992); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes dfQuickOpen {
+  from { opacity: 0; transform: translateY(-5px) scale(0.965); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes dfQuickClose {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(-4px) scale(0.97); }
+}
+
+@keyframes dfSidebarActionEnter {
+  from { opacity: 0; transform: translateX(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes dfSidebarActionExit {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateX(6px); }
+}
+
+@keyframes dfStartupOrbit {
+  to { rotate: 360deg; }
+}
+
+@keyframes dfStartupGlow {
+  from { opacity: 0.42; scale: 0.96; }
+  to { opacity: 0.82; scale: 1.06; }
+}
+
+@keyframes dfStartupFade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes dfStartupHandoff {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dfStartupReveal {
+  0% { opacity: 1; transform: none; }
+  78% {
+    opacity: 1;
+    transform: translate(var(--df-startup-target-x, 0px), var(--df-startup-target-y, 0px)) scale(var(--df-startup-target-scale, 0.524));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--df-startup-target-x, 0px), var(--df-startup-target-y, 0px)) scale(var(--df-startup-target-scale, 0.524));
+  }
+}

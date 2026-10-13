@@ -220,6 +220,9 @@ fun FishGlyph(name: String, modifier: Modifier = Modifier, tint: Color = LocalCo
         "viewfinder" -> com.dafeiyu.mobile.R.drawable.sf_viewfinder
         "pair" -> com.dafeiyu.mobile.R.drawable.sf_pair
         "lock" -> com.dafeiyu.mobile.R.drawable.sf_lock
+        "sandbox-readonly" -> com.dafeiyu.mobile.R.drawable.dsh_permission_readonly
+        "sandbox-workspace" -> com.dafeiyu.mobile.R.drawable.dsh_permission_workspace
+        "sandbox-full" -> com.dafeiyu.mobile.R.drawable.dsh_permission_full
         "whale" -> com.dafeiyu.mobile.R.drawable.ic_whale
         "deepseek" -> com.dafeiyu.mobile.R.drawable.ic_deepseek
         else -> com.dafeiyu.mobile.R.drawable.sf_document

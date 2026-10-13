@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.Interaction
@@ -82,8 +83,10 @@ fun WorkspaceSidebar(
     fusionBackdrop: PageBackdropCapture? = null,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
     val palette = MaterialTheme.colorScheme
+    val reducedMotion = LocalReduceGlassMotion.current
     val taskEngine = repository.backgroundTasks
     val deletionTasks = taskEngine?.tasks?.collectAsStateWithLifecycle()?.value
     val deletionStorageIssue = taskEngine?.storageIssue?.collectAsStateWithLifecycle()?.value
@@ -113,6 +116,11 @@ fun WorkspaceSidebar(
     var workspacePreparationAttempt by remember { mutableIntStateOf(0) }
     var conversationToArchiveId by remember { mutableStateOf<String?>(null) }
     var conversationArchiveScope by remember { mutableStateOf<RemoteDshScope?>(null) }
+    var contextRow by remember { mutableStateOf<SidebarSwipeIdentity?>(null) }
+    var renameRow by remember { mutableStateOf<SidebarSwipeIdentity?>(null) }
+    var renameText by remember { mutableStateOf("") }
+    var metadataError by remember { mutableStateOf<String?>(null) }
+    var metadataGeneration by remember { mutableIntStateOf(0) }
     val remoteScope = repository.remoteWorkspaceScope
     LaunchedEffect(repository.displayWorkspaceId) { revealedRow = null }
     LaunchedEffect(repository.connectionMode, remoteScope) {
@@ -120,6 +128,11 @@ fun WorkspaceSidebar(
         conversationToArchiveId = null
         conversationArchiveScope = null
         confirmWorkspaceFiles = false
+        contextRow = null
+        renameRow = null
+        metadataError = null
+        metadataGeneration++
+        revealedRow = null
         repository.clearWorkspaceRemovalConfirmation()
     }
     LaunchedEffect(workspaceToDeleteId, workspacePreparationAttempt) {
@@ -173,7 +186,7 @@ fun WorkspaceSidebar(
     val visibleConversations = repository.displayConversations.filter { conversation ->
         conversation.workspaceId == repository.displayWorkspaceId &&
             repository.isConversationVisibleInWorkspace(conversation)
-    }
+    }.sortedByDescending { it.pinned }
     Column(Modifier.fillMaxHeight().widthIn(max = 296.dp).padding(horizontal = 14.dp)) {
         Row(
             Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 10.dp),
@@ -210,6 +223,11 @@ fun WorkspaceSidebar(
                 val identity = SidebarSwipeIdentity(workspace.id, SidebarSwipeAction.DeleteEmptyWorkspace)
                 SidebarSwipeRow(
                     identity = identity,
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = GlassMotion.scalar(GlassMotion.PressMillis, reducedMotion),
+                        placementSpec = tween(if (reducedMotion) 0 else GlassMotion.ReleaseMillis, easing = GlassMotion.EaseOut),
+                        fadeOutSpec = GlassMotion.scalar(GlassMotion.PressMillis, reducedMotion),
+                    ),
                     title = workspace.name,
                     glyph = if (workspace.uri == null) "menu" else "folder",
                     selected = workspace.id == repository.displayWorkspaceId,
@@ -220,6 +238,7 @@ fun WorkspaceSidebar(
                         else if (revealedRow == row) revealedRow = null
                     },
                     onAction = performSwipeAction,
+                    onLongPress = { contextRow = identity; metadataError = null },
                     onSelect = {
                         revealedRow = null
                         repository.selectWorkspace(workspace.id)
@@ -271,8 +290,14 @@ fun WorkspaceSidebar(
                 val identity = SidebarSwipeIdentity(conversation.id, SidebarSwipeAction.Archive)
                 SidebarSwipeRow(
                     identity = identity,
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = GlassMotion.scalar(GlassMotion.PressMillis, reducedMotion),
+                        placementSpec = tween(if (reducedMotion) 0 else GlassMotion.ReleaseMillis, easing = GlassMotion.EaseOut),
+                        fadeOutSpec = GlassMotion.scalar(GlassMotion.PressMillis, reducedMotion),
+                    ),
                     title = conversation.title,
                     glyph = "chat",
+                    pinned = conversation.pinned,
                     selected = conversation.id == repository.displayConversationId,
                     actionEnabled = repository.canArchiveConversation(conversation.id),
                     revealedRow = revealedRow,
@@ -281,6 +306,7 @@ fun WorkspaceSidebar(
                         else if (revealedRow == row) revealedRow = null
                     },
                     onAction = performSwipeAction,
+                    onLongPress = { contextRow = identity; metadataError = null },
                     onSelect = {
                         repository.selectConversation(conversation.id)
                         onConversationChanged()
@@ -351,6 +377,108 @@ fun WorkspaceSidebar(
     if (showRemoteDirectory) RemoteDirectoryPicker(repository.remoteDsh,
         onDismiss = { showRemoteDirectory = false }, notify = repository::updateNotice)
     if (showRemoteArtifacts) RemoteArtifactsContent(repository, onDismiss = { showRemoteArtifacts = false })
+    val heldRow = contextRow
+    val heldName = heldRow?.let { identity ->
+        if (identity.action == SidebarSwipeAction.Archive)
+            repository.displayConversations.firstOrNull { it.id == identity.id }?.title
+        else repository.displayWorkspaces.firstOrNull { it.id == identity.id }?.name
+    }
+    if (heldRow != null && heldName != null) {
+        val conversation = heldRow.action == SidebarSwipeAction.Archive
+        val canRename = if (conversation) repository.canRenameConversation(heldRow.id)
+            else repository.canRenameWorkspace(heldRow.id)
+        val pinned = conversation && repository.isConversationPinned(heldRow.id)
+        AlertDialog(
+            onDismissRequest = { if (!repository.sidebarMetadataBusy) contextRow = null },
+            title = { Text(heldName) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (repository.connectionMode == "online") Text(
+                        "电脑尚未提供重命名与置顶接口，请在电脑端操作。此处不会修改手机本地记录。",
+                        style = MaterialTheme.typography.bodySmall, color = palette.onSurfaceVariant,
+                    ) else if (!canRename && !repository.sidebarMetadataBusy) Text(
+                        "请等待当前回复、保存或引擎操作完成后再编辑。",
+                        style = MaterialTheme.typography.bodySmall, color = palette.onSurfaceVariant,
+                    )
+                    TextButton(onClick = {
+                        renameText = heldName
+                        renameRow = heldRow
+                        contextRow = null
+                        metadataError = null
+                    }, enabled = canRename, modifier = Modifier.fillMaxWidth()) {
+                        FishGlyph("edit", Modifier.size(18.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text("重命名", Modifier.weight(1f))
+                    }
+                    if (conversation) TextButton(onClick = {
+                        val generation = metadataGeneration
+                        metadataError = null
+                        scope.launch {
+                            val saved = repository.setConversationPinned(heldRow.id, !pinned)
+                            if (generation == metadataGeneration && contextRow == heldRow) {
+                                if (saved) contextRow = null
+                                else metadataError = "置顶状态未能保存，请检查存储状态后重试。"
+                            }
+                        }
+                    }, enabled = repository.canPinConversation(heldRow.id), modifier = Modifier.fillMaxWidth()) {
+                        Text(if (pinned) "取消置顶" else "置顶对话", Modifier.weight(1f))
+                    }
+                    if (repository.sidebarMetadataBusy) Text("正在保存…", style = MaterialTheme.typography.bodySmall)
+                    metadataError?.let { Text(it, color = palette.error, style = MaterialTheme.typography.bodySmall) }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { contextRow = null }, enabled = !repository.sidebarMetadataBusy) { Text("完成") }
+            },
+        )
+    }
+    val renaming = renameRow
+    val renamingExists = renaming?.let { identity ->
+        if (identity.action == SidebarSwipeAction.Archive)
+            repository.displayConversations.any { it.id == identity.id }
+        else repository.displayWorkspaces.any { it.id == identity.id }
+    } == true
+    if (renaming != null && renamingExists) {
+        val conversation = renaming.action == SidebarSwipeAction.Archive
+        val maxLength = if (conversation) 100 else 80
+        val validName = renameText.trim().let { it.isNotBlank() && it.length <= maxLength && it.none(Char::isISOControl) }
+        val canRename = if (conversation) repository.canRenameConversation(renaming.id)
+            else repository.canRenameWorkspace(renaming.id)
+        AlertDialog(
+            onDismissRequest = { if (!repository.sidebarMetadataBusy) renameRow = null },
+            title = { Text(if (conversation) "重命名对话" else "重命名工作区") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(value = renameText, onValueChange = {
+                        if (it.length <= maxLength) { renameText = it; metadataError = null }
+                    }, enabled = !repository.sidebarMetadataBusy, singleLine = true,
+                        label = { Text(if (conversation) "对话名称" else "工作区名称") })
+                    if (!conversation) Text("仅修改显示名称，磁盘路径与文件保持原样。",
+                        style = MaterialTheme.typography.bodySmall, color = palette.onSurfaceVariant)
+                    if (repository.sidebarMetadataBusy) Text("正在保存…", style = MaterialTheme.typography.bodySmall)
+                    metadataError?.let { Text(it, color = palette.error, style = MaterialTheme.typography.bodySmall) }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val generation = metadataGeneration
+                    val name = renameText
+                    metadataError = null
+                    scope.launch {
+                        val saved = if (conversation) repository.renameConversation(renaming.id, name)
+                            else repository.renameWorkspace(renaming.id, name)
+                        if (generation == metadataGeneration && renameRow == renaming) {
+                            if (saved) renameRow = null
+                            else metadataError = "名称未能保存，请检查存储状态后重试。"
+                        }
+                    }
+                }, enabled = validName && canRename) { Text("保存") }
+            },
+            dismissButton = {
+                TextButton(onClick = { renameRow = null }, enabled = !repository.sidebarMetadataBusy) { Text("取消") }
+            },
+        )
+    }
     val conversationToArchive = repository.displayConversations.firstOrNull { it.id == conversationToArchiveId }
     if (conversationToArchive != null && conversationArchiveScope != null) {
         AlertDialog(
@@ -635,13 +763,16 @@ private class SidebarFusionLayoutState {
 @Composable
 private fun SidebarSwipeRow(
     identity: SidebarSwipeIdentity,
+    modifier: Modifier = Modifier,
     title: String,
     glyph: String,
+    pinned: Boolean = false,
     selected: Boolean,
     actionEnabled: Boolean,
     revealedRow: SidebarSwipeIdentity?,
     onRevealChanged: (identity: SidebarSwipeIdentity, isRevealed: Boolean) -> Unit,
     onAction: (identity: SidebarSwipeIdentity) -> Boolean,
+    onLongPress: () -> Unit,
     onSelect: () -> Unit,
 ) {
     val palette = MaterialTheme.colorScheme
@@ -671,10 +802,12 @@ private fun SidebarSwipeRow(
     }
     val currentRevealChanged by rememberUpdatedState(onRevealChanged)
     val currentAction by rememberUpdatedState(onAction)
+    val currentLongPress by rememberUpdatedState(onLongPress)
     val currentRevealedRow by rememberUpdatedState(revealedRow)
     val currentActionEnabled by rememberUpdatedState(actionEnabled)
     val gate = remember(swipeState) { SidebarSwipeGate() }
     var pointerPressed by remember(swipeState) { mutableStateOf(false) }
+    var pointerCancelled by remember(swipeState) { mutableStateOf(false) }
     var fusionPressed by remember(swipeState) { mutableStateOf(false) }
     var dragInProgress by remember(swipeState) { mutableStateOf(false) }
     var dragCompletion by remember(swipeState) { mutableIntStateOf(0) }
@@ -817,13 +950,14 @@ private fun SidebarSwipeRow(
         }
     }
     Box(
-        Modifier.fillMaxWidth().padding(vertical = 3.dp).height(52.dp)
+        modifier.fillMaxWidth().padding(vertical = 3.dp).height(52.dp)
             .onSizeChanged { rowWidthPx = it.width.toFloat() }
                 .pointerInput(swipeState, gate) {
                     awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         reboundJob?.cancel()
                         pointerPressed = true
+                        pointerCancelled = false
                         fusionPressed = true
                         dragInProgress = false
                         val gestureGeometry = currentGeometry
@@ -836,6 +970,7 @@ private fun SidebarSwipeRow(
                         val gestureGeneration = gate.generation
                         if (currentEvent.changes.count { it.pressed } > 1) {
                             gate.cancel()
+                            pointerCancelled = true
                             fusionPressed = false
                         }
                         swipeState.updateAnchors(DraggableAnchors {
@@ -848,7 +983,15 @@ private fun SidebarSwipeRow(
                             var anyPressed: Boolean
                             do {
                                 val event = awaitPointerEvent(PointerEventPass.Initial)
-                                if (event.changes.count { it.pressed } > 1 || !currentActionEnabled ||
+                                val primary = event.changes.firstOrNull { it.id == down.id }
+                                val displacement = primary?.let { it.position - down.position } ?: Offset.Zero
+                                val verticalScroll = abs(displacement.y) > viewConfiguration.touchSlop &&
+                                    abs(displacement.y) >= abs(displacement.x)
+                                val secondaryPointer = event.changes.any {
+                                    it.id != down.id && (it.pressed || it.previousPressed)
+                                }
+                                if (secondaryPointer || verticalScroll) pointerCancelled = true
+                                if (secondaryPointer || verticalScroll || !currentActionEnabled ||
                                     (gate.startedAtReveal && currentRevealedRow != identity)) {
                                     gate.cancel()
                                     fusionPressed = false
@@ -863,6 +1006,7 @@ private fun SidebarSwipeRow(
                             } while (anyPressed)
                         } catch (cancelled: CancellationException) {
                             gate.cancel()
+                            pointerCancelled = true
                             dragCompletion = gestureGeneration
                             throw cancelled
                         } finally {
@@ -889,6 +1033,13 @@ private fun SidebarSwipeRow(
                     val rowType = if (identity.action == SidebarSwipeAction.Archive) "对话" else "工作区"
                     contentDescription = "$rowType：$title${if (selected) "，当前$rowType" else ""}"
                     customActions = buildList {
+                        add(CustomAccessibilityAction("更多${rowType}操作") {
+                            gate.cancel()
+                            currentRevealChanged(identity, false)
+                            rebound(SidebarSwipe.Closed)
+                            currentLongPress()
+                            true
+                        })
                         if (actionEnabled) add(CustomAccessibilityAction("$actionLabel$rowType") {
                             gate.cancel()
                             val accepted = currentAction(identity)
@@ -935,17 +1086,27 @@ private fun SidebarSwipeRow(
             // Only the body is clipped to its viewport. The action keeps its complete round ends.
             Box(Modifier.fillMaxSize().clip(RoundedCornerShape(26.dp))) {
                 SidebarItem(
-                    title = title, glyph = glyph, selected = selected, opaquePill = true,
+                    title = title, glyph = glyph, selected = selected, pinned = pinned, opaquePill = true,
                     opaqueColor = bodyColor, drawOwnMaterial = drawOwnMaterial,
                     modifier = Modifier.absoluteOffset {
                         IntOffset(actualGeometry.visualOffset(swipeState.requireOffset()).roundToInt(), 0)
                     }.onGloballyPositioned(fusionLayout::updateBody),
                     onClick = {
-                        if (abs(swipeState.requireOffset()) > .5f) {
+                        if (pointerPressed && pointerCancelled) Unit
+                        else if (abs(swipeState.requireOffset()) > .5f) {
                             gate.cancel()
                             currentRevealChanged(identity, false)
                             rebound(SidebarSwipe.Closed)
                         } else onSelect()
+                    },
+                    onLongClick = {
+                        if ((!pointerPressed || !pointerCancelled) && !dragInProgress && !swipeState.isAnimationRunning) {
+                            pointerCancelled = true
+                            gate.cancel()
+                            currentRevealChanged(identity, false)
+                            rebound(SidebarSwipe.Closed)
+                            currentLongPress()
+                        }
                     },
                 )
             }
@@ -1035,10 +1196,12 @@ private fun SidebarItem(
     title: String,
     glyph: String,
     selected: Boolean,
+    pinned: Boolean = false,
     modifier: Modifier = Modifier,
     opaquePill: Boolean = false,
     opaqueColor: Color? = null,
     drawOwnMaterial: Boolean = true,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     val palette = MaterialTheme.colorScheme
@@ -1054,10 +1217,12 @@ private fun SidebarItem(
         animationSpec = tween(if (reducedMotion) 0 else GlassMotion.ReleaseMillis, easing = GlassMotion.EaseOut),
         label = "sidebarOpaqueBody",
     )
-    val bodyModifier = modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp))
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null,
-                role = Role.Button, onClick = onClick)
-            .height(52.dp)
+    val interactions = remember { MutableInteractionSource() }
+    val clicks = if (onLongClick == null) Modifier.clickable(interactionSource = interactions,
+        indication = null, role = Role.Button, onClick = onClick)
+    else Modifier.combinedClickable(interactionSource = interactions, indication = null,
+        role = Role.Button, onLongClickLabel = "更多操作", onLongClick = onLongClick, onClick = onClick)
+    val bodyModifier = modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).then(clicks).height(52.dp)
     val body: @Composable BoxScope.() -> Unit = {
         Row(Modifier.fillMaxWidth().height(52.dp)
             .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -1070,6 +1235,7 @@ private fun SidebarItem(
             fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
             color = foreground, maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
+        if (pinned) Text("置顶", style = MaterialTheme.typography.labelSmall, color = foreground)
         }
     }
     if (opaquePill) OpaqueSidebarCapsule(opaqueColor ?: bodyColor, bodyModifier,

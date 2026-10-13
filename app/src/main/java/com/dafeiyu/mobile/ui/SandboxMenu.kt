@@ -22,9 +22,17 @@ import com.dafeiyu.mobile.ui.components.FishGlyph
 import com.dafeiyu.mobile.ui.components.applyButtonDeformation
 
 enum class SandboxMode(val title: String, val glyph: String, val description: String) {
-    ReadOnly("只读", "lock", "只查看与分析文件"),
-    WorkspaceWrite("工作区内修改", "folderedit", "允许编辑当前工作目录中的文件"),
-    FullAccess("完全权限", "unlock", "允许操作工作目录之外的文件"),
+    ReadOnly("只读", "sandbox-readonly", "只查看与分析文件"),
+    WorkspaceWrite("工作区内修改", "sandbox-workspace", "允许编辑当前工作目录中的文件"),
+    FullAccess("完全权限", "sandbox-full", "允许操作工作目录之外的文件"),
+}
+
+/** Match known permission values only; extension presets retain their own labels. */
+internal fun sandboxGlyphForValue(value: String?): String? = when (value) {
+    com.dafeiyu.mobile.data.LinuxSandboxContract.READ_ONLY -> SandboxMode.ReadOnly.glyph
+    com.dafeiyu.mobile.data.LinuxSandboxContract.WORKSPACE_WRITE -> SandboxMode.WorkspaceWrite.glyph
+    com.dafeiyu.mobile.data.LinuxSandboxContract.FULL_ACCESS -> SandboxMode.FullAccess.glyph
+    else -> null
 }
 
 /** Remote presets are persisted by the PC. Local presets wait for verified executor capabilities. */
@@ -53,7 +61,8 @@ fun SandboxMenu(
         onOverlayProgress = onOverlayProgress,
         sourceContent = {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                FishGlyph(if (remoteOptions != null) "lock" else selectedMode.glyph, Modifier.size(19.dp), colors.onSurface)
+                FishGlyph(if (remoteOptions != null) sandboxGlyphForValue(selectedRemoteValue) ?: "lock"
+                    else selectedMode.glyph, Modifier.size(19.dp), colors.onSurface)
             }
         },
     ) {
@@ -73,7 +82,10 @@ fun SandboxMenu(
                         .clip(RoundedCornerShape(18.dp))
                         .selectable(value == selectedRemoteValue, role = Role.RadioButton, onClick = { onRemoteSelected(value); onDismiss() })
                         .heightIn(min = 56.dp).padding(horizontal = 10.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        sandboxGlyphForValue(value)?.let { glyph ->
+                            FishGlyph(glyph, Modifier.size(21.dp), if (value == selectedRemoteValue) colors.primary else colors.onSurface)
+                        }
                         Text(label, Modifier.weight(1f), fontSize = 14.sp)
                         RadioButton(value == selectedRemoteValue, onClick = null)
                     }

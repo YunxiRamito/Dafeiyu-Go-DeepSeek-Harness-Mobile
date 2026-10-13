@@ -20,8 +20,8 @@ android {
         applicationId = "com.dafeiyu.mobile"
         minSdk = 30
         targetSdk = 35
-        versionCode = 27
-        versionName = "0.1.26"
+        versionCode = 28
+        versionName = "0.1.27"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // Release validation covers the real PKB110 arm64 device and the

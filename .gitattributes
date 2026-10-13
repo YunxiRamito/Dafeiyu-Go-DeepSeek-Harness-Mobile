@@ -1,4 +1,6 @@
 * text=auto eol=lf
+plugins/dafeiyu-mobile-ui/** -text
+third_party/mobile-ui/manifest.json -text
 *.png binary
 *.jpg binary
 *.jpeg binary

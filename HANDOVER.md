@@ -1,4 +1,126 @@
-# 当前批次 · 0.1.26 / code27 · 2026-10-13
+# 当前批次 · 0.1.27 / code28 · 2026-10-13
+
+### 当前接续：正式包 QA 主页面通过，真机本轮不推
+
+以本节为最新状态，下面旧的“白屏未解决／暂停”保留为历史。Android 仍为候选 **0.1.27 / code28**。固定 DSH 服务在 QA 硬件 WebView 中已经实际显示正文和输入卡片：r7/r8b 证明 `innerHeight=866` 时原 `100dvh` 计算高度仍为0，r9改为固定 frame/inset 后实际正文恢复；启动 ready 同时验证 frame 和真实 composer card 的几何，避免零高／裁出画面时提前揭示。DSH WebView 保持普通硬件窗口 sibling，不放进原生玻璃采样或设置 source 的 GraphicsLayer。
+
+canonical 网页包为 **dafeiyu-mobile-ui@0.1.5**。当前候选冻结 **94,067 bytes / SHA-256 `52da8726d0f957ed2f4ca29563684fe34e6fbde359587b762fa25c2ddce8f18e`**；built client **216,182 bytes / `1d1d9bc06d0253e745846e40dbf69dc5bd25377413a287685dec887dc943fc07`**，CSS **92,862 bytes / `c3fe91b3815dca9198be248506bea553d6783688c82c516baa4c058a8f7ba4bc`**。它不是 Connect 包。设置／快捷菜单／活动面板使用生命周期持有的窗口高度变量，跟随 WebView／IME resize，退出恢复原宿主值并保留后写者；普通 PC 不启用。npm pack 关闭脚本、12 regular members 与 canonical 逐字节相等。源和built边界 **60/60 PASS**，固定SDK独立profile **9/9 PASS**；证据在 `../Temp_Android/qa/android-mobile-plugin-0.1.27/web-layout-r9/` 的 r11日志和 package-receipt。
+
+`build-web-mobile-0.1.27-panels-r11.log` 的 debug＋androidTest **BUILD SUCCESSFUL，49s，66 tasks / 7 executed**。真实窗口专项 `main-window-panels-r11.log` **OK(1)，49.318s，9/9 PASS**，报告与实际 PixelCopy 在 `qa/android-mobile-plugin-0.1.27/window-53bff7d2-1370-44d6-a9ef-d520b56cd97e/`。覆盖真实Repo／服务／bundle、全窗口无重复原生导航、四色像素与触摸、真实历史文字隐藏和还原、三项加号菜单及DSH设置弹层可见、原生设置往返两次、深色stop/resume、健康及原用户索引／设置／身份保留。测试UUID自有目录和服务已清理；paid=0、crash buffer为空，主 Agent已查看浅色正文、菜单、DSH设置和深色截图。组合owner为 STARTED、实际QA Activity为 RESUMED；**不替代正式包真实 MainActivity 或 PKB110 回归，用户视觉待验收**。
+
+`ScrollingGlassHeader.capturePageBackdrop` 的 revision 发布放在 `Snapshot.withoutReadObservation`，避免生产者订阅自己的递增造成静止重绘。实际原生设置页有限动画结束后2秒窗口采样 **0 新帧**，仅证明本次静止页面，不扩写为所有设备的性能结论。r9的canvas夹具也受100vh零高影响，r10改fixed inset后前7项PASS；其隔离身份为空断言不符合打开公告设置会生成本地installation_id的真实行为。r11预置UUID自有身份并核对完全不变／无heartbeat，原用户数据断言不变，完整9项通过；旧失败日志保留。
+
+正式 `assembleRelease + lintRelease` 首次 `build-release-0.1.27-r11.log` 在 `packageRelease / IncrementalSplitterRunnable` 失败，5m24s；同源码串行重试 `build-release-0.1.27-r12.log` **BUILD SUCCESSFUL，24s，55 tasks / 4 executed**。没有根据泛化异常断言首次失败根因。正式APK `../Temp_Android/Dist/Dafeiyu-Go-Mobile-0.1.27.apk` **94,336,613 bytes / SHA-256 `816e422ab6759a08770da075b8866c147e5f8b126bdde2d41e21f357a7a7a282`**，包名 `com.dafeiyu.mobile`、0.1.27/code28、非debuggable；apksigner v2验证成功，单一RSA4096发行证书SHA-256 `d4341e66075d1e35909796cb5962b22f8aaed378ca50e057a1b25ed97fe0c64b`。内嵌0.1.5包及manifest与冻结源逐字节一致，旧0.1.3/0.1.4缓存资产仍在包中，不是运行选择。
+
+真实正式包已在 `Dafeiyu_QA_API_37 / emulator-5558` **install -r 成功**。主 Agent操作真实 `.MainActivity / RESUMED`：首屏原版无Key提示用“Configure later”关闭、正文与composer、滚动、HOME后恢复、静止、加号三项菜单、DSH设置显式关闭、原生设置往返两次均取得实际窗口截图和可见节点边界；`../Temp_Android/qa/formal-main-0.1.27-r4/report.json` **27项PASS**，未发送提示、未写凭据、未授权限、未清数据。正式空会话正文仅证明该场景，已有对话正文由上述UUID隔离debug专项补证；正式包不可run-as，没有声称用户数据逐字节比对。应用UID10235日志无Java/native crash，应用PID3339保持。全局crash buffer有uiautomator PID3805的UiAutomation/Bad file descriptor，属于工具失败，不能写全局buffer为空。系统Back从DSH弹层退到其他Activity的错误点位尝试保留；回本应用后按真实关闭按钮完成检查。工具脚本已加当前MainActivity窗口归属预检。
+
+用户最新确认 **“先不推了”**，本轮不再连接、配对或安装PKB110，不再追问端口。QA通过不代替真机闪退回归或用户视觉验收；APK尚未公开发布，整份parity目标仍继续。
+
+**跨仓库状态（2026-10-14）：** canonical CSS已修改并冻结；主Agent接手 PC `MobileUiPluginService.cs`／`MobileUiPluginOperation.mjs`，改为嵌入固定 DSH SDK 0.2.1-alpha.1 helper，并接入 `WinUIProgram` 自有服务启动前。固定包持久存放在 owning DSH 的内容摘要目录；launcher lease 与官方 package.json writer lock共同保护安装，实际 Node/SDK双解析、12文件核验、外来包和安装层 shadow拒绝、升级及禁用选择保留。运行服务只读检查，未确认既有 profile时不写入或重启；普通PC的可选皮肤准备失败不阻断普通服务，远程web capability仍false。`../Temp_SetupandLauncher/MobileUiPlugin-20261014/` 的 C#生产focused **12/12 PASS、strict编译**，实际SDK/pnpm离线profile **10/10 PASS**，真实SDK writer竞争 **2/2 PASS**（等待期间禁用仍保留，外来依赖插入后拒绝且不写cache）。PC整仓 `pc-build-r1.log` **0错误、40警告、40.74s**；实际输出 `DeepSeek Harness.Core.dll` 中helper及0.1.5包/manifest与冻结源逐字节一致，见 `built-assets-receipt.json`。以上不代替真实WinUI启动、远程网页或公网验收；PC 1.8.0未发布。运行中的用户8787／8791保持原服务。Android、canonical与本轮PC接线尚未提交、推送或公开发布；整份parity后续待办继续执行。
+
+## 当前任务：DSH 自有网页插件与电脑手机尺寸预览
+
+### Android 移植恢复执行（2026-10-13）
+
+用户已确认继续 Plan 并设立目标，Android 移植／构建／覆盖安装暂停解除。持续目标覆盖 `docs/MOBILE-PC-PARITY-SPEC.md`，先交付真实主窗口绘制修复与已确认网页插件。主 Agent 负责标准 web profile 安装、冻结 UI 资产、串行构建／ADB 与证据；三名子 Agent 分别负责 Factory／HostBridge、Main／Content／启动等待和主窗口专项，不再派生。
+
+安装实现将签名 APK 自带的零依赖 `dafeiyu-mobile-ui@0.1.3` 解到内容摘要命名目录，逐文件验证后注册到实际固定 DSH web profile，保留既有依赖、设置及 bundle 顺序，不运行 npm 脚本；它不是替换 Connect `0.3.0` 冻结包。实际固定 SDK 的独立 profile 专项 `qa/android-mobile-plugin-0.1.27/profile-report.json` 已 **9/9 PASS**，覆盖官方初始化、Node 实际 resolve、幂等、外来包拒绝、其他字段保留、实际固定 pnpm 离线 install 后来源链接保留及官方 composeEntries 读回客户端，付费调用与进程重启均0；不代表 Android 窗口可见。
+
+本轮 UI bridge、直接 WebView sibling 与启动就绪动画已集成，`build-web-mobile-0.1.27-r4.log` 的 `assembleDebug + assembleDebugAndroidTest` **BUILD SUCCESSFUL，4m10s，66 tasks**，两调试包已在独立 QA 覆盖安装。实际窗口 `main-window-r1.log` 仍失败：导航可见且当前文档／真实连接就绪，但保存的合成历史正文位于屏幕上方（top=-290.95），聊天区和输入框未通过可见像素检查。**实际 Android 主窗口白屏／真机闪退尚未证实解决**，不发布此候选。
+
+只读布局诊断追加后 `diagnostic-r5` 编译成功，但运行在文档尚无 body 的初期由测试 `JSONObject("null")` 提前失败，未取得真实 DSH 布局，不能将此空文档的零高当作根因。测试只在原45秒启动等待中处理空回调，保留异常、附着状态、正文可见性和像素门槛；`build-web-mobile-0.1.27-diagnostic-r6.log` 已编译成功（1m4s，48 tasks），下一次设备诊断进行中。实际截图、报告和每次失败保留在 `qa/android-mobile-plugin-0.1.27/window-<UUID>/`。原网页 0.1.2／Android 0.1.27 旧失败证据保留，下面的“暂停”描述是恢复前历史状态，不再是当前执行限制。
+
+`diagnostic-r6` 已取得真实页面布局证据：HTML、body、`#root` 和 center 的实际高度为 0，手机 frame 只有 64px 且 `max-height: 0px`、grid 两行均为 0；`.wSkVaW_scrollBody` 也是 0px 高并被自动滚到 `scrollTop=383.619`，所以历史 marker 的实际边界为 `top=-290.952`，输入卡片被一起裁出窗口。顶栏固定导航仍可绘制，DSH 握手、mobile-ui bridge、presentation readiness 和启动状态均为 ready。这证明问题在网页根高度约束，不是 WebView GPU 绘制；CSS 修复正在 canonical 0.1.4 中进行，尚未重新编译 Android 或宣称白屏已解决。
+
+### 当前冻结稿：手机网页 0.1.2、触屏侧栏与启动动画预览
+
+2026-10-13 用户最新要求已写入唯一需求文档：活动按钮只在当前会话有后台任务／子 Agent 记录时出现；删除侧栏重复新会话；会话双左滑归档、长按重命名与置顶；工作区双左滑删除、长按重命名；轻引擎同步触屏逻辑，并提供启动动画预览。网页插件唯一源码仍为同级 `../Dafeiyu-Go-DeepSeek-Harness-Mobile-CSS/`，版本 **0.1.2**；Android 保持 **0.1.27 / code28**，**构建、安装和发布仍暂停至网页效果确认**。
+
+网页实现：读取固定 SDK 的真实当前会话计数（子 Agent 目录总数、含 live／settled 的后台任务），已完成历史仍计入，零／未知不显示。入口失去记录时立即 inert／disabled／aria-hidden，150ms 有限退场，活动轨道收为零宽；禁动和退出清理 timer。侧栏原新会话仅隐藏展示，顶栏加号仍转发其原回调。触摸与 pen 的第一次左滑展开黄色归档／红色删除，松手稳定后新的独立第二次左滑才转发原版动作；长按打开真实菜单。原生按钮和 mouse 操作保持；处理纵向滚动、多指、取消、失焦、抽屉关闭、身份变化和卸载，不复制 React 行或确认流程。
+
+删除边界：当前 DSH 网页转发原版工作区删除，解除登记、保留磁盘目录／日志、会话归 Ungrouped；没有在本轮 UI 适配中补整组归档、停止任务或磁盘删除。Android 独立工作区生命周期已有的任务停止、会话归档与独立文件确认保持源码原样。实际触屏 QA 在 capture 阶段拦截归档和 Delete 回调，证明手势转发及真实菜单，**未实际归档／删除用户数据，也不证明服务端持久化删除成功**。
+
+预览 `http://127.0.0.1:8791/` 增加“预览启动动画”，等待展示1800ms后复用按真实坐标缩回左上角的揭示动画，可重复播放。只接受准确 preview 父窗口、8791 origin、固定版本与请求 ID；正式 Android 与普通电脑拒绝。重播不调用 reconnect、不启动或重启服务，真实断线返回不可用，取消／替换／退出清理。真实启动仍等待 connected＋root／composer／侧栏按钮就绪，服务启动之前的 Android 宿主等待继续待移植。
+
+最终网页证据统一在 `../Temp_Android/qa/pc-dsh-web-customization-20261013/touch-sidebar/`，绑定 **`final-receipt.json`**。`build-final.log` exit0，Client **209,572 bytes**，SHA-256 **`5983003694ecc85ac1007b31493d0f19f71e859a88c45cb7c677999a182904f0`**；实际 HTTP 去除精确官方尾部后完全一致，revision **`030e4d449a77`**。源码 **51/51 PASS**；含真实生成 bundle 的 `test-built-final.log` **52/52 PASS、0 fail/skip，3718.2177ms**。实际 `final-browser-report.json` **46/46 PASS**（348 CSS 选择器全部有效与门控），`touch-report.json` **13/13 PASS**，`preview-final-report.json` **7/7 PASS**。主 Agent 已查看最终黄色归档、红色删除、长按菜单、等待／揭示和空会话截图。没有付费模型调用；设备与用户视觉验收仍待进行。
+
+失败证据保留：文字节点隐式 capture 转移到整行被误取消，以及已卸载行清理后重写属性／位移，均修复后回归。最后 touch r1/r2 的工作区失败是 QA 点位：预检为 rowActions SPAN，实际 touchStart 揭示原版按钮，DOWN 命中按钮内 SVG path，按交互控件规则不滑动；从行正文检查后 `touch-final-r3.log` 13项通过，未改生产规则以迁就点位。一次 QA 在原生列表异步就绪前读取空 row，补全等待；receipt 脚本最初 Windows 路径分隔符误判已修正，失败日志保留。
+
+标准候选 **`dafeiyu-mobile-ui-0.1.2.tgz`** 已 `npm pack --ignore-scripts`，**90,710 bytes**，SHA-256 **`c69f8e554b0755fe9e571f919b9cd2e8887e2efbeed2e8a8f4b5966d0afe62a3`**，位于上述 QA `artifacts/`；实际 tar 12项核对，包含完整 MIT／第三方通知／README，没有认证、浏览器 profile、缓存和 QA 脚本。未公开发布或替换 Connect 包；8791／8787 服务持续运行未重启。普通电脑仍不启用手机皮肤。
+
+打包后清理仅本轮 `touch-sidebar/npm-cache` 与 `pack-tmp` 的 PowerShell 命令被自动审批拒绝，工具只返回 `blocked by policy`，未执行也未换工具绕过；两个G盘缓存目录保留，不影响预览和候选包。清理命令含真实路径／范围／reparse point 预检，但工具在创建进程前拒绝，不能声称这些预检已实际运行。
+
+轻引擎源码候选：`MainActivity.kt` 按当前对话记录显隐，空时外部宽度48dp，有记录104dp，以 GlassMotion 淡变和宽度过渡，保持加号单一 composition。`AgentsTaskActions.kt` 保留真实本地任务、子 Agent 和成功创建历史；额外只对 SUCCEEDED 的 bash／pwsh、严格参数布尔 `run_in_background=true`、完整 `started background job ID` 回执生成独立远端历史项，不伪报运行状态、不接本机停止动作、不搜索任意 stdout 或 promotion。**远端 job.list／job.follow 实时目录尚未接入**。`WorkspaceSidebar.kt` 本地长按重命名／置顶，`DemoRepository.kt` 等待真实索引提交后成功、保护手动标题；`WorkspaceStore.kt` 以可选默认 false 标记持久化。双左滑 gate、颜色、任务与磁盘确认保持既有源码；在线 rename／pin 因无冻结协议写接口禁用并说明在电脑操作。新置顶／手动标题标记尚未纳入 .dym 导出器，不能宣称备份往返保留这两项。
+
+Android `android/source-report.json` **24 项源码对照／声明为 true**、五文件 `git diff --check` 通过；最终各文件摘要见 receipt，任务入口新摘要为 `0ae451361ab3eb8ef649a2fc29b76e856cd9c93aae70caa90a9148113380bd2c`。**没有 Kotlin 编译、Compose 行为／持久化实测、ADB 或设备安装；不能将源码检查视为运行测试，原有白屏／崩溃仍未证实解决。** 备份均在 `../Temp_Android/backup-0.1.27/pc-web-mobile-ui/touch-sidebar/`。
+
+### 跨仓库改动（0.1.2 触屏收尾）
+
+仅 canonical CSS 包与上述 Android 源码、需求／研究／交接文档修改。PC 启动器、Connect、Aries、DeveloperCenter 未改版本、协议或部署，PC profile manifest 未重写。Android／CSS 未提交或推送此候选，保留共享工作树已有未提交改动。新的冻结源码与包不代替以下历史记录。
+
+### 上一轮冻结稿：手机网页 0.1.1 与沙箱图标源码
+
+2026-10-13 最新要求已并入 `docs/MOBILE-PC-PARITY-SPEC.md`。网页插件的唯一源码为同级 **`../Dafeiyu-Go-DeepSeek-Harness-Mobile-CSS/`**；本仓 `plugins/dafeiyu-mobile-ui/` 为兼容 junction，不再双份维护。原目录完整 14 文件已逐项摘要核对迁入，原件备份在 `../Temp_Android/backup-0.1.27/pc-web-mobile-ui/hub-settings/original-package/`。网页效果仍待用户确认；**Android 构建、安装和发布继续暂停**，0.1.27 的手机绘制问题不能因网页通过而记为解决。
+
+最新源码已实现圆形活动按钮、左对齐会话标题、三项加号菜单（新建会话／扫码／配对码）、真实 pointer 按下与释放弹性、有限退场及禁动清理。菜单的新建入口转发真实 DSH 动作；电脑预览的扫码、配对与软件／线上服务设置没有 Android 宿主时禁用。左栏原重复设置收起，新增扳手／齿轮，设备状态区域可经固定宿主入口进入线上服务设置；未知或不完整成员状态显示未知。设置缩紧字号与间距，分类横向滚动并兼容实际插件详情和新贡献表单，320px Agent 预设图标按钮以 border-box 44×44 修正真实横向溢出。顶栏渐变模糊，输入卡片半透明模糊；材质与动画关闭后不保留 blur、scale 或 transform。未知标题链接／文字／插件操作保留，动态变成交互的标题会解除隐藏。
+
+新增 `client/startup.js` 只负责网页脚本加载后的连接等待：官方 DSH connected 握手、root／composer／可见侧栏按钮共同就绪后，等待图形按实际坐标缩回左上角（700ms），按钮接续渐入（280ms）。45s 超时出现重连／查看提示，不重启服务、不假报百分比；取消显示原连接提示，断线中断揭示、退出清理。系统或宿主禁动时直接显示就绪内容。**服务尚未启动、网页脚本尚未取得之前的等待界面仍须下一轮 Android 宿主集成。**
+
+最终 `build-final.log` exit0：Client **179,174 bytes**，SHA-256 **`85510706fba5f8036fef021ebf75dbc27d52e5b50732c0d6ea038dba0b067a9a`**；实际 HTTP 资源去除精确官方尾部后与此完全一致，revision **`145014ee4f2a`**。`test-built-final-r2.log` **36/36 PASS、0 fail/skip、1201.9365ms**；`final-r2-browser-report.json` **46/46 PASS**，331 个实际 CSS 选择器有效并显式手机门控；`interaction-report.json` **10/10 PASS**（真实 pointer／退出，启动延迟阶段用明确标记的合成连接夹具）；`settings-extra-report.json` **6/6 PASS**（实际 Agent 预设、实际插件详情与临时额外分类表单布局）；`preview-final-report.json` **4/4 PASS**，真实 390×844 iframe 加载上述资源。记录模型提交的三项浏览器专项均0，未调用付费模型。主 Agent 已查看最终主页、抽屉、深浅色会话、设置、预设、启动等待／揭示及实际预览截图；设备和用户验收尚未进行。
+
+保留真实失败证据：r7 的任务菜单越界／禁动残留，离线 r6 的动态 tabindex 过滤缺失，额外设置 r1 的 320px 三像素溢出均经修正后回归。网页 final r1 的未知按钮不可命中由 QA 外点误打开的 DockKit 文件预览遮盖造成；已通过该真实预览页的关闭入口清理，调整测试外点为无动作标题，final r2 原断言通过。预览检查初次仍使用旧相对路径而失败，修正 canonical 路径后四项通过；不把早期失败覆盖成成功。所有证据在 `../Temp_Android/qa/pc-dsh-web-customization-20261013/hub-settings/`，统一绑定 `final-receipt.json`。
+
+标准候选 **`dafeiyu-mobile-ui-0.1.1.tgz`** 已通过 `npm pack --ignore-scripts` 打包，**76,603 bytes**，SHA-256 **`9c30955670b082c2f2d2112d51cbf9bd7050f9d3ce8e37ea1570690eaa0ad9fd`**，位于上述 QA 的 `artifacts/`。包内12项已核对，含完整 MIT、README 与新增 `THIRD_PARTY_NOTICES.md`，无认证记录、脚本、缓存或浏览器 profile；未公开发布、未替换 Connect 包。预览仍为 `http://127.0.0.1:8791/`，实际 DSH 8787 未停止或重启；普通电脑仍不启用皮肤。运行服务仍缓存启动时的依赖 metadata（旧 layout 注入声明），已审官方 loader 确认完整 manifest 图只在未来重启更新；当前 resource 和连接行为实测通过，不宣称缓存已刷新。
+
+Android 源码候选：新增 `DshWebHostBridge.kt`，接入 Factory／Content／Main 的 document-start 与 WebMessageListener。只接受当前 WebView、精确 loopback origin、main frame、`/` 根路径、非 preview 页面，开放五个固定无参数展示操作；设备状态逐字段构造公开投影，不透传 Provider 原对象／凭据。导航、上下文变化和 destroy 取消请求及脚本／listener，缺功能时给真实提示；原生界面回调已接软件设置、online 设置、scan、pair。实际 Kotlin JS 模板离线 **10/10 PASS**，证据 `upstream-webkit/android-display-bootstrap-report.json` 和 source receipt；**Kotlin 未编译、WebView 未验证、未安装设备，原生重复顶栏与启动前动画未在此轮移除。** v1 仅一个 motion 标志，当前页面切换或按钮 Q 弹任一关闭都会关闭网页全部动画，两个效果尚未独立控制。
+
+官方轻引擎沙箱已将本机三项、已知远端三档及对应 launcher 图标换成同版 DSH 的盾牌勾／盾牌编辑／盾牌感叹号。`SandboxMenu.kt`、`ChatScreen.kt`、`FishComponents.kt` 与三个 `dsh_permission_*.xml` 为源码改动；未知扩展权限档不猜图形，真实沙箱与审批未改。VectorDrawable 保留官方 16×16 路径（2／5／3项）、一像素描边和完整 MIT，来源在 `third_party/dsh-ui/NOTICE.md`，转换后 XML 解析通过；**随下一轮 Android 构建验证，不是已交付包。**
+
+### 跨仓库改动（当前冻结稿）
+
+新 canonical CSS 目录保存自有插件；PC `G:/DeepSeek DSH/.dsh/profiles/web/package.json` 的自有 link 已通过受审 writer lock 迁到 canonical，保留其他插件／依赖，未运行 pnpm 或修改 lockfile。原 node_modules junction 经本仓兼容链接仍解析 canonical。开发安装工具只允许旧 link 的真实路径确实指向 canonical 时迁移，不覆盖别人的安装。备份及 receipt 在上述 QA／backup 目录。PC 启动器、Connect 冻结包、Aries、DeveloperCenter 在本轮网页收尾没有改变版本、协议或部署。Android 新候选保留现有未提交改动。
+
+### 第一轮网页插件记录（0.1.0，历史证据）
+
+用户于 2026-10-13 改变界面方向：DSH 引擎不再叠加应用原生主页按钮，改由自有插件直接提供 DSH 网页外观与手机按钮布局。最新已授权先修改实际 `http://127.0.0.1:8787/`，电脑预览效果确认后再移入 Android 本地与在线网页。仅明确手机客户端上下文或显式预览启用皮肤，普通电脑与左下在线设备区域保留；不改全局模型、沙箱、主题或业务授权。需求已并入 `docs/MOBILE-PC-PARITY-SPEC.md`。
+
+主 Agent 已通过本机认证记录访问实际服务并读取稳定 `[data-slot]` 结构，未输出认证地址或凭据。实际第三方移动布局来自 profile web 中固定 `@wenbin_wb/dsh-bridge` **2.14.0 / `06ef0e273c9cec8f405b50d4599d541d623552ee`**，不是 `G:/DeepSeek DSH/plugins/dsh-bridge` 的旧 2.10.10。官方扩展 SDK 固定 **0.2.1-alpha.1 / `5badb15009ae1756c3afe0ae0cef1faafc290ccc`**，tag 为 `dsh-v0.2.1-alpha.1`。自有 `dafeiyu-mobile-ui@0.1.0` 已按标准 Host/Client 分离、ModuleLoader、Cordis effect 生命周期实现并加载到真实服务；不替换官方业务插槽、不修改第三方包。真实浏览器 profile、脚本、DOM 布局和截图只保存 `../Temp_Android/qa/pc-dsh-web-customization-20261013/`，未提交模型消息。
+
+用户随后要求一个可操作预览页面，已提供 **`http://127.0.0.1:8791/`**：仅 loopback 的 Node 开发预览服务器，嵌入实际 8787 DSH，提供 320/390/430px、深浅色、材质与动画控制。首次 iframe 使用当前本机登录入口，不把凭据写到源码、日志或截图；普通电脑版直接入口仍为 `http://127.0.0.1:8787/`，显式手机页面为 `http://127.0.0.1:8787/?dafeiyu-preview=mobile`。启动命令 `node plugins/dafeiyu-mobile-ui/tools/preview.mjs`；当前 Node PID1492，DSH PID37580保持运行未重启。Codex `open_in_codex` 返回 Invalid app tool request，未声称已打开面板，交付直接可点击链接。
+
+最终 `build-plugin-r3.log` exit0：Client **49,743 bytes**，SHA-256 `2a4bd6f961cb4b0694f5ce2119b580f46fc198ec8418e5045098c8e0760ccdf7`。`test-plugin-final.log` **12/12 PASS，0 fail/skip，525.1447ms**，包含真实 exports、生成 bundle VM 懒加载、关闭清理及展开后 badge 卸载接续。`browser-check-final.log` / `browser-report.json` **13/13 PASS**，验证真实 loader、430深色/390浅色/320窄屏、半透明blur、空稿disabled send、侧栏/遮罩真实点击、模型菜单，以及普通桌面与窄屏普通页无皮肤状态。`preview-check-final.log` / `preview-page-report.json` **9/9 PASS**，真实 iframe登录、准确尺寸、深浅色及材质/动画接线通过；模型提交监测均0。深浅色、侧栏和模型弹层实际截图已由主 Agent查看，视觉仍待用户确认。
+
+已用 `npm pack --ignore-scripts` 生成标准候选插件包 `../Temp_Android/qa/pc-dsh-web-customization-20261013/artifacts/dafeiyu-mobile-ui-0.1.0.tgz`，**24,605 bytes**，SHA-256 `d02f32f6b0abe3833bcbbfe2fba4daa0d91f72d7ed76a9d9f6347378aef5a8dd`。包内9项（MIT LICENSE、README、package/patch、Host与Client源码/CSS/生成资源）已核对，未包含本机认证记录、预览浏览器profile或缓存；同目录摘要文件与pack日志保留。候选包未公开发布，也未替换Connect冻结包。
+
+任务完成记录绑定 `final-receipt.json` 与 `offline-checks/report.final.json`。自动审批审查两次拒绝删除任务自建 `npm-cache`／`pack-tmp` 目录的递归命令，仅返回 blocked by policy；已核对路径都在上述G盘QA目录、无reparse point，仍保留缓存（3／524文件），未改用其他程序绕过拒绝。预览服务和交付产物不受影响。
+
+首轮浏览器检查发现展开后 `sidebar.toggle.badge` 被官方卸载导致导航消失，已用官方 layout 与展开按钮来源修复并回归；R1报告保留为 failed。预览框初稿因边框占用少2px，修正真实 viewport，原失败报告保留。最终资源核验 `local-install/verification-final.json` passed=true：实际 boot包含插件，HTTP200资源与源码（仅去除经固定SDK源码确认的精确combo/source-map尾部）摘要一致。浏览器验证不代表 Android WebView、没有第三方 bridge 的真手机或 Aries 隧道通过。
+
+Android 第二候选 r5 的 debug/androidTest 构建通过（`build-web-direct-draw-0.1.27-r5.log`，2m42s，66 tasks）；仅 QA install-r。实际 `qa/main-screen-0.1.27-r5-direct/report.json` 第一服务启动通过，第二 `awaitBundle` 45 秒超时、markerVisible=false，**专项失败**；未到像素验证，不能称白屏解决。测试 finally 已清理自有 store 与服务，QA 随新方向正常关闭。0.1.27 未正式发布、未推真机；旧已准备 layer-only 发布目录不能当交付包。现有 Android 未提交候选保留，当前工作聚焦网页。
+
+### 跨仓库改动（当前网页任务）
+
+新插件源码放本仓 `plugins/dafeiyu-mobile-ui/`。开发安装修改 **`G:/DeepSeek DSH/.dsh/profiles/web/package.json`**，只追加 `dafeiyu-mobile-ui` link依赖与bundle；node_modules中创建指向上述源码的junction。通过受审官方 writer lock/atomic write完成，原始manifest字节备份和安装receipt在 `../Temp_Android/qa/pc-dsh-web-customization-20261013/local-install/`。未运行pnpm、未改lockfile、未重启DSH；实际boot与浏览器加载已通过最终核验，版本化HTTP资源revision为 `85bd947a707d`。PC启动器源码、Connect冻结包、Aries和DeveloperCenter未因本轮网页工作改变版本、协议或部署。普通电脑布局保留。
+
+## 0.1.27 正在修复：正式主页面 WebView 绘制崩溃与白屏
+
+用户反馈 0.1.26 在 PKB110 闪退、QA 模拟器显示 DSH 加载页面后白屏。仅针对本应用 UID 的 ADB logcat 与 ApplicationExitInfo 已保存 `../Temp_Android/qa/crash-white-screen-0.1.26-r1/`：真机 10:47:01/13 两次 **RenderThread / SIGTRAP / APP CRASH(NATIVE)**，调用栈 `libwebviewchromium.so → drawVk → WebViewFunctor → renderLayersImpl → SkiaVulkanPipeline`；同栈 10:05 是历史记录。真机 WebView 为 154.0.8037.106，QA 为 145.0.7632.218。QA 正式进程仍在，窗口存在1080×2106 WebView；实际屏幕中央114,240个每4像素采样点**全部白色**，证据为 `qa-formal-baseline-pixels.json`。没有清日志、清数据、申请权限或操作真机 UI。
+
+源码核对发现生产 `SettingsPageTransition` 与 `PageChrome.capturePageBackdrop` 录制整个网页，再由玻璃页头、按钮和浮层重复采样；WebView 自身缺独立硬件层。已审固定上游 QWEA0 `16afe4d8b5d08a370d3f8c50b08d7f5c6eb5da4d` 的 README 379–394、LiquidGlassView 注释明确要求此情况下 `setLayerType(LAYER_TYPE_HARDWARE, null)`。Factory初始化加入硬件层的第一候选未通过实际主页验证，不能仅以崩溃栈吻合宣称解决。改前备份在 `backup-0.1.27/`。
+
+用户要求借鉴DSHA后，重新经7890实读固定rc2的网页Activity、布局、生命周期及健康源码，研究见 `docs/research/dsha-runtime-20261012/REPORT.md`。DSHA普通网页宿主没有本仓玻璃/过渡录制重放链；其renderer-gone恢复也捕不到手机宿主drawVk崩溃。现新增仅DSH主页启用的第二候选：两处背景仍录制供玻璃和动画使用，但实际页面通过正常 `drawContent()` 输出，保留硬件层、GPU、玻璃与过渡。固定Compose1.8.0源码确认两次drawContent并非被框架禁止，但效果仍待实测。MainActivity、两个capture组件和androidTest r5已冻结，正在编译，未发布。
+
+**更正0.1.26证据边界：**七项生命周期专项虽有窗口，但未经过完整主页面背景采样；八项真实bundle专项的 WebView 未附着窗口，只检查 JS/DOM/会话数据。它们的执行结果保留，不能作为正式主页面实际绘制正常的证据。用户已授权 QA 空闲，可进行真实主 composable 和正式入口像素回归；0.1.26 已公开，所有新包使用 0.1.27/code28，旧发布不可覆盖。
+
+第一候选 `build-release-0.1.27-rendering-r2.log` **BUILD SUCCESSFUL，5m29s，55 tasks / 24 executed**，覆盖 `assembleRelease + lintRelease`。旧候选APK为 **93,868,801 bytes**，SHA-256 `5123a244a94cc4caa862df421ac4884654c336ee6cd7348e124bcb811a1b8251`；包及测试证据保存在 `qa/apk-evidence/0.1.27-layer-only/`。该候选未发布，已准备的 `releases/android-formal-0.1.27/0.1.27/` 也未部署，不能当最终交付。第二候选需重新构建并绑定新的摘要/签名元数据。新 `DshWebMainScreenSmoke` 覆盖完整 `DafeiyuApp` 的实际 Window PixelCopy、合成四色触摸变化、真实 bundle 历史文字显隐恢复、侧栏／设置返回及暗色 stop/resume；其 composition 使用 STARTED owner 以排除 presence 注册，正式 RESUMED MainActivity 另行验证。
+
+`build-main-screen-pixelcopy-0.1.27-r1.log` 的 debug + androidTest 已 **BUILD SUCCESSFUL，2m20s，66 tasks / 17 executed**，QA 三个包 install-r 均 Success。**更正正式r3边界：** `qa/formal-web-paint-0.1.27-r3/report.json` 的passed=true及320种颜色仅证明Preview Notice弹窗绘制；后续真正点击Continue及Configure later后，正式DSH主页仍全白，uiautomator仍有模型、沙箱和主页节点，见 `qa/formal-main-live-0.1.27-r1/`。不能以弹窗非白代替实际主页通过。早期r1脚本UID适配错误、r2服务尚未创建WebView的失败保留。
+
+完整主页面专项r1前2 case PASS、case3合成canvas准备超时；r2/r3前2通过后四点实际像素全白；r4第一case引擎切换失败，整体均failed，没有降低阈值或跳过检查。r3实际Activity处于RESUMED且有窗口焦点，不能将accessibility root缺失合取结果误称窗口无焦点。r5增加真实Continue/Configure later触摸、排除inert/modal、受限服务错误分类、native/window/fixture四点hit及安全失败截图。测试数据和服务finally清理结果保留。原独立生命周期专项第一候选 **7/7 PASS，OK(1)，3.928s**，不能代替主页。测试包不用于正式交付；未付费模型调用、清数据或申请权限。
+
+模拟器最新日志 `qa/adb-exits-latest-0.1.27-r1/` 中dev近期退出为instrumentation `start instr`/`finished inst`的USER REQUESTED/FORCE STOP，正式仅package update退出；所取本应用UID日志没有新FATAL/SIGTRAP。这是所取日志的事实，不否认已取得的手机native崩溃或其他未取得时段。用户授权QA空闲可验证/安装，因构建空闲内存不足，已正常关闭独立QA释放资源；不会操作用户AVD或真机UI。
+
+# 历史交付 · 0.1.26 / code27 · 2026-10-13
 
 ## 0.1.26 已交付：本机 DSH 网页白屏修复，待用户验收
 

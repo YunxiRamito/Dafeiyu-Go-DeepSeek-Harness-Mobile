@@ -358,7 +358,9 @@ fun ChatScreen(repository: DemoRepository, onModels: () -> Unit, onSettings: () 
                                     .onGloballyPositioned { sandboxMorph.anchorBounds = it.boundsInWindow() }
                                     .graphicsLayer { alpha = sandboxMorph.launcherAlpha }
                                     .clip(CircleShape).semantics { contentDescription = "沙箱权限：${sandboxMode.title}" }) {
-                                FishGlyph(sandboxMode.glyph, Modifier.size(19.dp), colors.onSurface)
+                                FishGlyph(if (repository.connectionMode == "online")
+                                    sandboxGlyphForValue(repository.remoteDshState.projection?.workspace?.settings?.sandbox) ?: "lock"
+                                    else sandboxMode.glyph, Modifier.size(19.dp), colors.onSurface)
                             }
                             SandboxMenu(sandboxOpen, sandboxMorph, sandboxMode,
                                 onModeSelected = { repository.updateLocalSandboxMode(when (it) {

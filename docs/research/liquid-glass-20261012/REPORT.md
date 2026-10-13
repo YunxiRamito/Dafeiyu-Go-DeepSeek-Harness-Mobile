@@ -2,6 +2,12 @@
 
 日期：2026-10-12，Asia/Shanghai。范围：只读生产源码，通过 `http://127.0.0.1:7890` 获取固定提交的文本证据，只在本研究目录写文件。未启动 JVM/Kotlin/Gradle、ADB、模型请求或外部仓库脚本；生产冻结保持。
 
+## 2026-10-13 WebView 绘制修复接续
+
+用户反馈本机 DSH 正式主页在 PKB110 闪退、QA 加载后白屏。只读 ADB 证据确认手机 code26 与 code27 均在 Chromium Vulkan `drawVk → WebViewFunctor → renderLayersImpl` 崩溃；准确 CHECK/FATAL 未取得，不能把上游某个断言分支当作已知根因。QA 的真实窗口中央区域为纯白，旧 JS/DOM 与隔离生命周期专项没有覆盖正式主页的完整玻璃采样，不能证明实际绘制正常。
+
+固定上游 README 379–394 与 `LiquidGlassView.kt` 779 附近明确建议为被玻璃捕获的 WebView 设置独立硬件层。生产 `DshWebViewFactory` 已在 owner 回调、配置与导航前加入 `setLayerType(View.LAYER_TYPE_HARDWARE, null)`，让玻璃重放其纹理，保留原 GPU、玻璃和认证逻辑；未复制上游模块。该最小候选须经完整 `DafeiyuApp` 的实际 Window PixelCopy、动态内容变化和正式 RESUMED 主入口验证，模拟器通过也不代替 WebView154 真机稳定性。当前源码实现与构建、设备、用户验收状态分别维护于 HANDOVER。
+
 ## 结论与证据边界
 
 已实际下载并精读 QWEA0 的固定提交源码。上游双形状融合是单一 shader 内的平滑并集：覆盖率、法线、折射和高光共同使用融合距离场。项目现有 `LiquidGlassBridge` 是两块独立玻璃之间的 gap-only 贝塞尔填色片，没有共同距离场或背景采样，不能算完整玻璃表面融合。建议复用上游的融合机制，适配现有 Compose 内容捕获层；不要直接导入整个 View 模块。

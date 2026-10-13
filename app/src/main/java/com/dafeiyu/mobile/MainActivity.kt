@@ -10,12 +10,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
@@ -26,6 +29,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
@@ -42,6 +46,7 @@ import androidx.compose.ui.platform.*
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.dafeiyu.mobile.data.DeveloperCenterPresenceClient
 import com.dafeiyu.mobile.data.ArchiveCleanupScheduler
@@ -76,6 +82,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
+@OptIn(ExperimentalComposeUiApi::class)
 fun DafeiyuApp(repository: DemoRepository = viewModel()) {
     var route by rememberSaveable { mutableStateOf("home") }
     var scanReturnToPair by rememberSaveable { mutableStateOf(false) }
@@ -91,6 +98,7 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
     val keyboard = LocalSoftwareKeyboardController.current
     val rootDensity = LocalDensity.current
     val imeVisible = WindowInsets.ime.getBottom(rootDensity) > 0
+    val statusBarInset = WindowInsets.statusBars.getTop(rootDensity)
     val sidebarBack = remember { Animatable(0f) }
     val settingsTransfer = remember { Animatable(1f) }
     var transferringSettings by remember { mutableStateOf(false) }
@@ -98,6 +106,8 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
     val settingsDetail = rememberSettingsPageTransitionState()
     var navigationJob by remember { mutableStateOf<Job?>(null) }
     var menuButtonBounds by remember { mutableStateOf<Rect?>(null) }
+    var dshHomeBounds by remember { mutableStateOf<Rect?>(null) }
+    var dshPageReady by remember { mutableStateOf(false) }
     var homeBackdropCapture by remember { mutableStateOf<PageBackdropCapture?>(null) }
     var chatOverlay by remember { mutableFloatStateOf(0f) }
     var plusOverlay by remember { mutableFloatStateOf(0f) }
@@ -207,10 +217,18 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
             settingsHome.isActive -> navigate { settingsHome.close(pageMotionReduced) }
         }
     }
-    fun openSettings(target: String? = null) {
+    fun openSettings(target: String? = null): Boolean {
         focus.clearFocus(); keyboard?.hide()
-        if (settingsHome.isActive) return
-        val origin = menuButtonBounds ?: return
+        if (settingsHome.isActive) return true
+        // A webpage bridge has no native toolbar to measure. Use an in-window
+        // presentation anchor without mounting a second navigation button.
+        val origin = if (repository.engineMode == "dsh") dshHomeBounds?.let { bounds ->
+            val buttonSize = with(rootDensity) { 48.dp.toPx() }
+            val inset = with(rootDensity) { 12.dp.toPx() }
+            val top = bounds.top + statusBarInset + inset
+            Rect(bounds.left + inset, top, bounds.left + inset + buttonSize, top + buttonSize)
+        } else menuButtonBounds
+        if (origin == null) return false
         settingsHome.recordSource("settings", origin, origin, with(rootDensity) { 24.dp.toPx() })
         val fromSidebar = menuOpen
         menuOpen = false
@@ -231,6 +249,7 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
                 settingsDetail.open(pageMotionReduced)
             }
         }
+        return true
     }
     LaunchedEffect(repository.workspaceInitialized, repository.engineMode, repository.connectionMode,
         repository.autoStartDsh, dshInstallation?.installedVersion, repository.runtimeAutostartSuppressed) {
@@ -240,13 +259,27 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
             repository.startRuntime()
         } else awaitingDshHome = false
     }
-    LaunchedEffect(repository.runtimeLastError, menuButtonBounds, repository.engineMode, repository.connectionMode) {
-        if (awaitingDshHome && repository.engineMode == "dsh" && repository.connectionMode == "local" &&
-            repository.runtimeLastError != null && menuButtonBounds != null) openSettings("dsh-engine")
+    LaunchedEffect(repository.engineMode, repository.connectionMode) {
+        dshPageReady = false
+        if (repository.engineMode == "dsh") {
+            menuOpen = false
+            homeBackdropCapture = null
+            chatOverlay = 0f
+            plusOverlay = 0f
+            tasksOverlay = 0f
+            tasksSurfaceVisible = false
+        }
     }
-    LaunchedEffect(repository.runtimeAccessUrl, repository.engineMode, repository.connectionMode, repository.localEngineSwitchBusy) {
+    LaunchedEffect(repository.runtimeLastError, dshHomeBounds, repository.engineMode, repository.connectionMode) {
         if (awaitingDshHome && repository.engineMode == "dsh" && repository.connectionMode == "local" &&
-            repository.runtimeAccessUrl != null && !repository.localEngineSwitchBusy && repository.localEngineSwitchError == null) {
+            repository.runtimeLastError != null && dshHomeBounds != null) {
+            awaitingDshHome = false
+            openSettings("dsh-engine")
+        }
+    }
+    LaunchedEffect(dshPageReady, awaitingDshHome, repository.engineMode, repository.connectionMode, repository.localEngineSwitchBusy) {
+        if (awaitingDshHome && repository.engineMode == "dsh" && repository.connectionMode == "local" &&
+            dshPageReady && repository.runtimeAccessUrl != null && !repository.localEngineSwitchBusy && repository.localEngineSwitchError == null) {
             awaitingDshHome = false
             settingsDetail.close(pageMotionReduced)
             settingsHome.close(pageMotionReduced)
@@ -341,14 +374,58 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
             Scaffold(containerColor = Color.Transparent, contentColor = palette.onBackground,
                 snackbarHost = { SnackbarHost(snackbar, Modifier.navigationBarsPadding().imePadding()) },
                 contentWindowInsets = WindowInsets(0, 0, 0, 0)) { innerPadding ->
-                Box(Modifier.fillMaxSize().padding(innerPadding)) {
+                Box(Modifier.fillMaxSize().padding(innerPadding).semantics { testTagsAsResourceId = true }) {
                     GlassBackdrop(backdrop, Modifier.matchParentSize(), baseColor = palette.background)
-                    CompositionLocalProvider(LocalSettingsPageTransition provides settingsDetail) {
+                    val dshHome = repository.engineMode == "dsh"
+                    if (dshHome) {
+                        // A WebView functor must draw only through the ordinary
+                        // hardware window. It is never a descendant of PageChrome,
+                        // a recorded settings source, or a native RenderEffect.
+                        DshWebContent(repository,
+                            modifier = Modifier.fillMaxSize().onGloballyPositioned {
+                                val position = it.positionInWindow()
+                                dshHomeBounds = Rect(position.x, position.y,
+                                    position.x + it.size.width, position.y + it.size.height)
+                            },
+                            interactive = !settingsHome.isActive && !routeSurfaceVisible,
+                            onReadyChanged = { dshPageReady = it },
+                            onSettings = { awaitingDshHome = false; openSettings("dsh-engine") },
+                            onExit = { awaitingDshHome = false; openSettings() },
+                            hostActions = DshWebHostActions(
+                                openAppSettings = {
+                                    route == "home" && repository.engineMode == "dsh" && openSettings()
+                                },
+                                openConnectionSettings = {
+                                    route == "home" && repository.engineMode == "dsh" && openSettings("online")
+                                },
+                                openScanner = {
+                                    if (route != "home" || repository.engineMode != "dsh" || settingsHome.isActive) false else {
+                                        focus.clearFocus(); keyboard?.hide(); scanReturnToPair = false
+                                        route = "scan"
+                                        true
+                                    }
+                                },
+                                openPairing = {
+                                    if (route != "home" || repository.engineMode != "dsh" || settingsHome.isActive) false else {
+                                        focus.clearFocus(); keyboard?.hide(); scanReturnToPair = false
+                                        route = "pair"
+                                        true
+                                    }
+                                },
+                                connectionState = { connectionProvider.call("get_connection_state") },
+                                onFailure = repository::updateNotice))
+                    }
+                    if (!dshHome || settingsHome.isActive) CompositionLocalProvider(LocalSettingsPageTransition provides settingsDetail) {
                         SettingsPageTransition(settingsHome,
                             modifier = Modifier.pageRouteInputBlocked(routeSurfaceVisible),
                             reducedMotion = pageMotionReduced,
                             crossfadeProgress = if (transferringSettings) settingsTransfer.value else null,
                             sourceContent = {
+                                if (dshHome) {
+                                    // Native settings may record this empty source;
+                                    // the live webpage stays a separate sibling below.
+                                    Box(Modifier.fillMaxSize().testTag("dsh-settings-inert-source"))
+                                } else {
                                 val density = LocalDensity.current
                                 val blurSteps = remember(density.density, reducedMotion) { (0..4).map { index ->
                                     if (Build.VERSION.SDK_INT >= 31 && !reducedMotion && index > 0)
@@ -382,9 +459,7 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
                                         onBackdropCapture = { homeBackdropCapture = it },
                                         modalProgress = { maxOf(chatOverlay, plusOverlay, tasksOverlay, sidebar.progress) }) {
                                         savedPages.SaveableStateProvider("home-${repository.displayConversationId}") {
-                                            if (repository.engineMode == "dsh") DshWebContent(repository,
-                                                onSettings = { openSettings("dsh-engine") })
-                                            else ChatScreen(repository, onModels = { openSettings("models") },
+                                            ChatScreen(repository, onModels = { openSettings("models") },
                                                 overlayVisible = menuOpen || tasksSurfaceVisible || settingsHome.isActive || routeSurfaceVisible,
                                                 onOverlayProgress = { chatOverlay = it },
                                                 onAttachmentsOpening = {
@@ -397,6 +472,7 @@ fun DafeiyuApp(repository: DemoRepository = viewModel()) {
                                 Box(Modifier.matchParentSize().graphicsLayer {
                                     alpha = maxOf(chatOverlay, plusOverlay, tasksOverlay, sidebar.progress, if (transferringSettings) 1f else 0f) * .12f
                                 }.background(palette.scrim))
+                                }
                             },
                             destinationContent = {
                                 SettingsPageTransition(settingsDetail, reducedMotion = pageMotionReduced,
@@ -544,6 +620,18 @@ private fun PageChrome(
     var taskMenuVisible by remember { mutableStateOf(false) }
     var plusMenuVisible by remember { mutableStateOf(false) }
     var titleTarget by remember { mutableStateOf(Offset.Zero) }
+    val taskEngine = repository.backgroundTasks.takeIf { repository.connectionMode != "online" }
+    val conversationTasks = taskEngine?.tasks?.collectAsStateWithLifecycle()?.value.orEmpty()
+    val conversationActivity = repository.remoteDshState.selectedView?.activity
+        .takeIf { repository.connectionMode == "online" }
+    val hasTaskActivity = conversationTaskActivities(repository.displayConversationId, conversationTasks,
+        repository.displayMessages, conversationActivity).isNotEmpty()
+    val reducedMotion = LocalReduceGlassMotion.current
+    val taskActionsWidth by animateDpAsState(if (hasTaskActivity) 104.dp else 48.dp,
+        animationSpec = tween(if (reducedMotion) 0 else GlassMotion.ReleaseMillis, easing = GlassMotion.EaseOut),
+        label = "conversationTaskHubWidth")
+    val taskActivityAlpha by animateFloatAsState(if (hasTaskActivity) 1f else 0f,
+        animationSpec = GlassMotion.scalar(GlassMotion.PressMillis, reducedMotion), label = "conversationTaskHubAlpha")
     Box(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().capturePageBackdrop(capture).background(palette.background)) {
             CompositionLocalProvider(LocalSettingsNavigationState provides if (page == "home") null else navigation,
@@ -588,28 +676,47 @@ private fun PageChrome(
                     } else Spacer(Modifier.height(22.dp))
                 }
                 if (page == "home") {
-                    LiquidGlassButtonPair(
-                        first = actionsButton, second = plusButton,
-                        firstAlpha = { actionsLauncherAlpha }, secondAlpha = { plusLauncherAlpha },
-                    ) { drawLauncherMaterial ->
-                        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AgentsTaskActions(repository.backgroundTasks, onOpenTasks = onTasks,
-                        onOpening = onTasksOpening, dismissRequested = dismissHomeActions || plusMenuVisible,
-                        onOverlayProgress = onTasksOverlay,
-                        onSurfaceVisibilityChanged = {
-                            taskMenuVisible = it
-                            onTasksVisibility(it)
-                        }, deformation = actionsButton,
-                        drawLauncherMaterial = drawLauncherMaterial,
-                        onLauncherAlphaChanged = { actionsLauncherAlpha = it })
-                            NewSessionActions(onNew, onScan, onPairing = onPairing,
-                        isPaired = isPaired, onOverlayProgress = onPlusOverlay,
-                        onOpening = onPlusOpening,
-                        onSurfaceVisibilityChanged = { plusMenuVisible = it },
-                        dismissRequested = dismissHomeActions || taskMenuVisible,
-                        deformation = plusButton,
-                        drawLauncherMaterial = drawLauncherMaterial,
-                        onLauncherAlphaChanged = { plusLauncherAlpha = it })
+                    // The plus keeps one composition and anchor while the title recovers the empty hub's space.
+                    Box(Modifier.width(taskActionsWidth).height(48.dp)) {
+                        Box(Modifier.align(Alignment.CenterEnd)
+                            .wrapContentSize(Alignment.CenterEnd, unbounded = true).width(104.dp).height(48.dp)) {
+                            LiquidGlassButtonPair(
+                                first = actionsButton, second = plusButton,
+                                firstAlpha = { actionsLauncherAlpha * taskActivityAlpha },
+                                secondAlpha = { plusLauncherAlpha },
+                            ) { drawLauncherMaterial ->
+                                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.End) {
+                                    AnimatedVisibility(visible = hasTaskActivity,
+                                        enter = fadeIn(GlassMotion.scalar(GlassMotion.PressMillis, reducedMotion)),
+                                        exit = fadeOut(GlassMotion.scalar(GlassMotion.PressMillis, reducedMotion))) {
+                                        Row(Modifier.pageRouteInputBlocked(!hasTaskActivity)) {
+                                            key(repository.connectionMode, repository.displayConversationId) {
+                                                AgentsTaskActions(taskEngine, onOpenTasks = onTasks,
+                                                    conversationId = repository.displayConversationId,
+                                                    history = repository.displayMessages, activity = conversationActivity,
+                                                    onOpening = onTasksOpening,
+                                                    dismissRequested = dismissHomeActions || plusMenuVisible || !hasTaskActivity,
+                                                    onOverlayProgress = onTasksOverlay,
+                                                    onSurfaceVisibilityChanged = {
+                                                        taskMenuVisible = it
+                                                        onTasksVisibility(it)
+                                                    }, deformation = actionsButton,
+                                                    drawLauncherMaterial = drawLauncherMaterial,
+                                                    onLauncherAlphaChanged = { actionsLauncherAlpha = it })
+                                            }
+                                            Spacer(Modifier.width(8.dp))
+                                        }
+                                    }
+                                    NewSessionActions(onNew, onScan, onPairing = onPairing,
+                                        isPaired = isPaired, onOverlayProgress = onPlusOverlay,
+                                        onOpening = onPlusOpening,
+                                        onSurfaceVisibilityChanged = { plusMenuVisible = it },
+                                        dismissRequested = dismissHomeActions || taskMenuVisible,
+                                        deformation = plusButton,
+                                        drawLauncherMaterial = drawLauncherMaterial,
+                                        onLauncherAlphaChanged = { plusLauncherAlpha = it })
+                                }
+                            }
                         }
                     }
                 }

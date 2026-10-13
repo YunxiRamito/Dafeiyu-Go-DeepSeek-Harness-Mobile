@@ -90,6 +90,8 @@ class DemoRepository : ViewModel() {
     private val conversationMessages = mutableStateMapOf<String, SnapshotStateList<ChatMessage>>()
     var workspaceInitialized by mutableStateOf(false)
         private set
+    var sidebarMetadataBusy by mutableStateOf(false)
+        private set
     var workspaceRootPath by mutableStateOf("")
         private set
     private var workspaceStore: WorkspaceStore? = null
@@ -1645,6 +1647,86 @@ class DemoRepository : ViewModel() {
         persistWorkspaces()
     }
 
+    private fun canEditSidebarMetadata(): Boolean = connectionMode == "local" && workspaceInitialized &&
+        workspaceStore != null && workspaceSaveError == null && !workspaceDeletionBusy && !sendPending &&
+        !isResponding && !localEngineSwitchBusy && !sidebarMetadataBusy
+
+    fun canRenameWorkspace(id: String): Boolean = canEditSidebarMetadata() && workspaces.any { it.id == id }
+
+    fun canRenameConversation(id: String): Boolean = canEditSidebarMetadata() &&
+        conversations.any { it.id == id && it.archivedAtMillis == null }
+
+    fun canPinConversation(id: String): Boolean = canRenameConversation(id)
+
+    fun isConversationPinned(id: String): Boolean = connectionMode == "local" &&
+        conversations.any { it.id == id && it.pinned }
+
+    /** Accept display metadata only; names cannot rename a directory or change a workspace identity. */
+    suspend fun renameWorkspace(id: String, name: String): Boolean {
+        val normalized = name.trim()
+        if (normalized.isBlank() || normalized.length > 80 || normalized.any(Char::isISOControl)) {
+            updateNotice("工作区名称需为 1–80 个字符，不能包含控制字符")
+            return false
+        }
+        if (!canRenameWorkspace(id)) return false
+        return saveSidebarMetadata("工作区名称已保存") {
+            val index = workspaces.indexOfFirst { it.id == id }
+            if (index < 0) false else {
+                workspaces[index] = workspaces[index].copy(name = normalized)
+                true
+            }
+        }
+    }
+
+    suspend fun renameConversation(id: String, title: String): Boolean {
+        val normalized = title.trim()
+        if (normalized.isBlank() || normalized.length > 100 || normalized.any(Char::isISOControl)) {
+            updateNotice("对话名称需为 1–100 个字符，不能包含控制字符")
+            return false
+        }
+        if (!canRenameConversation(id)) return false
+        return saveSidebarMetadata("对话名称已保存") {
+            val index = conversations.indexOfFirst { it.id == id && it.archivedAtMillis == null }
+            if (index < 0) false else {
+                conversations[index] = conversations[index].copy(title = normalized, titleManuallySet = true)
+                true
+            }
+        }
+    }
+
+    suspend fun setConversationPinned(id: String, pinned: Boolean): Boolean {
+        if (!canPinConversation(id)) return false
+        return saveSidebarMetadata(if (pinned) "对话已置顶" else "已取消置顶") {
+            val index = conversations.indexOfFirst { it.id == id && it.archivedAtMillis == null }
+            if (index < 0) false else {
+                conversations[index] = conversations[index].copy(pinned = pinned)
+                true
+            }
+        }
+    }
+
+    /** Use the real workspace writer, and report success only after the index commits. */
+    private suspend fun saveSidebarMetadata(success: String, apply: () -> Boolean): Boolean =
+        withContext(Dispatchers.Main.immediate) {
+            if (!canEditSidebarMetadata()) return@withContext false
+            sidebarMetadataBusy = true
+            sendPending = true
+            try {
+                saveJob?.cancelAndJoin()
+                saveJob = null
+                if (!apply()) return@withContext false
+                persistenceRevision++
+                val committed = commitWorkspace(workspaceSnapshot())
+                if (committed) updateNotice(success)
+                committed
+            } finally {
+                sendPending = false
+                sidebarMetadataBusy = false
+                // Retain unsaved metadata in memory and use the existing recovery/error path.
+                persistWorkspaces()
+            }
+        }
+
     /** Permanent deletion is confirmed separately from archive and commits only
      * after every linked DSH history has an actual durable deletion receipt. */
     fun deleteConversation(id: String): Boolean {
@@ -1951,6 +2033,7 @@ class DemoRepository : ViewModel() {
         if (connectionMode == "online") return conversation.archivedAtMillis == null
         val current = conversations.firstOrNull { it.id == conversation.id } ?: return false
         if (current.workspaceId != conversation.workspaceId || current.archivedAtMillis != null) return false
+        if (current.pinned || current.titleManuallySet) return true
         return conversationMessages[current.id]?.any {
             it.role in setOf("user", "assistant") && it.text.isNotBlank()
         } == true
@@ -1986,6 +2069,7 @@ class DemoRepository : ViewModel() {
     private fun pruneUnusedEmptyDrafts(): Int {
         val unusedIds = conversations.asSequence()
             .filter { it.archivedAtMillis == null && it.id != selectedConversationId }
+            .filterNot { it.pinned || it.titleManuallySet }
             .filter { isAutoCreatedEmptyConversation(it, conversationDeleteFacts(it.id)) }
             .map { it.id }
             .toSet()
@@ -3329,7 +3413,8 @@ class DemoRepository : ViewModel() {
                 if (generation != responseGeneration) return@launch
                 emit(AssistantStreamEvent.MessageStarted(sequence++, streamMessageId))
                 val conversationIndex = conversations.indexOfFirst { it.id == conversationId }
-                if (conversationIndex >= 0 && conversations[conversationIndex].title == "新对话") {
+                if (conversationIndex >= 0 && !conversations[conversationIndex].titleManuallySet &&
+                    conversations[conversationIndex].title == "新对话") {
                     conversations[conversationIndex] = conversations[conversationIndex].copy(
                         title = input.replace('\n', ' ').trim().take(30).ifBlank { "附件对话" },
                     )
@@ -3614,7 +3699,8 @@ class DemoRepository : ViewModel() {
                                 replaceStreamMessage(conversationId, id, measuredSnapshot(snapshot))
                                 if (event is AssistantStreamEvent.MessageStarted) {
                                     val index = conversations.indexOfFirst { it.id == conversationId }
-                                    if (index >= 0 && conversations[index].title == "新对话") {
+                                    if (index >= 0 && !conversations[index].titleManuallySet &&
+                                        conversations[index].title == "新对话") {
                                         conversations[index] = conversations[index].copy(
                                             title = input.replace('\n', ' ').trim().take(30).ifBlank { "新对话" },
                                         )
@@ -3719,7 +3805,8 @@ class DemoRepository : ViewModel() {
                                 replaceStreamMessage(conversationId, id, measuredSnapshot(snapshot))
                             if (event is AssistantStreamEvent.MessageStarted) {
                                 val index = conversations.indexOfFirst { it.id == conversationId }
-                                if (index >= 0 && conversations[index].title == "新对话") {
+                                if (index >= 0 && !conversations[index].titleManuallySet &&
+                                    conversations[index].title == "新对话") {
                                     conversations[index] = conversations[index].copy(title = input.replace('\n', ' ').take(30))
                                 }
                             }

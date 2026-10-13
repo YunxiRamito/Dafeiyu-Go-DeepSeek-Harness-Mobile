@@ -24,6 +24,14 @@ DSHA 自己的 NOTICE 标明 Standard PRoot 二进制精确源码修订未验证
 
 下载逻辑按 PC 分流：默认国内 CDN，GitHub 镜像在前、官方兜底；npm 走 npmmirror；官方只官方；后端是独立选择，不混入 CDN 自动回退。GitHub API/uploads 不发往第三方镜像。后端使用私有 CA 和既有 SPKI pin、保留 HTTPS 主机校验，下载内容再按固定 SHA-256 校验。取消、字节上限、失败切源、未完成文件与提交分开处理。
 
+## 网页宿主补充审查（2026-10-13）
+
+用户反馈本客户端网页白屏和闪退后，重新通过7890读取同一 rc2 固定提交的25份 README、MIT许可、NOTICE、网页宿主、布局及服务源码；原始来源、HTTP200与逐文件摘要在 `../Temp_Android/qa/dsha-web-host-review-0.1.27/source-manifest.json`，详细对照在该目录 `REVIEW.md`。先前HEAD树只用于路径发现，这次结论均来自 `8362bba747fcf84c19e436c3dbb594a0fc388a67`，没有运行上游脚本。
+
+DSHA Standard 的 `LaunchFragment` 打开独立 `WebPreviewActivity`，网页挂到普通 `FrameLayout`。它没有本客户端 `PageChrome` 背景录制、`SettingsPageTransition` 或玻璃浮层重放，也没有禁GPU、软件层或特殊Vulkan配置。它的 `onRenderProcessGone` 销毁精确退出的renderer并提供显式重试，但不能捕获本次手机宿主 RenderThread 的 SIGTRAP。服务generation、页面实例和authUrl一起校验，普通暂停/恢复不重启Node；仅实际不可连接才是健康watchdog的重启候选。现有本客户端认证、节点和进程校验继续保持，不能因网页空白便放松校验或无限重启服务。
+
+本轮借鉴其网页正常绘入宿主窗口的架构边界：保留本客户端玻璃与动画，研究将玻璃/动画用背景录制和实际网页显示分开。仅给WebView独立硬件层后，正式QA可绘制预览声明，但关闭声明及无凭据引导后仍复现主页面全白、DOM节点仍在；因此单一硬件层候选未通过。直接内容绘制候选和完整主页面PixelCopy、真实触摸、历史像素差分仍需实际验证，不把DSHA稳定的用户报告或源码审查当作本客户端通过。
+
 ## 验证边界
 
 准备脚本实际执行后固定了官方 Termux PRoot `5.1.107.96`、android-shmem `0.7`、talloc `2.5.0`。PRoot 源码提交 `a179d3e8a4e045aaa1fb8cc3284f23509d96d353`，Termux build system 提交 `3e13ceaa08e462bb3e0eb6529135ad67f9a3a9c5`；DEB、五个原生文件及完整源码归档 SHA 保存在打包的 `linux-runtime/runtime-lock.json`。源码归档和固定 build system 随 APK 提供，许可证按文件保留；未声称完成了二进制可复现重建。首次准备脚本下载 Termux build system 时遇到 `curl (35) schannel: failed to receive handshake`；随后校验研究阶段已下载归档的固定 SHA，复用本地缓存重跑成功，未关闭 TLS 验证。

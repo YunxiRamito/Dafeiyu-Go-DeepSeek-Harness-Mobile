@@ -337,6 +337,8 @@ class DshRuntimeManager private constructor(
             }
             val plugin = ConnectionPluginPackage(app).ensureBundled(DshArchiveLaunchContract.CONNECT_VERSION)
             val pluginSlot = DshArchiveLaunchContract.verifyPreparedPackage(pluginManifest, plugin)
+            val mobileUiInstaller = DshMobileUiPackage(app)
+            val mobileUi = mobileUiInstaller.ensureBundled()
             val home = File(app.filesDir, "dsh-home")
             require(!LinuxArchiveExtractor.isSymlink(home) && (home.isDirectory || home.mkdirs())) { "无法创建 DSH 数据目录" }
             DshExtensionTransaction.requireReady(home)
@@ -356,21 +358,23 @@ class DshRuntimeManager private constructor(
             }
             val launch = File(app.noBackupFilesDir, "dsh-android-launch")
             require(!LinuxArchiveExtractor.isSymlink(launch) && (launch.isDirectory || launch.mkdirs()))
-            for (name in listOf("android-launch.mjs", "android-sandbox.mjs", "android-provider-order.mjs", "android-persistence.mjs")) {
+            for (name in listOf("android-launch.mjs", "android-sandbox.mjs", "android-provider-order.mjs", "android-persistence.mjs", "android-mobile-ui.mjs")) {
                 val target = File(launch, name)
                 require(!LinuxArchiveExtractor.isSymlink(target))
                 app.assets.open("dsh-runtime/$name").use { input -> target.outputStream().use { input.copyTo(it) } }
             }
             runtime.startManagedProcess(PROCESS_ID,
-                DshArchiveLaunchContract.command(app.applicationInfo.nativeLibraryDir, port),
+                DshArchiveLaunchContract.command(app.applicationInfo.nativeLibraryDir, port, mobileUi.guestPath),
                 mapOf("/dafeiyu-dsh" to validated.directory, "/dafeiyu-dsh-home" to home, "/dafeiyu-dsh-launch" to launch,
                     "/dafeiyu-workspaces" to workspaces, "/dafeiyu-provider-order" to providerOrder,
+                    "/dafeiyu-extension-packages" to mobileUi.sources,
                     DshArchiveLaunchContract.CONNECT_MOUNT to pluginSlot), workspace,
                 DshArchiveLaunchContract.environment(), guestWorkingDirectory = stableCwd,
                 beforeStart = {
                     DshExtensionTransaction.requireReady(home)
                     DshArchiveLaunchContract.verifyOwningBundle(validated.directory, validated.manifest.dshVersion)
                     DshArchiveLaunchContract.verifyPreparedPackage(pluginManifest, plugin)
+                    mobileUiInstaller.verifyInstalled(mobileUi)
                     LinuxDshArchiveEnvironment.validate(DshArchiveLaunchContract.environment(),
                         mapOf(LinuxDshArchiveEnvironment.BUNDLE to validated.directory, LinuxDshArchiveEnvironment.HOME to home))
                 })
@@ -394,10 +398,13 @@ internal object DshArchiveLaunchContract {
         LinuxDshArchiveEnvironment.ANCHOR_ENV to LinuxDshArchiveEnvironment.INSTALL_ANCHOR,
         LinuxDshArchiveEnvironment.DIRECTORY_ENV to LinuxDshArchiveEnvironment.ARCHIVE_DIRECTORY)
 
-    fun command(nativeDirectory: String, port: Int): List<String> {
+    fun command(nativeDirectory: String, port: Int, mobileUiPath: String? = null): List<String> {
         require(port in 1024..65535)
+        require(mobileUiPath == null || mobileUiPath.matches(Regex("/dafeiyu-extension-packages/mobile-ui/[a-f0-9]{64}/package")))
         return listOf("/usr/local/bin/node", "--import", PRELOAD, "/dafeiyu-dsh-launch/android-launch.mjs",
-            LinuxDshArchiveEnvironment.BUNDLE, nativeDirectory, "web", "--host", "127.0.0.1", "--port", port.toString(), "--no-open")
+            LinuxDshArchiveEnvironment.BUNDLE, nativeDirectory) +
+            (mobileUiPath?.let { listOf("--dafeiyu-mobile-ui", it) } ?: emptyList()) +
+            listOf("web", "--host", "127.0.0.1", "--port", port.toString(), "--no-open")
     }
 
     fun verifyOwningBundle(directory: File, version: String) {

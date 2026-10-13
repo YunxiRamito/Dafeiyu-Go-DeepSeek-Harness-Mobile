@@ -123,6 +123,7 @@ fun SettingsPageTransition(
     modifier: Modifier = Modifier,
     reducedMotion: Boolean = LocalReduceGlassMotion.current,
     crossfadeProgress: Float? = null,
+    directSourceContent: Boolean = false,
     sourceContent: @Composable BoxScope.() -> Unit,
     destinationContent: @Composable BoxScope.(String) -> Unit,
 ) {
@@ -171,7 +172,7 @@ fun SettingsPageTransition(
         }.drawWithContent {
             sourceLayer.record { this@drawWithContent.drawContent() }
             sourceRecording.revision++
-            drawLayer(sourceLayer)
+            if (directSourceContent) this@drawWithContent.drawContent() else drawLayer(sourceLayer)
         }, content = sourceContent)
         if (active) {
             val route = requireNotNull(state.targetRoute)

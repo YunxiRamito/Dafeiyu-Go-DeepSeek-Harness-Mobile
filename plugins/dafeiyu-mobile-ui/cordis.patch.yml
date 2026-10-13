@@ -1,0 +1,6 @@
+# Add the browser half to a DSH profile. The client factory is deliberately
+# dependency-free; it becomes active only after the Android host marker passes
+# validation (or an explicit dafeiyu-preview=mobile URL is present).
+- insert:
+    - id: dafeiyu-mobile-ui
+      name: 'dafeiyu-mobile-ui'

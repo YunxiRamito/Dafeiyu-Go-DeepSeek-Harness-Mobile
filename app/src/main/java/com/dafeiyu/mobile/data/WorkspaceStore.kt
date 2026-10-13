@@ -20,6 +20,8 @@ data class Conversation(
     val workspaceId: String,
     val archivedAtMillis: Long? = null,
     val archiveOrigin: ConversationArchiveOrigin? = null,
+    val pinned: Boolean = false,
+    val titleManuallySet: Boolean = false,
 )
 internal data class WorkspaceSnapshot(
     val workspaces: List<Workspace>,
@@ -123,7 +125,8 @@ internal class WorkspaceStore(context: Context) {
                 if (id.isNotBlank() && (workspaces.any { it.id == workspaceId } || origin != null) &&
                     none { it.id == id }) {
                     add(Conversation(id, item.optString("title", "新对话").take(100), workspaceId,
-                        archivedAtMillis, origin))
+                        archivedAtMillis, origin, pinned = item.opt("pinned") == true,
+                        titleManuallySet = item.opt("titleManuallySet") == true))
                 }
             }
         }
@@ -443,6 +446,8 @@ internal class WorkspaceStore(context: Context) {
                 put(JSONObject().put("id", conversation.id).put("title", conversation.title)
                     .put("workspaceId", conversation.workspaceId)
                     .apply {
+                        if (conversation.pinned) put("pinned", true)
+                        if (conversation.titleManuallySet) put("titleManuallySet", true)
                         conversation.archivedAtMillis?.let { put("archivedAtMillis", it) }
                         if (conversation.archivedAtMillis != null) {
                             conversation.archiveOrigin?.let { put("archiveOrigin", encodeArchiveOrigin(it)) }
