@@ -20,6 +20,22 @@
 
 PC `qa/dym-official-durable-next/` 是冻结的隔离候选，**46 PASS／strict .NET 0 warning 0 error**：真实 CurrentUser DPAPI、File.Replace、冷 child process、CAS／取消／同步 mutex 通过；DSH 与 host 部分仍为合成夹具，生产未接或启用自动恢复。主 Agent 已读 REVIEW；子 Agent 分别补实际固定 Node 存储桥和完整异步 host gate，所有权限定新隔离目录，尚不修改共享 PC 树／index／真实服务。Android `.dym` 实际设备专项已通过上列九项；PC 真实接线与跨端往返仍继续。
 
+接续验证：实际固定 SDK 0.2.1-alpha.1／Windows DPAPI／私有 HMAC Node 存储桥的 r1 为 **61 PASS**，包含真正不同 C#／Node 冷进程在 stage／select 丢失响应后恢复；该矩阵的 host gate／worker registry 仍是合成。主 Agent 发现 stderr drain 真正结束前即注销 worker 的问题，r2 修正后生命周期专项 **24 PASS，strict .NET 0 warning／0 error，3.30s**；实际进程、仍持有 stderr 的子进程、注销失败后重试均有证据，未把 r1 的 61 项当作已在 r2 重跑。冻结文件和边界在 `../Temp_SetupandLauncher/qa/dym-official-dsh-port-next/REVIEW.md`、`candidate-manifest-r2.json` 与 `bundle-verification.json`。
+
+PC host gate 最小接线候选的严格检查 **7/7 PASS**。主 Agent 将它与 durable coordinator、r2 Node port 和三个固定 helper 合到 `qa/pc-official-integration-next/tree/`，复制的是共享 1.8 未提交源码的 **237 文件隔离快照**，没有写回共享树或 index。实际完整 WinUI type build 两次通过，最新 **32.19s／40 warnings／0 errors**；DLL SHA-256 `b49128b304ca720bc8ee01987039f423f0afcc809f765ccd12a1271a2e01a5f3`。`compiled-resources-receipt.json` 确认三个真正嵌入资源与 helper 原字节完全匹配、原 237 文件 drift=0。此编译快照尚未完成早期 bootstrap／全部 writer 和 CLI 生命周期接线，`bootstrapBound=false`，不能作为可正常启动、已恢复或可发布 PC 的证据。独立 bootstrap 接续候选只拥有 `pc-official-host-gate-next/next-bootstrap/`，不启用到稳定 PC。
+
+PC bootstrap 最小接续已冻结，清单 SHA-256 `51e316246c79964f08bae33a0017436e3f16ceb837b11dda21443b25df3ad04b`，严格 focused .NET **0 warning／0 error**，实际配置／CurrentUser DPAPI／持久 readback／live holder 小专项 **10/10 PASS**。已有真实 PC 实例持有单实例 mutex，`installVerified=false`；没有停止它或增加绕过。主 Agent 核对九份源文件与 r1 基线后，只合入上述隔离树；HostBinding 基线只有 CRLF/LF 差异，文字逐字符一致，原字节已备份。接续完整 WinUI type build **37.10s／40 warnings／0 errors**，DLL SHA-256 `f755cb6e5c24b76cdd2f36a243bf227b2640d7cce554e3037a4a703b19e990d0`，三份实际嵌入资源一致、原 237 文件 drift=0。候选当前明确关闭日常执行，实际 future launch／完整 `.env` 尚未提供，不能发布为 PC 成品。首次 focused 构建的新 .NET home 自动安装了未信任的 ASP.NET 开发证书，原日志保留；后续已关闭首次体验、证书生成和遥测，不删除未知原有证书。
+
+Android cold-storage 接续仍为隔离候选：`../Temp_Android/qa/official-dsh-cold-recovery-next/` 的最终固定 SDK 存储检查 r3 **8/8 PASS**，六个真实不同 Node PID、实际 SDK 锁持有者、完整 raw／planned／launch 证明、stage／select 写后丢失响应及 null 删除均有证据；平台为 Windows Node24.21.0，journal／host／slot approval 为合成，不能当作 AndroidKeyStore、Android exclusive lease 或真实手机服务通过。最终 runtime retained pipe 候选的严格 Kotlin 编译及真实 JVM child／pump **4/4 PASS**，不把 cancelled-but-not-completed Job 当作已清理；Android shared maps／PRoot 尚待设备验证。`FROZEN-MANIFEST.json` SHA-256 为 `30f4d2f14b01081a1332f37e0bbe7c6f29d3638c12a46f89365a6c497e077eaa`。固定 SDK 的 YAML atomic writer 不保证 fsync 掉电耐久，不能把进程冷重读通过扩大为该保证。
+
+主 Agent 的 `qa/android-official-coordinator-next/` 把完整存储证明接入既有事务／加密 journal 的隔离候选，最终 `focused-659a3a2eecbf4f56843bd2e79a9ef0d2/` 严格 `-Werror` 编译、既有 **96 PASS** 与新 **31/31 PASS**。冷收据不伪造进程内 settings revision；稳定未来 port／cwd 续存，缺证明或不同 live port 拒绝恢复。新矩阵使用真实 AES-GCM／NIO 与合成 native／DSH port，只重新打开存储，不是真正 Android／SDK／进程重启。`candidate-manifest.json` 绑定源码、authorizer 字节与最终日志；早期夹具失败日志保留。还需实际启动 factory、HMAC pipe、具体 journal authorizer、停止／清理／独占 lease 与 Android 中断后冷进程验证，故本轮未改正式代码、构建新 APK 或部署服务。
+
+Android 私有 HMAC 客户端最终采用 `qa/android-official-controlled-port-next/` 的 r2：**92/92 PASS**、严格 `-Werror` 编译，源码 SHA-256 `be5ed9d6be1ce3029bee7fd4f88ff3da88ed533db5bc0110b0def1e19ebf0505`，冻结清单 SHA-256 `ee1f4aaf41bae8c01342f9ded46b6a1ae939a869896408b83e09bfe7dafea38a`。密钥删除 stage 两阶段与非空三阶段分开核对；修正关闭与 writer 登记的竞态、延迟启动返回的真实句柄丢失，真实 Node 子进程／实际读写 Job 未完成时保留 Ownership 和运行环境租约。证据 `verify-f5e69755cb414882a16df82f7fb2e1d1/` 的 Android authorizer／runtime maps／DSH 操作仍为合成，固定真正 helper、AndroidKeyStore、PRoot 和设备尚未在客户端专项执行；早期 r1 84 项不替代 r2。
+
+主 Agent 的服务清理接续 `qa/android-official-service-lifecycle-next/` 严格编译及原生命周期 **12/12**、新增真实 Node child／stderr pump **6/6 PASS**。服务退出后不先释放真实管道租约，完成实际 reader Jobs 后才允许替换；该 Node 验证的健康响应和 Android runtime maps 是夹具，未集入生产或作为设备 PASS。首轮集中编译的源括号及 fixture JDK/Android Process API 错误已修正，失败日志保留。继续由三名子 Agent 分别补可信 Android launch factory、真正冷进程设备测试源、PC 实际 future launch 捕获；主 Agent 负责生产整合、串行构建和验收。
+
+上一段 PC 调查期间一次错误参数曾在 `G:/home/profiles/web/` 创建三个空模板 `cordis.patch.yml`／`package.json`／`pnpm-workspace.yaml`。两次精准清理均在执行前被自动审批拒绝，返回理由只有 `blocked by policy`；没有继续绕过，模板保留，原错误、路径和摘要见 `dym-official-dsh-port-next/research/ACCIDENTAL-FIXTURE-PATH.md`。这不涉及真实凭据或模型调用。
+
 **在途 DSH 事务跨服务进程恢复仍需持久 profile／epoch 证明**：当前遇到不匹配时保留 journal 和旧引用、拒绝执行，不把相同 selector 或重置的内存 revision 当成持久提交证明。该缺口在下一步补齐并另做实际中断／冷进程验证；已完成事务重启 PASS 不代替此项。Connect／Aries 的网页／文件／归档新能力保持原 gate；本轮至此未部署协议或更换冻结包。DeveloperCenter 已完成本轮 0.1.30 APK 发布，服务镜像未变。
 
 # 上轮交付 · 0.1.29 离线更新恢复已交付 · 2026-10-14
