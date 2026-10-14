@@ -1,4 +1,25 @@
-# 当前接续 · 0.1.29 离线更新恢复已交付 · 2026-10-14
+# 当前接续 · 0.1.30 官方凭据共享验证 · 2026-10-14
+
+持续功能对齐目标仍 active。最新执行顺序为主题链路（已交付）→ 离线更新恢复（已交付）→ 官方凭据本机共享与 PC 持久恢复 → Aries 网页／手动产物／归档及剩余清单。工具只支持修改既有目标状态，最新范围继续由 `docs/MOBILE-PC-PARITY-SPEC.md` 维护。正式已发布仍为下节 **0.1.29 / code30**；**0.1.30 / code31** 的生产源已整合，最终正式构建进行中，尚未发布或安装正式 QA。主 App 真机推包仍暂停，调色盘安装已有授权但 PKB110 当前未连接。
+
+### 0.1.30 实现与验证
+
+官方 DeepSeek 的 Provider 与 Balance 两个 Android 安全存储使用加密事务日志、版本 CAS、同文件事务标记和删除墓碑。未装或未启动 DSH 时先提交本机，后续 DSH 通过新引用与实际 settings CAS 发布。UI 提供明确的旧值来源选择、待恢复状态和重试；任务、余额、模型 worker 与备份读取采用共同准入，取消但未完成的真实任务仍保留租约。DSH 旧引用暂不清理。DYM 的明确缺失不恢复旧默认 Key；提供商组失败继续处理其他有效组。
+
+- 最终修复后的严格 JVM／NIO／AES 回归 `official-credentials-0.1.30-json-r2.log` **96/96 PASS**，固定实际 DSH helper **4/4 PASS**。首次实际 Android 写入发现 `Long` 经 JSON 读回成 `Integer` 后被当成损坏；修正精确数值语义比较，保留结构、类型、大整数及认证读回校验。两份失败记录保留，不能当 PASS；诊断报告 `qa/official-credentials-0.1.30-final/DEVICE-FIRST-FAILURE-AUDIT.md`。
+- QA `device-3670689714d84e169ad2d48cc76a332e` 的 native 5、recovery 5、restart prepare 1、restart recover 2 项均 PASS；真实进程从 PID18951 到18989，AndroidKeyStore／AtomicFile、旧值冲突、墓碑、lost-ACK 和新进程恢复实测通过。该整次 runner 后续 DSH 重启断言失败，所以 runner 本身不是全通过。
+- 单独复验 `device-010f9cb23ccf4d6a8608d59e1f7853e1` 的真实 DSH **8/8 PASS**、runner completed／passed=true、cleanup **4/4 PASS**：实际固定 0.2.1-alpha.1／Node24.19.0、helper、authenticated loopback settings RPC、两类指定 CAS 冲突、替换／删除、不同 PID 重启、普通提供商发布／反向读取。固定 SettingsForms revision 属于进程内 Map，完成事务重启验收核对持久 user／effective selector、事务归属和真实凭据，不跨 PID 比较该计数。UUID fixture 已清理，公共存储／原 aliases／已安装 runtime slot 保留，模型调用和权限授予为0。
+- 生命周期回归 **25/25**，worker generation／native **12/12**、真实 Node HTTP／cancel **11/11**；普通提供商共享 **38/38**、固定 helper **3/3**。共享历史 mapper **8/8**、固定实际存储 **16/16**；`dym-backup-0.1.30-r2.log` 严格 UI／生产 helper 编译及真实 7z／none／zstd **39/39 PASS**，后者尚不等于真实 Android DYM coordinator 验收。首次共享历史脚本遗漏 `DshMobileUiPackage` 编译输入，补齐后通过，原失败日志保留。
+
+调试生产代码已在 `build-official-credentials-0.1.30-json-debug-r3.log` **2m8s／67 tasks** 通过；修正测试版本号作用域后的 test-only 构建 **43s／49 tasks** 通过。正式 `build-official-credentials-0.1.30-release-r3.log` **4m17s／56 tasks**（assembleRelease + lintRelease，lint 0 Error）通过。最终 APK `../Temp_Android/Dist/Dafeiyu-Go-Mobile-0.1.30.apk` **95,024,995 bytes**，SHA-256 **841f5c6fb25ede2d031146272519a43c596b0438dd3a1817085c3e9622d71571**；aapt 为 `com.dafeiyu.mobile`／0.1.30／code31，apksigner v2 和固定发行证书 `d4341e66075d1e35909796cb5962b22f8aaed378ca50e057a1b25ed97fe0c64b` 通过。发布回执 `qa/android-release-0130-execute-20261014/receipt.json` 九个远端阶段均 exit0、completed=true，并已切换 stable；公网烟测 `qa/android-release-smoke-0130-20261014/report.json` **5/5 PASS**，实际清单、签名 APK 身份与八路 TLS Range 下载通过，无安装、权限授予或模型调用。正式 APK 已用 `install -r` 覆盖 QA `emulator-5558`，版本身份正确，启动后 crash buffer 为空；主 App 真机未推送。用户验收仍待进行，不把离线或 QA 结果扩大为 PKB110／跨端通过。
+
+### 跨仓库改动与下一步
+
+PC `qa/dym-official-durable-next/` 是冻结的隔离候选，**46 PASS／strict .NET 0 warning 0 error**：真实 CurrentUser DPAPI、File.Replace、冷 child process、CAS／取消／同步 mutex 通过；DSH 与 host 部分仍为合成夹具，生产未接或启用自动恢复。主 Agent 已读 REVIEW；子 Agent 分别补实际固定 Node 存储桥和完整异步 host gate，所有权限定新隔离目录，尚不修改共享 PC 树／index／真实服务。Android DYM 实际设备候选在单独目录编写，未执行。
+
+**在途 DSH 事务跨服务进程恢复仍需持久 profile／epoch 证明**：当前遇到不匹配时保留 journal 和旧引用、拒绝执行，不把相同 selector 或重置的内存 revision 当成持久提交证明。该缺口在下一步补齐并另做实际中断／冷进程验证；已完成事务重启 PASS 不代替此项。Connect／Aries 的网页／文件／归档新能力保持原 gate；本轮至此未部署协议或更换冻结包。DeveloperCenter 仅待发布最终 APK。
+
+# 上轮交付 · 0.1.29 离线更新恢复已交付 · 2026-10-14
 
 持续移动端／PC 对齐目标仍 active，最新执行范围以 `docs/MOBILE-PC-PARITY-SPEC.md` 为准：主题交付 → 离线更新恢复 → 官方凭据可靠共享 → Aries 网页／手动文件／归档及剩余清单。目标工具只能修改状态，不能重写既有正文；不将整个未完成计划标为完成来换目标。本轮已完成第二项，下一版生产修改从 **0.1.30 / code31** 开始。主 App 真机安装继续沿用用户“先不推”的决定；调色盘真机安装已有授权但未连接，不重复索取旧端口。
 

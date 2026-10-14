@@ -610,27 +610,36 @@ private fun ModelsContent(repository: DemoRepository, notify: (String) -> Unit) 
         nativeDeepSeekProvider = nativeProvider,
     )
     if (online) repository.remoteDshState.error?.let { Hint(it) }
+    if (!online) OfficialCredentialRecoveryContent(repository)
     if (showDeepSeekKey && !online) AlertDialog(
-        onDismissRequest = { showDeepSeekKey = false },
+        onDismissRequest = { key = ""; showDeepSeekKey = false },
         title = { Text("DeepSeek API Key") },
         text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Hint(if (repository.deepSeekConfigured) "API Key 已加密保存；输入新值可以替换。" else "DeepSeek 官方无需模型运行组件。")
+            Text(repository.officialCredentialState.title, style = MaterialTheme.typography.titleSmall)
+            Hint(repository.officialCredentialState.message)
             OutlinedTextField(key, { key = it.take(512) }, label = { Text("API Key") },
+                enabled = repository.officialCredentialState.nativeReady && !repository.deepSeekConfigurationBusy,
                 visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
             if (repository.deepSeekConfigured) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextButton(onClick = repository::refreshDeepSeekModels, enabled = !repository.deepSeekConfigurationBusy) {
+                TextButton(onClick = repository::refreshDeepSeekModels,
+                    enabled = repository.officialCredentialState.nativeReady && !repository.deepSeekConfigurationBusy) {
                     Text(if (repository.deepSeekConfigurationBusy) "读取模型中…" else "获取官方模型")
                 }
-                TextButton(onClick = { confirmClearKey = true }, enabled = !repository.deepSeekConfigurationBusy) {
+                TextButton(onClick = { confirmClearKey = true },
+                    enabled = repository.officialCredentialState.nativeReady && !repository.deepSeekConfigurationBusy) {
                     Text("清除 Key", color = MaterialTheme.colorScheme.error)
                 }
             }
+            if (repository.officialCredentialState.retryAllowed) TextButton(onClick = repository::retryOfficialCredentialRecovery,
+                enabled = !repository.deepSeekConfigurationBusy) { Text("重试恢复") }
             repository.deepSeekModelError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         } },
-        confirmButton = { TextButton(enabled = key.isNotBlank() && !repository.deepSeekConfigurationBusy, onClick = {
-            repository.saveDeepSeekKey(key); key = ""; showDeepSeekKey = false
+        confirmButton = { TextButton(enabled = key.isNotBlank() && repository.officialCredentialState.nativeReady &&
+            !repository.deepSeekConfigurationBusy, onClick = {
+            repository.saveDeepSeekKey(key); key = ""
         }) { Text("安全保存") } },
-        dismissButton = { TextButton(onClick = { showDeepSeekKey = false }) { Text("取消") } },
+        dismissButton = { TextButton(onClick = { key = ""; showDeepSeekKey = false }) { Text("关闭") } },
     )
     if (confirmClearKey && !online) AlertDialog(onDismissRequest = { confirmClearKey = false },
         title = { Text("清除 DeepSeek API Key？") },
@@ -639,6 +648,66 @@ private fun ModelsContent(repository: DemoRepository, notify: (String) -> Unit) 
             repository.clearDeepSeekKey(); confirmClearKey = false; showDeepSeekKey = false
         }) { Text("清除", color = MaterialTheme.colorScheme.error) } },
         dismissButton = { TextButton(onClick = { confirmClearKey = false }) { Text("取消") } })
+}
+
+@Composable
+private fun OfficialCredentialRecoveryContent(repository: DemoRepository) {
+    val state = repository.officialCredentialState
+    val reduceMotion = LocalReduceGlassMotion.current
+    var choice by remember { mutableStateOf<OfficialCredentialRecoveryChoice?>(null) }
+    AnimatedVisibility(visible = true,
+        enter = fadeIn(GlassMotion.scalar(GlassMotion.MorphMillis, reduceMotion)) +
+            expandVertically(tween(if (reduceMotion) 0 else GlassMotion.MorphMillis, easing = GlassMotion.EaseOut)),
+        exit = fadeOut(GlassMotion.scalar(GlassMotion.MorphMillis, reduceMotion)) +
+            shrinkVertically(tween(if (reduceMotion) 0 else GlassMotion.MorphMillis, easing = GlassMotion.EaseOut))) {
+        DetailCard {
+            Text(state.title, style = MaterialTheme.typography.titleMedium)
+            Hint(state.message)
+            if (state.busy || repository.deepSeekConfigurationBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (state.retryAllowed) FishButton(onClick = repository::retryOfficialCredentialRecovery,
+                enabled = !repository.deepSeekConfigurationBusy, accent = false, modifier = Modifier.fillMaxWidth()) {
+                Text(if (state.nativeChoiceAllowed) "重新检查" else "重试恢复")
+            }
+            if (state.phoneChoiceAllowed) {
+                FishButton(onClick = { choice = OfficialCredentialRecoveryChoice.PHONE }, enabled = !repository.deepSeekConfigurationBusy,
+                    modifier = Modifier.fillMaxWidth()) { Text("保留手机凭据") }
+                FishButton(onClick = { choice = OfficialCredentialRecoveryChoice.DSH }, enabled = state.dshChoiceAllowed && !repository.deepSeekConfigurationBusy,
+                    accent = false, modifier = Modifier.fillMaxWidth()) { Text("保留 DSH 凭据") }
+            }
+            if (state.nativeChoiceAllowed) {
+                FishButton(onClick = { choice = OfficialCredentialRecoveryChoice.PROVIDER }, enabled = !repository.deepSeekConfigurationBusy,
+                    modifier = Modifier.fillMaxWidth()) { Text("保留模型提供商存储") }
+                FishButton(onClick = { choice = OfficialCredentialRecoveryChoice.BALANCE }, enabled = !repository.deepSeekConfigurationBusy,
+                    accent = false, modifier = Modifier.fillMaxWidth()) { Text("保留官方请求存储") }
+                FishButton(onClick = { choice = OfficialCredentialRecoveryChoice.CLEAR }, enabled = !repository.deepSeekConfigurationBusy,
+                    accent = false, modifier = Modifier.fillMaxWidth()) { Text("清除两个存储的凭据", color = MaterialTheme.colorScheme.error) }
+            }
+        }
+    }
+    choice?.let { selected ->
+        AlertDialog(onDismissRequest = { choice = null },
+            title = { Text(selected.title) },
+            text = { Text("会停止使用官方凭据的任务、模型运行器和本机 DSH，等待真实停止后再处理。${selected.explanation}凭据值不会展示。") },
+            confirmButton = { TextButton(enabled = !repository.deepSeekConfigurationBusy, onClick = {
+                when (selected) {
+                    OfficialCredentialRecoveryChoice.PHONE -> repository.keepPhoneOfficialCredential()
+                    OfficialCredentialRecoveryChoice.DSH -> repository.keepDshOfficialCredential()
+                    OfficialCredentialRecoveryChoice.PROVIDER -> repository.resolveNativeOfficialCredential(com.dafeiyu.mobile.data.OfficialCredentialNativeChoice.PROVIDER)
+                    OfficialCredentialRecoveryChoice.BALANCE -> repository.resolveNativeOfficialCredential(com.dafeiyu.mobile.data.OfficialCredentialNativeChoice.BALANCE)
+                    OfficialCredentialRecoveryChoice.CLEAR -> repository.resolveNativeOfficialCredential(com.dafeiyu.mobile.data.OfficialCredentialNativeChoice.CLEAR)
+                }
+                choice = null
+            }) { Text("确认并恢复") } },
+            dismissButton = { TextButton(onClick = { choice = null }) { Text("取消") } })
+    }
+}
+
+private enum class OfficialCredentialRecoveryChoice(val title: String, val explanation: String) {
+    PHONE("保留手机凭据？", "手机已确认的值将成为 DSH 使用的值；原 DSH 值保留。"),
+    DSH("保留 DSH 凭据？", "将读取 DSH 当前实际选中的值，并恢复到手机的两个安全存储；DSH 未配置时会恢复为空。"),
+    PROVIDER("保留模型提供商存储？", "此来源的当前值将同步到另一个手机安全存储。"),
+    BALANCE("保留官方请求存储？", "此来源的当前值将同步到另一个手机安全存储。"),
+    CLEAR("清除两个手机存储？", "两个手机安全存储中的官方凭据将清除；原会话保留，DSH 删除会等待后续确认同步。"),
 }
 
 
@@ -3148,13 +3217,15 @@ private fun UsageContent(repository: DemoRepository) {
         value = withContext(Dispatchers.IO) { UsageStore(context).read() }
     }
     val snapshot = usageResult?.snapshot
-    val balanceStore = remember(context) { BalanceStore(context) }
-    val balanceClient = remember(context) { DeepSeekBalanceClient(balanceStore) }
     val balanceHasKey = repository.deepSeekConfigured
+    val credentialsReady = repository.officialCredentialState.nativeReady && repository.connectionMode == "local"
     var apiKeyInput by remember { mutableStateOf("") }
     var balanceResult by remember { mutableStateOf<DeepSeekBalanceClient.BalanceResult?>(null) }
     var balanceError by remember { mutableStateOf<String?>(null) }
     var balanceBusy by remember { mutableStateOf(false) }
+    LaunchedEffect(repository.officialCredentialState, repository.deepSeekConfigurationBusy, repository.connectionMode) {
+        if (!credentialsReady || repository.deepSeekConfigurationBusy) balanceResult = null
+    }
     val statusLabel = when (usageResult?.status) {
         UsageStore.Status.AVAILABLE -> "已读取本地 DSH 用量"
         UsageStore.Status.NO_DATA -> "暂无本地用量记录"
@@ -3165,7 +3236,8 @@ private fun UsageContent(repository: DemoRepository) {
     DetailCard {
         TinyLabel("账户余额", primary = balanceResult != null)
         Text("DeepSeek 余额", style = MaterialTheme.typography.titleMedium)
-        Hint("余额查询只在你主动点击后进行；API Key 使用 Android Keystore 加密保存，不写入普通设置或备份。")
+        Hint("余额查询只在你主动点击后进行；API Key 使用 Android Keystore 加密保存。显式导出的 .dym 备份会包含凭据，请妥善保管。")
+        if (!credentialsReady) Hint(repository.officialCredentialState.message)
         if (!balanceHasKey) {
             OutlinedTextField(
                 value = apiKeyInput,
@@ -3174,6 +3246,7 @@ private fun UsageContent(repository: DemoRepository) {
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
+                enabled = credentialsReady && !repository.deepSeekConfigurationBusy,
                 modifier = Modifier.fillMaxWidth(),
             )
             FishButton(
@@ -3181,7 +3254,7 @@ private fun UsageContent(repository: DemoRepository) {
                     repository.saveDeepSeekKey(apiKeyInput)
                     apiKeyInput = ""
                 },
-                enabled = apiKeyInput.isNotBlank() && !balanceBusy && !repository.deepSeekConfigurationBusy && !repository.isResponding,
+                enabled = credentialsReady && apiKeyInput.isNotBlank() && !balanceBusy && !repository.deepSeekConfigurationBusy,
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("安全保存 Key") }
         } else {
@@ -3191,11 +3264,15 @@ private fun UsageContent(repository: DemoRepository) {
                         scope.launch {
                             balanceBusy = true
                             balanceError = null
-                            balanceClient.fetchBalance().onSuccess { balanceResult = it }.onFailure { balanceError = it.message ?: "余额查询失败" }
-                            balanceBusy = false
+                            try {
+                                repository.fetchOfficialBalance().onSuccess {
+                                    if (repository.officialCredentialState.nativeReady && !repository.deepSeekConfigurationBusy)
+                                        balanceResult = it
+                                }.onFailure { balanceError = "余额查询未完成，请检查凭据状态或网络后重试" }
+                            } finally { balanceBusy = false }
                         }
                     },
-                    enabled = !balanceBusy && !repository.deepSeekConfigurationBusy,
+                    enabled = credentialsReady && !balanceBusy && !repository.deepSeekConfigurationBusy,
                     modifier = Modifier.weight(1f),
                 ) { Text(if (balanceBusy) "查询中…" else "查询余额") }
                 FishButton(
@@ -3205,7 +3282,7 @@ private fun UsageContent(repository: DemoRepository) {
                         apiKeyInput = ""
                         balanceError = null
                     },
-                    enabled = !balanceBusy && !repository.deepSeekConfigurationBusy,
+                    enabled = credentialsReady && !balanceBusy && !repository.deepSeekConfigurationBusy,
                     accent = false,
                     modifier = Modifier.weight(1f),
                 ) { Text("清除 Key") }

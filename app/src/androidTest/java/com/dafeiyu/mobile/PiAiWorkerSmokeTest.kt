@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.ContextWrapper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.dafeiyu.mobile.data.AndroidOfficialCredentialJournal
+import com.dafeiyu.mobile.data.JournalModelRuntimeRecoveryAccess
 import com.dafeiyu.mobile.data.LinuxArchiveExtractor
 import com.dafeiyu.mobile.data.LinuxComponentStatus
 import com.dafeiyu.mobile.data.LinuxRuntimeManager
@@ -125,6 +127,7 @@ class PiAiWorkerSmokeTest {
                 launchProcess = { directory -> PiAiNodeWorker.launchAndroid(isolated, runtime, directory) },
                 providerConfiguration = { JSONObject(configuration.toString()) },
                 saveCredential = { _, _, _ -> error("This offline test has no login or credential refresh") },
+                recovery = JournalModelRuntimeRecoveryAccess(AndroidOfficialCredentialJournal(isolated)),
             ).also { fixtureWorker = it }
             worker.start(component)
             checkCase("actual Android stream preserves text and tool data without executing tools") {

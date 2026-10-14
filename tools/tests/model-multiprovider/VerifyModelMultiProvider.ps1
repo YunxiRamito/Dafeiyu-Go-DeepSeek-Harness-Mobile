@@ -36,9 +36,10 @@ $classpath = (@($stdlib, $annotations, $coroutines, $json, $compiled, $androidJa
     (Find-CachedJar 'androidx.collection/collection-jvm'),
     (Find-CachedJar 'androidx.lifecycle/lifecycle-common-jvm')) + $transforms.FullName + $rJars) -join ';'
 $sourceRoot = Join-Path $projectRoot 'app/src/main/java/com/dafeiyu/mobile'
-$sources = @('data/ModelRuntimeController.kt', 'data/OfficialMultiProviderSession.kt', 'ui/ModelProvidersContent.kt') |
+$sources = @('data/ModelRuntimeController.kt', 'data/OfficialMultiProviderSession.kt', 'data/OfficialCredentialRecoveryUiState.kt', 'ui/ModelProvidersContent.kt') |
     ForEach-Object { Join-Path $sourceRoot $_ }
 $sources += Join-Path $PSScriptRoot 'ModelMultiProviderChecks.kt'
+$sources += Join-Path $projectRoot 'tools/tests/model-worker/RecoveryFixture.kt'
 $composePlugin = Find-CachedJar 'org.jetbrains.kotlin/kotlin-compose-compiler-plugin-embeddable/2.1.20'
 $jar = Join-Path $testRoot 'model-multiprovider.jar'
 $java = Join-Path $javaRoot 'bin/java.exe'

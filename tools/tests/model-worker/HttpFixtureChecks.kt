@@ -134,6 +134,7 @@ fun main(args: Array<String>) = runBlocking {
             },
             providerConfiguration = { JSONObject(configuration.toString()) },
             saveCredential = { _, _, _ -> error("This loopback fixture never performs login") },
+            recovery = fixtureModelRecoveryAccess(),
         )
         try {
             worker.start(File(args[2]))

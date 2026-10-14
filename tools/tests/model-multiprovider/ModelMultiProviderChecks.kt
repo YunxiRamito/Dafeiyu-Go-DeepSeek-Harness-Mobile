@@ -4,8 +4,10 @@ import com.dafeiyu.mobile.ui.providerCredential
 import com.dafeiyu.mobile.ui.providerEditedConfiguration
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -50,6 +53,8 @@ private fun catalog(): JSONObject = JSONObject().put("version", "0.87.1").put("a
             .put("default_level", "low")))))
 
 private class RuntimeFixture : ModelRuntimeBackend {
+    private val recovery = fixtureModelRecoveryAccess()
+    override suspend fun <T> withNativeReady(operation: suspend () -> T): T = recovery.withNativeReady(operation)
     override val components = MutableStateFlow(listOf(LinuxComponentState("ubuntu", "Ubuntu", LinuxComponentStatus.READY),
         LinuxComponentState("node", "Node", LinuxComponentStatus.READY)))
     override val processes = MutableStateFlow<List<LinuxManagedProcessInfo>>(emptyList())
@@ -63,6 +68,7 @@ private class RuntimeFixture : ModelRuntimeBackend {
     var onStart: suspend () -> Unit = {}
     var onInstall: suspend () -> Unit = {}
     var loginReply: String? = null
+    var onLoginCleanup: suspend () -> Unit = {}
     override fun installed() = directory
     override fun providers() = snapshot
     override fun hasCredential(providerId: String) = providerId in credentials
@@ -107,10 +113,12 @@ private class RuntimeFixture : ModelRuntimeBackend {
     }
     override suspend fun login(provider: String, authType: String, onPrompt: suspend (JSONObject) -> String,
         onEvent: suspend (JSONObject) -> Unit): JSONObject {
+        try {
         onEvent(JSONObject().put("type", "auth_url").put("url", "https://example.test/auth?fixture=1"))
         loginReply = onPrompt(JSONObject().put("type", "secret").put("message", "Fixture secret"))
         credentials.add(provider)
         return JSONObject().put("authenticated", true)
+        } finally { onLoginCleanup() }
     }
     override suspend fun logout(provider: String) { credentials.remove(provider) }
     override suspend fun stop() { processes.value = emptyList() }
@@ -321,6 +329,7 @@ fun main() {
                 check(runCatching { runtime.logout("fixture") }.isFailure)
                 check(runCatching { runtime.install() }.isFailure)
                 check(runCatching { runtime.shutdown() }.isFailure)
+                check(runCatching { runtime.shutdown(stopActive = true) }.isFailure)
                 runtime.generate(PiAiChatRequest("fixture", "fixture-model", JSONObject().put("messages", JSONArray()), reasoning = "high")) {}
                 check(runtime.state.value.activeSessions == 1 && backend.generated == 1)
                 val invalid = runCatching { runtime.generate(PiAiChatRequest("fixture", "fixture-model",
@@ -353,6 +362,125 @@ fun main() {
             runtime.remove("fixture")
             check(runtime.state.value.providers.providers.none { it.id == "fixture" })
         } } finally { scope.cancel() }
+    }
+    checkCase("forced shutdown waits for actual session cleanup without holding its management gate") {
+        val backend = RuntimeFixture()
+        val (runtime, scope) = fixtureController(backend)
+        val entered = CompletableDeferred<Unit>()
+        val cleaning = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        try { runBlocking {
+            val task = launch {
+                runtime.withSession("fixture") {
+                    try { entered.complete(Unit); awaitCancellation() }
+                    finally { withContext(NonCancellable) { cleaning.complete(Unit); release.await() } }
+                }
+            }
+            entered.await()
+            val stopped = async { runtime.shutdown(stopActive = true) }
+            withTimeout(2000) { cleaning.await() }
+            check(!stopped.isCompleted && runtime.state.value.status == ModelRuntimeStatus.STOPPING)
+            check(runCatching { runtime.reorder(listOf("fixture", "deepseek")) }.isFailure)
+            check(runCatching { runtime.shutdown(stopActive = true) }.isFailure)
+            release.complete(Unit)
+            withTimeout(2000) { stopped.await(); task.join() }
+            check(runtime.state.value.activeSessions == 0 && !runtime.state.value.busy)
+        } } finally { release.complete(Unit); scope.cancel() }
+    }
+    checkCase("forced shutdown waits for actual authentication cleanup before allowing credential edits") {
+        val cleaning = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val backend = RuntimeFixture().apply {
+            onLoginCleanup = { withContext(NonCancellable) { cleaning.complete(Unit); release.await() } }
+        }
+        val (runtime, scope) = fixtureController(backend)
+        try { runBlocking {
+            val login = launch { runtime.login("fixture", "oauth") }
+            withTimeout(2000) { runtime.state.first { it.authPrompt != null } }
+            val stopped = async { runtime.shutdown(stopActive = true) }
+            withTimeout(2000) { cleaning.await() }
+            check(!stopped.isCompleted && runtime.state.value.status == ModelRuntimeStatus.STOPPING)
+            check(runCatching { runtime.remove("fixture") }.isFailure)
+            release.complete(Unit)
+            withTimeout(2000) { stopped.await(); login.join() }
+            check(runtime.state.value.authPrompt == null && !runtime.state.value.busy)
+            runtime.remove("fixture")
+        } } finally { release.complete(Unit); scope.cancel() }
+    }
+    checkCase("cancelled shutdown still rejects edits and sessions until authentication cleanup completes") {
+        val cleaning = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val backend = RuntimeFixture().apply {
+            onLoginCleanup = { withContext(NonCancellable) { cleaning.complete(Unit); release.await() } }
+        }
+        val (runtime, scope) = fixtureController(backend)
+        try { runBlocking {
+            val login = launch { runtime.login("fixture", "oauth") }
+            withTimeout(2000) { runtime.state.first { it.authPrompt != null } }
+            val stopped = launch { runtime.shutdown(stopActive = true) }
+            withTimeout(2000) { cleaning.await() }
+            stopped.cancel(); stopped.join()
+            check(!login.isCompleted)
+            check(runCatching { runtime.remove("fixture") }.isFailure)
+            check(runCatching { runtime.refresh() }.isFailure)
+            check(runCatching { runtime.ensureStarted() }.isFailure)
+            var admitted = false
+            check(runCatching { runtime.withSession("fixture") { admitted = true } }.isFailure && !admitted)
+            release.complete(Unit)
+            withTimeout(2000) { login.join() }
+            runtime.remove("fixture")
+        } } finally { release.complete(Unit); scope.cancel() }
+    }
+    checkCase("cancelled installation retains its admission barrier through actual cleanup") {
+        val installing = CompletableDeferred<Unit>()
+        val cleaning = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val backend = RuntimeFixture().apply {
+            directory = null
+            onInstall = {
+                try { installing.complete(Unit); awaitCancellation() }
+                finally { withContext(NonCancellable) { cleaning.complete(Unit); release.await() } }
+            }
+        }
+        val (runtime, scope) = fixtureController(backend)
+        try { runBlocking {
+            val install = launch { runtime.install() }
+            installing.await(); runtime.cancelInstall()
+            withTimeout(2000) { cleaning.await() }
+            check(!install.isCompleted)
+            check(runCatching { runtime.remove("fixture") }.isFailure)
+            check(runCatching { runtime.shutdown(stopActive = true) }.isFailure)
+            check(runCatching { runtime.refresh() }.isFailure)
+            release.complete(Unit)
+            withTimeout(2000) { install.join() }
+            runtime.remove("fixture")
+        } } finally { release.complete(Unit); scope.cancel() }
+    }
+    checkCase("user-stopped foreground callers remain registered until real cleanup has finished") {
+        runBlocking {
+            val callers = java.util.concurrent.ConcurrentHashMap.newKeySet<Job>()
+            val entered = CompletableDeferred<Unit>()
+            val cleaning = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val caller = launchOfficialCredentialCaller(callers) {
+                check(callers.contains(requireNotNull(kotlinx.coroutines.currentCoroutineContext()[Job])))
+                try { entered.complete(Unit); awaitCancellation() }
+                finally { withContext(NonCancellable) { cleaning.complete(Unit); release.await() } }
+            }
+            try {
+                entered.await(); caller.cancel()
+                withTimeout(2000) { cleaning.await() }
+                check(!caller.isCompleted && caller in callers)
+                val stopped = async {
+                    awaitOfficialCredentialCallers(null, callers.toList(), {}, {}, timeoutMillis = 2000)
+                }
+                kotlinx.coroutines.yield()
+                check(!stopped.isCompleted)
+                release.complete(Unit)
+                stopped.await(); caller.join()
+                check(callers.isEmpty())
+            } finally { release.complete(Unit); caller.cancel(); caller.join() }
+        }
     }
     checkCase("cancelled start returns a retryable status") {
         val started = CompletableDeferred<Unit>()

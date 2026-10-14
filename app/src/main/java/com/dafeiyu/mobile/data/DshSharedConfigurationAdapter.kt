@@ -40,21 +40,22 @@ class DshSharedConfigurationAdapter(
     private val home = File(context.applicationContext.filesDir, "dsh-home")
     private val lock = locks.computeIfAbsent(context.applicationContext.filesDir.canonicalPath) { Mutex() }
     private val rpc = DshLocalConfigurationRpc()
+    private val officialCredentials = AndroidOfficialCredentialBinding(context, store, BalanceStore(context), bridge)
 
     /** Read the live DSH directory and private credentials, then commit through
      * the current device's Keystore. A concurrent native edit or DSH revision
      * change refuses the import, preserving both stores. */
-    suspend fun readFromDsh(accessUrl: String): ModelProviderSnapshot = withContext(Dispatchers.IO) {
+    suspend fun readFromDsh(accessUrl: String, acceptDeferredConflict: Boolean = false): ModelProviderSnapshot = withContext(Dispatchers.IO) {
         lock.withLock {
             DshExtensionTransaction.requireReady(home)
-            val current = store.exportPortable()
+            val current = officialCredentials.withNativeReady { store.exportPortable() }
             val settings = rpc.call(accessUrl, "settings/describe", JSONObject())
             val namespace = DshSharedConfigurationMapping.namespace(settings, "llm-pi-ai")
             val profiles = namespace.getJSONObject("value").optJSONObject("providers") ?: JSONObject()
             val credentials = bridge.readCredentialDocument()
             val converted = bridge.convertProviderConfiguration(JSONObject().put("operation", "from-dsh").put("providers", profiles))
             val next = DshSharedConfigurationMapping.importState(current, converted, credentials,
-                DshSharedConfigurationMapping.deepSeekCredentialReference(settings))
+                DshSharedConfigurationMapping.deepSeekCredentialReference(settings), acceptOfficialConflict = acceptDeferredConflict)
             next.getJSONObject("dshSync").put("settingsRevision", namespace.getLong("revision"))
                 .put("credentialRevision", credentials.getString("revision"))
             val checked = rpc.call(accessUrl, "settings/describe", JSONObject())
@@ -67,7 +68,18 @@ class DshSharedConfigurationAdapter(
             check(bridge.readCredentialDocument().getString("revision") == credentials.getString("revision")) {
                 "DSH 凭据已变化，请刷新后重试"
             }
-            store.importPortableIfRevision(next, current.getLong("revision"))
+            val officialRows = settings.getJSONArray("namespaces")
+            val official = (0 until officialRows.length()).map { officialRows.getJSONObject(it) }
+                .filter { it.optString("ns") in setOf("llm-deepseek", "llm-deepseek-api-key") }.single()
+            val proof = JSONObject().put("namespace", official.getString("ns")).put("settingsRevision", official.getLong("revision"))
+                .put("reference", DshSharedConfigurationMapping.deepSeekCredentialReference(settings))
+                .put("providerSettingsRevision", namespace.getLong("revision")).put("credentialRevision", credentials.getString("revision"))
+            when (val outcome = officialCredentials.coordinator(accessUrl).beginReverseImport(next, proof, current.getLong("revision").toString(),
+                acceptDeferredConflict = acceptDeferredConflict)) {
+                is OfficialCredentialOutcome.NativeCommitted -> store.read()
+                is OfficialCredentialOutcome.Pending -> error("官方凭据同步待恢复：${outcome.code}")
+                else -> error("官方凭据同步未确认")
+            }
         }
     }
 
@@ -76,8 +88,10 @@ class DshSharedConfigurationAdapter(
      * survive. Each setting mutation uses the real revision returned by DSH. */
     suspend fun writeToDsh(accessUrl: String): ModelProviderSnapshot = withContext(Dispatchers.IO) {
         lock.withLock {
-            DshExtensionTransaction.requireReady(home)
-            val current = store.exportPortable()
+            val current = officialCredentials.withDshReady {
+                DshExtensionTransaction.requireReady(home)
+                store.exportPortable()
+            }
             val converted = bridge.convertProviderConfiguration(JSONObject().put("operation", "to-dsh").put("native", current))
             val settings = rpc.call(accessUrl, "settings/describe", JSONObject())
             check(settings.optBoolean("writable")) { "DSH 当前配置只读，无法同步提供商" }
@@ -86,19 +100,23 @@ class DshSharedConfigurationAdapter(
             val plan = DshSharedConfigurationMapping.credentialPublication(current, converted, settings, credentials)
             var snapshot: ModelProviderSnapshot? = null
             DshCredentialPublisher.publish(plan,
-                requireNativeUnchanged = { check(store.read().revision == current.getLong("revision")) { "手机提供商已变化，请重试同步" } },
+                requireNativeUnchanged = { officialCredentials.withDshReady {
+                    check(store.read().revision == current.getLong("revision")) { "手机提供商已变化，请重试同步" }
+                } },
                 stageReferences = bridge::stageCredentialReferences,
                 readCredentials = bridge::readCredentialDocument,
                 mutateSettings = { operations -> rpc.call(accessUrl, "settings/mutate", JSONObject().put("ns", "llm-pi-ai")
                     .put("expectedRevision", namespace.getLong("revision")).put("ops", operations)) },
                 readSettings = { rpc.call(accessUrl, "settings/describe", JSONObject()) },
                 commitReceipt = { persistedRevision, credentialRevision ->
+                    officialCredentials.withDshReady {
                     current.put("dshSync", DshSharedConfigurationMapping.syncReceipt(plan.profiles.keys().asSequence().toList())
                         .put("officialManaged", current.getJSONObject("credentials").has("deepseek") || current.optJSONObject("dshSync")?.optBoolean("officialManaged") == true)
                         .put("settingsRevision", persistedRevision).put("credentialRevision", credentialRevision)
                         .put("retiredReferences", JSONArray(plan.retiredReferences.toList()))
                         .put("retiredRecords", JSONArray(plan.retiredRecords.toList())))
                     snapshot = store.importPortableIfRevision(current, current.getLong("revision"))
+                    }
                 },
                 cleanCredentials = { updates -> bridge.writeCredentialDocument(updates) })
             requireNotNull(snapshot)
@@ -126,11 +144,11 @@ internal data class DshCredentialPublication(
  * RPC response may hide a successful commit, so failure/cancellation never
  * deletes candidates or restores an old ref over a concurrent user's edit. */
 internal object DshCredentialPublisher {
-    suspend fun publish(plan: DshCredentialPublication, requireNativeUnchanged: () -> Unit,
+    suspend fun publish(plan: DshCredentialPublication, requireNativeUnchanged: suspend () -> Unit,
         stageReferences: suspend (JSONArray, String) -> JSONObject,
         readCredentials: suspend () -> JSONObject, mutateSettings: suspend (JSONArray) -> JSONObject,
-        readSettings: suspend () -> JSONObject, commitReceipt: (Long, String) -> Unit,
-        cleanCredentials: suspend (JSONObject) -> JSONObject) {
+        readSettings: suspend () -> JSONObject, commitReceipt: suspend (Long, String) -> Unit,
+        @Suppress("UNUSED_PARAMETER") cleanCredentials: suspend (JSONObject) -> JSONObject) {
         requireNativeUnchanged()
         val stagedRevision = if (plan.candidates.length() == 0) plan.credentialRevision
             else stageReferences(plan.candidates, plan.credentialRevision).getString("revision")
@@ -144,24 +162,11 @@ internal object DshCredentialPublisher {
             DshSharedConfigurationMapping.verifyMutation(result, plan.operations)
             result.getLong("revision")
         }
-        // Save ownership before optional cleanup. If cleanup fails, a retry
-        // still recognizes a newly published route and does not claim it foreign.
+        // Save the actual publication receipt. Retired refs remain private:
+        // an idle observation and a settings reread cannot lease in-flight
+        // connection snapshots or exclude another settings writer.
         requireNativeUnchanged()
         commitReceipt(persistedRevision, stagedRevision)
-        if (plan.retiredReferences.isEmpty() && plan.retiredRecords.isEmpty()) return
-        try {
-            val latest = readSettings()
-            val namespace = DshSharedConfigurationMapping.namespace(latest, "llm-pi-ai")
-            check(namespace.getLong("revision") == persistedRevision)
-            DshSharedConfigurationMapping.verifyMutation(namespace, plan.operations)
-            val credentials = readCredentials()
-            val updates = DshSharedConfigurationMapping.retiredCredentialUpdates(plan, latest, credentials)
-            if (updates.getJSONArray("refs").length() > 0 || updates.getJSONArray("records").length() > 0)
-                cleanCredentials(updates)
-        } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) {
-            throw IOException("DSH 提供商设置已保存；旧凭据清理未完成，保留待清理记录，请刷新后重试")
-        }
     }
 }
 
@@ -184,7 +189,8 @@ internal object DshSharedConfigurationMapping {
         return reference
     }
 
-    fun importState(current: JSONObject, converted: JSONObject, credentials: JSONObject, officialRef: String): JSONObject {
+    fun importState(current: JSONObject, converted: JSONObject, credentials: JSONObject, officialRef: String,
+                    acceptOfficialConflict: Boolean = false): JSONObject {
         val proposed = converted.getJSONArray("providers")
         val old = current.getJSONArray("providers")
         val oldProviders = List(old.length()) { ModelProviderConfig.fromJson(old.getJSONObject(it)) }
@@ -196,11 +202,11 @@ internal object DshSharedConfigurationMapping {
         val records = credentials.getJSONObject("records")
         if (refs.has(officialRef)) {
             val direct = ModelProviderCredential.validate(JSONObject().put("type", "api_key").put("key", refs.getString(officialRef)))
-            if (current.optJSONObject("dshSync")?.optBoolean("officialManaged") != true)
+            if (!acceptOfficialConflict && current.optJSONObject("dshSync")?.optBoolean("officialManaged") != true)
                 oldSecrets.optJSONObject("deepseek")?.let { require(sameJson(it, direct)) { "手机和 DSH 的官方 API Key 尚未同步，请先解决凭据冲突" } }
             secrets.put("deepseek", direct)
         }
-        else if (current.optJSONObject("dshSync")?.optBoolean("officialManaged") != true)
+        else if (!acceptOfficialConflict && current.optJSONObject("dshSync")?.optBoolean("officialManaged") != true)
             oldSecrets.optJSONObject("deepseek")?.let { secrets.put("deepseek", JSONObject(it.toString())) }
         for (index in 0 until proposed.length()) {
             val raw = proposed.getJSONObject(index)
@@ -495,6 +501,8 @@ internal object DshSharedConfigurationMapping {
     }
 }
 
+internal class DshSettingsRevisionConflictException : IOException("DSH 配置已变化，请刷新后重试")
+
 /** Exact pinned browser-auth/RPC envelope. Queries, cookies and response errors
  * never enter diagnostics; arbitrary endpoints and non-loopback URLs are refused. */
 internal class DshLocalConfigurationRpc {
@@ -538,7 +546,7 @@ internal class DshLocalConfigurationRpc {
             val result = envelope.getJSONObject("result")
             if (!result.optBoolean("ok")) {
                 val code = result.optJSONObject("error")?.optString("code")
-                if (code == "settings/conflict") throw IOException("DSH 配置已变化，请刷新后重试")
+                if (code == "settings/conflict") throw DshSettingsRevisionConflictException()
                 throw IOException("DSH 未接受配置修改，请检查服务和当前配置")
             }
             result.optJSONObject("value") ?: JSONObject()

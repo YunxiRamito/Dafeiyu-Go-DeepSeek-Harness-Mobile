@@ -96,6 +96,7 @@ private fun fixtureWorker(processes: Channel<FixtureProcess>, saved: MutableList
     launchProcess = { processes.receive().managed },
     providerConfiguration = { JSONObject().put("revision", 0).put("providers", JSONArray()).put("credentials", JSONObject()) },
     saveCredential = { id, _, revision -> saved += id; revision + 1 },
+    recovery = fixtureModelRecoveryAccess(),
 )
 
 private fun nativeMessage(content: JSONArray = JSONArray().put(JSONObject().put("type", "text").put("text", "answer")),

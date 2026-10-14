@@ -10,6 +10,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
+import org.json.JSONObject
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -81,9 +82,33 @@ class BalanceStore(context: Context) {
         readApiKeyLocked()
     }
 
-    private fun readApiKeyLocked(): String? {
+    /** A tombstone retains the AES alias and durable ownership proof until recovery completes. */
+    internal fun officialCredentialSnapshot(): OfficialNativeCredentialSnapshot = synchronized(lock) { readOfficialSnapshotLocked() }
+
+    internal fun compareAndSetOfficialCredential(expectedRevision: String, apiKey: String?, transactionId: String) = synchronized(lock) {
+        require(transactionId.matches(Regex("[a-f0-9]{32}")))
+        check(readOfficialSnapshotLocked().revision == expectedRevision) { "NATIVE_CAS_CONFLICT" }
+        val key = apiKey?.let(::normalizeApiKey)
+        val clearBytes = JSONObject().put("schema", 2).put("key", key ?: JSONObject.NULL)
+            .put("transactionId", transactionId).toString().toByteArray(StandardCharsets.UTF_8)
+        try {
+            val encrypted = encrypt(clearBytes)
+            val payload = ByteArray(2 + encrypted.iv.size + encrypted.ciphertext.size)
+            payload[0] = TRANSACTION_FORMAT_VERSION
+            payload[1] = encrypted.iv.size.toByte()
+            encrypted.iv.copyInto(payload, destinationOffset = 2)
+            encrypted.ciphertext.copyInto(payload, destinationOffset = 2 + encrypted.iv.size)
+            try { writePayload(payload) }
+            finally { payload.fill(0); encrypted.iv.fill(0); encrypted.ciphertext.fill(0) }
+        } finally { clearBytes.fill(0) }
+    }
+
+    private fun readApiKeyLocked(): String? = readOfficialSnapshotLocked().key
+
+    private fun readOfficialSnapshotLocked(): OfficialNativeCredentialSnapshot {
         val payload = try {
-            if (!credentialFile.isFile && !File(credentialFile.path + ".bak").isFile) return null
+            if (!credentialFile.isFile && !File(credentialFile.path + ".bak").isFile)
+                return OfficialNativeCredentialSnapshot("absent", null, null)
             credential.openRead().use { input ->
                 val buffer = ByteArray(1024)
                 val bounded = ByteArrayOutputStream()
@@ -113,7 +138,7 @@ class BalanceStore(context: Context) {
             require(payload.size in MIN_PAYLOAD_BYTES..MAX_PAYLOAD_BYTES) {
                 "DeepSeek API Key 存储数据大小无效"
             }
-            require(payload[0] == FORMAT_VERSION) { "DeepSeek API Key 存储版本不受支持" }
+            require(payload[0] == FORMAT_VERSION || payload[0] == TRANSACTION_FORMAT_VERSION) { "DeepSeek API Key 存储版本不受支持" }
             val ivLength = payload[1].toInt() and 0xff
             require(ivLength == GCM_IV_BYTES) { "DeepSeek API Key 存储随机数无效" }
             require(payload.size > 2 + ivLength + GCM_TAG_BYTES) {
@@ -124,7 +149,14 @@ class BalanceStore(context: Context) {
             try {
                 val clearBytes = decrypt(ciphertext, iv)
                 try {
-                    return normalizeApiKey(String(clearBytes, StandardCharsets.UTF_8))
+                    val revision = OfficialDeepSeekCredentialTransaction.encryptedRevision(payload)
+                    val clear = String(clearBytes, StandardCharsets.UTF_8)
+                    if (payload[0] == FORMAT_VERSION) return OfficialNativeCredentialSnapshot(revision, normalizeApiKey(clear), null)
+                    val stored = JSONObject(clear)
+                    require(stored.getInt("schema") == 2 && stored.keys().asSequence().toSet() == setOf("schema", "key", "transactionId"))
+                    val transactionId = stored.getString("transactionId").also { require(it.matches(Regex("[a-f0-9]{32}"))) }
+                    val key = if (stored.isNull("key")) null else normalizeApiKey(stored.getString("key"))
+                    return OfficialNativeCredentialSnapshot(revision, key, transactionId)
                 } finally {
                     clearBytes.fill(0)
                 }
@@ -233,6 +265,7 @@ class BalanceStore(context: Context) {
         private const val KEY_ALIAS = "dafeiyu_deepseek_api_key_aes_v1"
         private const val CREDENTIAL_FILE_NAME = ".deepseek_api_key.v1.bin"
         private const val FORMAT_VERSION: Byte = 1
+        private const val TRANSACTION_FORMAT_VERSION: Byte = 2
         private const val AES_KEY_BITS = 256
         private const val GCM_IV_BYTES = 12
         private const val GCM_TAG_BITS = 128

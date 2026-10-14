@@ -19,6 +19,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -26,11 +28,46 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 
+/** Every production instance binds to the same canonical journal root. */
+internal interface ModelRuntimeRecoveryAccess {
+    suspend fun <T> withNativeReady(operation: suspend () -> T): T
+    /** Callback admission fails fast so recovery cannot hold up process stop/cancel. */
+    suspend fun <T> tryWithNativeReady(operation: suspend () -> T): T
+}
+
+internal class JournalModelRuntimeRecoveryAccess(private val journal: OfficialCredentialJournalPort) : ModelRuntimeRecoveryAccess {
+    private val recovery = OfficialCredentialRecoveryGate(journal)
+    override suspend fun <T> withNativeReady(operation: suspend () -> T): T {
+        var admitted = false
+        try {
+            return recovery.withNativeReady { admitted = true; operation() }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            if (admitted) throw failure
+            throw ModelRuntimeException("CREDENTIAL_RECOVERY_REQUIRED", "凭据恢复尚未完成或记录损坏，请先在设置中恢复后重试")
+        }
+    }
+    override suspend fun <T> tryWithNativeReady(operation: suspend () -> T): T {
+        check(journal.transactionMutex.tryLock()) { "凭据恢复正在进行，请完成恢复后重新认证" }
+        var admitted = false
+        try {
+            check(!recovery.hasPending()) { "PENDING_EXISTS" }
+            admitted = true
+            return operation()
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            if (admitted) throw failure
+            throw ModelRuntimeException("CREDENTIAL_RECOVERY_REQUIRED", "凭据恢复尚未完成或记录损坏，请先在设置中恢复后重试")
+        } finally { journal.transactionMutex.unlock() }
+    }
+}
+
 /** A single controlled Node process multiplexes up to four requests. Tool calls are returned as data. */
 class PiAiNodeWorker internal constructor(
     private val launchProcess: suspend (File) -> LinuxManagedProcess,
     private val providerConfiguration: suspend () -> JSONObject,
     private val saveCredential: suspend (String, JSONObject?, Long) -> Long,
+    private val recovery: ModelRuntimeRecoveryAccess,
 ) {
     constructor(
         context: Context,
@@ -42,17 +79,22 @@ class PiAiNodeWorker internal constructor(
         saveCredential = { provider, credential, revision ->
             withContext(Dispatchers.IO) { providers.persistWorkerCredential(provider, credential, revision) }
         },
+        recovery = JournalModelRuntimeRecoveryAccess(AndroidOfficialCredentialJournal(context.applicationContext)),
     )
 
     /** All mutable protocol state belongs to one exact process lifetime, including request IDs. */
+    private class PendingRequest(val frames: Channel<JSONObject>, val type: String, val providerId: String?, val owner: Job)
+
     private class Generation(val process: LinuxManagedProcess) {
         val ready = CompletableDeferred<Unit>()
-        val pending = ConcurrentHashMap<String, Channel<JSONObject>>()
+        val pending = ConcurrentHashMap<String, PendingRequest>()
+        val receipts = mutableSetOf<String>()
         val writes = Mutex()
         val credentials = Mutex()
         val configuration = Mutex()
         @Volatile var revision = -1L
         @Volatile var configuredRevision = -1L
+        @Volatile var configuring = false
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -86,18 +128,44 @@ class PiAiNodeWorker internal constructor(
     private suspend fun configuredGeneration(): Generation {
         val generation = current.get() ?: throw IOException("模型运行组件未启动")
         generation.configuration.withLock {
-            ensureCurrent(generation)
-            val configuration = providerConfiguration()
-            ensureCurrent(generation)
-            val revision = configuration.getLong("revision")
-            if (generation.configuredRevision != revision) {
-                generation.revision = revision
-                call(generation, "configure", configuration) {}
-                ensureCurrent(generation)
-                generation.configuredRevision = revision
+            repeat(4) {
+                // configuration -> credentials -> journal -> vault. The
+                // journal/credentials locks never enclose a pipe/RPC wait.
+                val configuration = generation.credentials.withLock {
+                    recovery.withNativeReady {
+                        ensureCurrent(generation)
+                        JSONObject(providerConfiguration().toString()).also { snapshot ->
+                            val revision = snapshot.getLong("revision")
+                            require(revision >= 0)
+                            // DeepSeek's dedicated native Key never enters the
+                            // Node authentication store or callback protocol.
+                            snapshot.getJSONObject("credentials").remove("deepseek")
+                            if (generation.configuredRevision != revision || generation.revision != revision) {
+                                check(generation.pending.isEmpty()) { "模型任务正在运行，无法切换配置" }
+                                generation.revision = revision
+                                generation.configuredRevision = -1L
+                                generation.configuring = true
+                            }
+                        }
+                    }
+                }
+                val revision = configuration.getLong("revision")
+                if (!generation.configuring) return generation
+                try { call(generation, "configure", configuration) {} }
+                finally { generation.credentials.withLock { generation.configuring = false } }
+                val accepted = generation.credentials.withLock {
+                    recovery.withNativeReady {
+                        ensureCurrent(generation)
+                        val actualRevision = providerConfiguration().getLong("revision")
+                        val matches = actualRevision == revision && generation.revision == revision
+                        generation.configuredRevision = if (matches) revision else -1L
+                        matches
+                    }
+                }
+                if (accepted) return generation
             }
+            throw IOException("提供商配置连续变化，请稍后重新读取目录")
         }
-        return generation
     }
 
     suspend fun catalog(allBuiltins: Boolean = false): JSONObject {
@@ -113,6 +181,7 @@ class PiAiNodeWorker internal constructor(
         requestId: String = UUID.randomUUID().toString(),
         onEvent: suspend (JSONObject) -> Unit,
     ): JSONObject {
+        require(providerId != "deepseek") { "DeepSeek 官方使用原生直接接入" }
         val generation = configuredGeneration()
         return call(generation, "stream", JSONObject().put("provider", providerId).put("model", modelId).put("context", context)
             .also { if (reasoning != null) it.put("reasoning", reasoning) }, requestId, onEvent)
@@ -124,6 +193,7 @@ class PiAiNodeWorker internal constructor(
         onPrompt: suspend (JSONObject) -> String,
         onEvent: suspend (JSONObject) -> Unit = {},
     ): JSONObject = coroutineScope {
+        require(providerId != "deepseek") { "DeepSeek 官方的 API Key 使用专用入口管理" }
         val generation = configuredGeneration()
         val prompts = ConcurrentHashMap<String, Job>()
         try {
@@ -151,6 +221,7 @@ class PiAiNodeWorker internal constructor(
     }
 
     suspend fun logout(providerId: String): JSONObject {
+        require(providerId != "deepseek") { "DeepSeek 官方的 API Key 使用专用入口管理" }
         val generation = configuredGeneration()
         return call(generation, "logout", JSONObject().put("provider", providerId)) {}
     }
@@ -178,10 +249,21 @@ class PiAiNodeWorker internal constructor(
 
     private suspend fun call(generation: Generation, type: String, arguments: JSONObject, id: String, onEvent: suspend (JSONObject) -> Unit): JSONObject {
         require(id.isNotBlank() && id.length <= 120)
-        ensureCurrent(generation)
-        check(generation.pending.size < 4)
         val frames = Channel<JSONObject>(64)
-        check(generation.pending.putIfAbsent(id, frames) == null) { "模型请求 ID 重复" }
+        val owner = currentCoroutineContext()[Job] ?: error("模型请求需要可取消的协程")
+        val request = PendingRequest(frames, type, arguments.optString("provider").takeIf { it.isNotBlank() }, owner)
+        generation.credentials.withLock {
+            recovery.withNativeReady {
+                currentCoroutineContext().ensureActive()
+                ensureCurrent(generation)
+                val actualRevision = providerConfiguration().getLong("revision")
+                val expectedRevision = if (type == "configure") arguments.getLong("revision") else generation.configuredRevision
+                check(actualRevision == expectedRevision && generation.revision == expectedRevision) { "提供商配置已变化，请重新读取目录" }
+                check(type == "configure" || !generation.configuring) { "模型配置尚未载入" }
+                check(generation.pending.size < 4)
+                check(generation.pending.putIfAbsent(id, request) == null) { "模型请求 ID 重复" }
+            }
+        }
         var terminal = false
         try {
             write(generation, JSONObject(arguments.toString()).put("type", type).put("id", id))
@@ -204,7 +286,7 @@ class PiAiNodeWorker internal constructor(
                 throw IOException("模型运行器中断，响应未完成")
             }
         } finally {
-            generation.pending.remove(id, frames)
+            generation.pending.remove(id, request)
             frames.close()
             if (!terminal && current.get() === generation && generation.process.isAlive) withContext(NonCancellable) {
                 runCatching { withTimeout(1000) { cancel(generation, id) } }
@@ -255,7 +337,7 @@ class PiAiNodeWorker internal constructor(
                     "credential_write" -> persistCredential(generation, frame)
                     else -> frame.optString("id").takeIf { it.isNotBlank() }?.let { id ->
                         val target = generation.pending[id]
-                        if (target != null && target.trySend(frame).isFailure) throw IOException("模型事件过多，已停止运行器以保护内存")
+                        if (target != null && target.frames.trySend(frame).isFailure) throw IOException("模型事件过多，已停止运行器以保护内存")
                     }
                 }
             }
@@ -269,16 +351,49 @@ class PiAiNodeWorker internal constructor(
         // Serialize a durable write with process replacement. A stale receipt never
         // writes current credentials or acknowledges to a different process.
         if (current.get() !== generation) return@withLock
-        generation.credentials.withLock {
-        val success = runCatching {
-            val credential = if (frame.isNull("credential")) null else frame.getJSONObject("credential")
-            generation.revision = saveCredential(frame.getString("provider"), credential, generation.revision)
-            generation.configuredRevision = generation.revision
-        }.isSuccess
-        write(generation, JSONObject().put("type", "credential_ack").put("id", UUID.randomUUID().toString())
-            .put("receiptId", frame.getString("receiptId")).put("ok", success))
+        val receiptId = frame.getString("receiptId")
+        require(receiptId.length in 1..120 && receiptId.none(Char::isISOControl))
+        val success = if (!generation.credentials.tryLock()) false else {
+            try {
+                check(generation.receipts.size < 4096 && generation.receipts.add(receiptId)) { "认证回执重复或过多" }
+                val providerId = frame.getString("provider")
+                require(providerId != "deepseek") { "DeepSeek 官方的 API Key 使用专用入口管理" }
+                check(credentialCallerActive(generation, providerId)) { "认证请求已取消或不属于当前提供商" }
+                recovery.tryWithNativeReady {
+                    ensureCurrent(generation)
+                    // Revalidate the live owner after journal admission. The
+                    // callback uses tryLock and never queues behind recovery.
+                    check(credentialCallerActive(generation, providerId)) { "认证请求已取消" }
+                    val snapshot = providerConfiguration()
+                    check(snapshot.getLong("revision") == generation.revision && generation.configuredRevision == generation.revision) {
+                        "提供商配置已变化，拒绝旧认证回调"
+                    }
+                    val providers = snapshot.getJSONArray("providers")
+                    check((0 until providers.length()).any { index -> providers.getJSONObject(index).let {
+                        it.getString("id") == providerId && it.optBoolean("enabled", true)
+                    } }) { "所选提供商已删除或停用" }
+                    val credential = if (frame.isNull("credential")) null else frame.getJSONObject("credential")
+                    val revision = saveCredential(providerId, credential, generation.revision)
+                    check(revision > generation.revision) { "凭据持久化没有产生新版本" }
+                    generation.revision = revision
+                    generation.configuredRevision = revision
+                }
+                true
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { false }
+            finally { generation.credentials.unlock() }
         }
+        // lifecycle remains held so the exact process gets its own receipt;
+        // credentials/journal are released before any backpressured IO.
+        write(generation, JSONObject().put("type", "credential_ack").put("id", UUID.randomUUID().toString())
+            .put("receiptId", receiptId).put("ok", success))
     }
+
+    private fun credentialCallerActive(generation: Generation, providerId: String): Boolean =
+        !generation.configuring && generation.pending.values.any { request ->
+            request.owner.isActive && (request.type == "catalog" ||
+                request.type in setOf("login", "logout", "stream") && request.providerId == providerId)
+        }
 
     private fun ensureCurrent(generation: Generation) {
         if (current.get() !== generation || !generation.process.isAlive) throw IOException("模型运行器已退出或切换到新进程")
@@ -287,7 +402,7 @@ class PiAiNodeWorker internal constructor(
     private fun retire(generation: Generation, failure: Throwable) {
         current.compareAndSet(generation, null)
         generation.ready.completeExceptionally(failure)
-        generation.pending.values.forEach { it.close(failure) }
+        generation.pending.values.forEach { it.frames.close(failure) }
     }
 
     companion object {

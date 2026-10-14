@@ -44,7 +44,10 @@ class ModelProviderStore(context: Context) {
         val index = list.indexOfFirst { it.id == config.id }
         if (index < 0) { require(list.size < 128); list += config } else list[index] = config
         state.put("providers", JSONArray(list.map { it.toJson() }))
-        if (credential != null) state.getJSONObject("credentials").put(config.id, ModelProviderCredential.validate(credential))
+        if (credential != null) {
+            state.getJSONObject("credentials").put(config.id, ModelProviderCredential.validate(credential))
+            if (config.id == "deepseek") state.remove("officialCredentialReceipt")
+        }
         commit(state)
     }
 
@@ -78,11 +81,52 @@ class ModelProviderStore(context: Context) {
         }
         if (value == null) state.getJSONObject("credentials").remove(providerId)
         else state.getJSONObject("credentials").put(providerId, ModelProviderCredential.validate(value))
+        if (providerId == "deepseek") state.remove("officialCredentialReceipt")
         commit(state).revision
     }
 
+    internal fun officialCredentialSnapshot(): OfficialNativeCredentialSnapshot = synchronized(lock) {
+        val state = readLocked()
+        val secret = state.getJSONObject("credentials").optJSONObject("deepseek")
+        require(secret == null || secret.getString("type") == "api_key")
+        OfficialNativeCredentialSnapshot(state.getLong("revision").toString(), secret?.getString("key"),
+            state.optJSONObject("officialCredentialReceipt")?.getString("transactionId"), OfficialCredentialPortable.digest(state))
+    }
+
+    internal fun compareAndSetOfficialCredential(expectedRevision: String, key: String?, transactionId: String) = synchronized(lock) {
+        require(transactionId.matches(Regex("[a-f0-9]{32}")))
+        val state = readLocked()
+        check(state.getLong("revision").toString() == expectedRevision) { "NATIVE_CAS_CONFLICT" }
+        if (key == null) state.getJSONObject("credentials").remove("deepseek")
+        else state.getJSONObject("credentials").put("deepseek", ModelProviderCredential.validate(JSONObject().put("type", "api_key").put("key", key)))
+        state.put("officialCredentialReceipt", JSONObject().put("schema", 1).put("transactionId", transactionId))
+        commit(state)
+    }
+
+    /** Full restore and private receipt commit together. External portable
+     * markers are discarded; a lost acknowledgement is proved by both the
+     * marker and a digest of the actual current full configuration. */
+    internal fun compareAndSetPortableOfficialCredential(expectedRevision: String, portable: JSONObject, transactionId: String) = synchronized(lock) {
+        require(transactionId.matches(Regex("[a-f0-9]{32}")))
+        val before = readLocked()
+        check(before.getLong("revision").toString() == expectedRevision) { "NATIVE_CAS_CONFLICT" }
+        val state = OfficialCredentialPortable.sanitize(portable)
+        val digest = OfficialCredentialPortable.digest(state)
+        state.put("revision", before.getLong("revision"))
+        state.put("officialCredentialReceipt", JSONObject().put("schema", 1).put("transactionId", transactionId).put("configurationDigest", digest))
+        commit(state)
+    }
+
+    internal fun confirmOfficialCredentialProjection(key: String?, transactionId: String, configurationDigest: String?) = synchronized(lock) {
+        val state = readLocked()
+        val secret = state.getJSONObject("credentials").optJSONObject("deepseek")?.getString("key")
+        check(secret == key && state.optJSONObject("officialCredentialReceipt")?.getString("transactionId") == transactionId &&
+            (configurationDigest == null || OfficialCredentialPortable.digest(state) == configurationDigest)) { "NATIVE_CHANGED" }
+        dshOrder.publish(snapshot(state))
+    }
+
     /** Explicit backup operation; callers must explain that the archive contains credentials. */
-    internal fun exportPortable(): JSONObject = synchronized(lock) { JSONObject(readLocked().toString()) }
+    internal fun exportPortable(): JSONObject = synchronized(lock) { JSONObject(readLocked().toString()).apply { remove("officialCredentialReceipt") } }
 
     /** Explicit .dym restore writes portable cleartext back through this device's Keystore. */
     internal fun importPortable(portable: JSONObject): ModelProviderSnapshot = synchronized(lock) {
@@ -98,6 +142,8 @@ class ModelProviderStore(context: Context) {
 
     private fun importLocked(portable: JSONObject, revision: Long): ModelProviderSnapshot {
         val state = JSONObject(portable.toString())
+        // Device-local ownership must never be restored from a portable backup.
+        state.remove("officialCredentialReceipt")
         require(state.getInt("schema") == 1)
         val incoming = snapshot(state)
         val ids = incoming.providers.map { it.id }.toSet()
@@ -170,6 +216,13 @@ class ModelProviderStore(context: Context) {
     }
 
     private fun validateSyncReceipt(state: JSONObject) {
+        if (state.has("officialCredentialReceipt")) {
+            val receipt = state.getJSONObject("officialCredentialReceipt")
+            require(receipt.getInt("schema") == 1 && setOf("schema", "transactionId").all(receipt::has) &&
+                receipt.keys().asSequence().all { it in setOf("schema", "transactionId", "configurationDigest") } &&
+                receipt.getString("transactionId").matches(Regex("[a-f0-9]{32}")))
+            if (receipt.has("configurationDigest")) require(receipt.getString("configurationDigest").matches(Regex("[a-f0-9]{64}")))
+        }
         state.optJSONObject("dshSync")?.let { receipt ->
             require(receipt.getInt("schema") == 1)
             val routes = receipt.getJSONArray("routes")

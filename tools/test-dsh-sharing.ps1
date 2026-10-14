@@ -25,9 +25,10 @@ $classpath = @($stdlib, $coroutines, $annotations, (Cached 'org.apache.commons\c
 $dataRoot = Join-Path $projectRoot 'app\src\main\java\com\dafeiyu\mobile\data'
 $sources = @('LinuxRuntimeContract.kt', 'LinuxSandboxContract.kt', 'LinuxSandboxVerifier.kt', 'LinuxArchiveExtractor.kt', 'LinuxRuntimeManager.kt', 'LinuxManagedProcess.kt',
     'ComponentDownloadClient.kt', 'ArtifactDownloader.kt', 'DshRuntimeManifest.kt', 'DshRuntimeInstaller.kt',
-    'DshRuntimeManager.kt', 'DshSandboxProbe.kt', 'DshSharedPersistenceBridge.kt', 'DshSharedHistoryAdapter.kt',
+    'DshRuntimeManager.kt', 'DshMobileUiPackage.kt', 'DshSandboxProbe.kt', 'DshSharedPersistenceBridge.kt', 'DshSharedHistoryAdapter.kt',
     'AssistantStreamProtocol.kt', 'ChatMessage.kt', 'DshExtensionTransaction.kt', 'DshProviderOrderProjection.kt',
-    'ModelProviderConfig.kt', 'ModelProviderStore.kt', 'ConnectionPluginPackage.kt', 'ConnectionPackageValidator.kt') | ForEach-Object { Join-Path $dataRoot $_ }
+    'ModelProviderConfig.kt', 'ModelProviderStore.kt', 'ConnectionPluginPackage.kt', 'ConnectionPackageValidator.kt',
+    'OfficialDeepSeekCredentialTransaction.kt', 'OfficialCredentialPortable.kt') | ForEach-Object { Join-Path $dataRoot $_ }
 $sources += Join-Path $PSScriptRoot 'tests\archive-startup\CompileDependencies.kt'
 $sources += Join-Path $PSScriptRoot 'tests\provider\android-api\Resources.kt'
 $javaRoot = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { 'C:\Program Files\Java\JDK21' }

@@ -109,6 +109,12 @@ private class PublicationFixture(
             events += "receipt"; receivedReceipt = settingsRevision to credentialRevision
             source.put("dshSync", DshSharedConfigurationMapping.syncReceipt(plan.profiles.keys().asSequence().toList())
                 .put("retiredReferences", JSONArray(plan.retiredReferences.toList())).put("retiredRecords", JSONArray(plan.retiredRecords.toList())))
+            if (settingsDrift) {
+                val ns = DshSharedConfigurationMapping.namespace(settings, "llm-pi-ai")
+                ns.put("revision", 99)
+                for (root in listOf("value", "user")) ns.getJSONObject(root).getJSONObject("providers")
+                    .getJSONObject("fixture-route").put("apiKeyEnv", oldKeyRef)
+            }
         },
         cleanCredentials = { updates ->
             events += "cleanup"
@@ -154,10 +160,10 @@ internal suspend fun providerTransactionChecks(): Int {
             )) check(runCatching { DshCandidateCredentialStaging.prepare(fixture.document, candidates, plan.credentialRevision) }.isFailure)
             check(fixture.document.toString() == before)
         }
-        test("staging then confirmed CAS then receipt then cleanup rotates key without changing foreign data") {
+        test("staging then confirmed CAS and receipt rotate selection while retaining prior connection keys") {
             val fixture = PublicationFixture(); fixture.publish()
-            check(fixture.events == listOf("stage", "cas", "receipt", "cleanup"))
-            check(fixture.activeReference() == newKeyRef && !fixture.document.getJSONObject("refs").has(oldKeyRef))
+            check(fixture.events == listOf("stage", "cas", "receipt"))
+            check(fixture.activeReference() == newKeyRef && fixture.oldKeyPreserved())
             check(fixture.document.getJSONObject("refs").getString("FOREIGN_KEEP") == "SYNTHETIC_FOREIGN")
             check(DshSharedConfigurationMapping.namespace(fixture.settings, "llm-pi-ai").getJSONObject("value")
                 .getJSONObject("providers").getJSONObject("fixture-route").getJSONObject("headers").getString("X-Keep") == "keep")
@@ -197,25 +203,25 @@ internal suspend fun providerTransactionChecks(): Int {
             check(runCatching { fixture.publish() }.isFailure)
             check(fixture.oldKeyPreserved() && fixture.receivedReceipt == null && "cleanup" !in fixture.events)
         }
-        test("cleanup failure is distinct from saved settings and keeps an ownership receipt") {
+        test("unleased destructive cleanup callback cannot run even when configured to throw") {
             val fixture = PublicationFixture().apply { cleanupFailure = true }
-            val error = runCatching { fixture.publish() }.exceptionOrNull()
-            check(error?.message?.contains("设置已保存") == true)
+            fixture.publish()
             check(fixture.receivedReceipt != null && fixture.oldKeyPreserved() && fixture.activeReference() == newKeyRef)
+            check("cleanup" !in fixture.events)
         }
-        test("saved retirement receipt allows cleanup retry without a second key stage or settings submission") {
+        test("repeated publication retains prior private refs and needs no duplicate stage or settings submission") {
             val fixture = PublicationFixture().apply { cleanupFailure = true }
-            check(runCatching { fixture.publish() }.isFailure)
+            fixture.publish()
             fixture.cleanupFailure = false; fixture.publish()
             check(fixture.events.count { it == "stage" } == 1 && fixture.events.count { it == "cas" } == 1)
-            check(!fixture.document.getJSONObject("refs").has(oldKeyRef) && fixture.activeReference() == newKeyRef)
+            check(fixture.oldKeyPreserved() && fixture.activeReference() == newKeyRef && "cleanup" !in fixture.events)
             val next = fixture.plan()
-            check(next.retiredReferences.isEmpty() && next.retiredRecords.isEmpty())
+            check(oldKeyRef in next.retiredReferences)
         }
-        test("settings changed after confirmed CAS prevent destructive credential cleanup") {
+        test("a concurrent settings writer can reselect the old ref after receipt without losing its key") {
             val fixture = PublicationFixture().apply { settingsDrift = true }
-            check(runCatching { fixture.publish() }.isFailure)
-            check(fixture.receivedReceipt != null && fixture.oldKeyPreserved() && "cleanup" !in fixture.events)
+            fixture.publish()
+            check(fixture.receivedReceipt != null && fixture.oldKeyPreserved() && fixture.activeReference() == oldKeyRef && "cleanup" !in fixture.events)
         }
         test("another live namespace or foreign route referencing retired key protects it") {
             val fixture = PublicationFixture()
@@ -227,7 +233,7 @@ internal suspend fun providerTransactionChecks(): Int {
         test("API key removal selects an absent fresh reference without staging or restoring ambient auth") {
             val fixture = PublicationFixture(source = native(null)); fixture.publish()
             check("stage" !in fixture.events && fixture.activeReference() == newKeyRef)
-            check(!fixture.document.getJSONObject("refs").has(newKeyRef) && !fixture.document.getJSONObject("refs").has(oldKeyRef))
+            check(!fixture.document.getJSONObject("refs").has(newKeyRef) && fixture.oldKeyPreserved())
         }
         test("unchanged key needs no new credential reference and external key names remain owned externally") {
             val fixture = PublicationFixture(source = native("SYNTHETIC_OLD"), settings = described(original("EXTERNAL_REF")), document = credentials("EXTERNAL_REF"))

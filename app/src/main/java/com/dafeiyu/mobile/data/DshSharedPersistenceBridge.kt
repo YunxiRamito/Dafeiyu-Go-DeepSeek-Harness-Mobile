@@ -15,6 +15,9 @@ import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** Fixed helper conflict identity; payloads and OS messages remain private. */
+internal class DshCredentialRevisionConflictException : IOException("DSH 凭据已变化，请刷新后重试")
+
 /** A storage-only Node process using the exact installed DSH persistence code.
  * Its input/output are private; no diagnostic can expose OAuth grants or keys. */
 class DshSharedPersistenceBridge(
@@ -158,6 +161,10 @@ class DshSharedPersistenceBridge(
                             val code = result.optString("code").takeIf {
                                 it in setOf("SHARED_STORAGE_FAILED", "SHARED_CONFIGURATION_FAILED", "SHARED_HISTORY_DELETION_FAILED")
                             } ?: "HELPER_FAILED"
+                            if (code == "SHARED_STORAGE_FAILED" && operation == "credentials-write" &&
+                                result.optString("reason") == "SHARED_CREDENTIAL_REVISION_CONFLICT") {
+                                throw DshCredentialRevisionConflictException()
+                            }
                             val reason = result.optString("reason").takeIf {
                                 it in setOf("ENOENT", "EACCES", "EPERM", "EINVAL", "EBUSY", "EAGAIN", "ERR_DLOPEN_FAILED",
                                     "MODULE_NOT_FOUND", "ERR_MODULE_NOT_FOUND", "ERR_INVALID_ARG_VALUE", "ERR_FLOCK_UNSUPPORTED_PLATFORM")

@@ -83,6 +83,9 @@ class DemoRepository {
     fun updateDshUpdatePolicy(value: String) { dshUpdatePolicy = value }
     fun suppressDshAutostartAfterImport() { autostartSuppressed = true }
     fun exportDymProviderConfiguration(): JSONObject = JSONObject()
+    internal suspend fun captureDymOfficialCredentials(configuration: JSONObject, retained: JSONObject?): JSONObject =
+        DymSharedCredentials.captureWithoutDsh(configuration, retained)
+    internal suspend fun <T> withDymCredentialMutation(operation: suspend () -> T): T = operation()
     suspend fun restoreDymProviderConfiguration(value: JSONObject): Result<Unit> = runCatching { check(value.length() >= 0) }
     fun restoreBackup(value: AndroidBackupStore.ValidatedBackup): Result<Unit> = runCatching { check(value.workspaces.isNotEmpty()) }
 }

@@ -52,6 +52,25 @@ fun main() = runBlocking {
         val owned = DshSharedConfigurationMapping.importState(native, JSONObject().put("providers", JSONArray()), empty, "OFFICIAL_REF")
         check(owned.getJSONArray("providers").length() == 1 && !owned.getJSONObject("credentials").has("deepseek"))
     }
+    test("explicit source choice accepts the selected DSH key without modifying captured native configuration") {
+        val native = state(direct, custom)
+        native.getJSONObject("credentials").put("deepseek", JSONObject().put("type", "api_key").put("key", "OFFLINE_NATIVE"))
+        val before = native.toString()
+        val emptyProfiles = JSONObject().put("providers", JSONArray())
+        refuses { DshSharedConfigurationMapping.importState(native, emptyProfiles, credentials, "OFFICIAL_REF") }
+        val selected = DshSharedConfigurationMapping.importState(native, emptyProfiles, credentials, "OFFICIAL_REF", acceptOfficialConflict = true)
+        check(selected.getJSONObject("credentials").getJSONObject("deepseek").getString("key") == "OFFLINE_DIRECT")
+        check(native.toString() == before)
+    }
+    test("explicit source choice preserves real DSH absence rather than restoring an unpublished native key") {
+        val native = state(direct, custom)
+        native.getJSONObject("credentials").put("deepseek", JSONObject().put("type", "api_key").put("key", "OFFLINE_NATIVE"))
+        val empty = JSONObject().put("refs", JSONObject()).put("records", JSONObject())
+        val selected = DshSharedConfigurationMapping.importState(native, JSONObject().put("providers", JSONArray()), empty,
+            "OFFICIAL_REF", acceptOfficialConflict = true)
+        check(!selected.getJSONObject("credentials").has("deepseek"))
+        check(native.getJSONObject("credentials").getJSONObject("deepseek").getString("key") == "OFFLINE_NATIVE")
+    }
     test("unowned metadata and credential collisions refuse import instead of overwriting either store") {
         val native = state(direct, alias)
         val conflicted = JSONObject().put("providers", JSONArray().put(alias.copy(name = "Different").toJson()))

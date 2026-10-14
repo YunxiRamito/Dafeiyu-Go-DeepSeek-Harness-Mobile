@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -30,6 +31,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 
 enum class ModelRuntimeStatus { MISSING, READY, INSTALLING, STARTING, RUNNING, STOPPING, ERROR }
@@ -91,6 +93,8 @@ internal interface ModelRuntimeBackend {
     fun upsert(config: ModelProviderConfig, credential: JSONObject?): ModelProviderSnapshot
     fun remove(providerId: String): ModelProviderSnapshot
     fun reorder(order: List<String>): ModelProviderSnapshot
+    /** Only short vault operations. Never call a worker, take a runtime lock or wait for UI here. */
+    suspend fun <T> withNativeReady(operation: suspend () -> T): T
     suspend fun refreshComponents()
     suspend fun installLinux(id: String, source: String)
     fun cancelLinuxInstall()
@@ -145,6 +149,7 @@ class ModelRuntimeController internal constructor(
 
     suspend fun refresh() = gate.withLock {
         requireIdle()
+        checkNativeReady()
         backend.refreshComponents()
         publishProviders()
         val installed = installedDirectory()
@@ -158,6 +163,10 @@ class ModelRuntimeController internal constructor(
 
     /** Does not install anything implicitly or start the DSH web service. */
     suspend fun ensureStarted() = gate.withLock {
+        checkNativeReady()
+        check(!managementBusy && installTask?.isCompleted != false && authTask?.isCompleted != false) {
+            "模型运行器正在维护或认证"
+        }
         if (running() && mutableState.value.catalog.isNotEmpty()) return@withLock
         requireIdle()
         startLocked()
@@ -221,6 +230,7 @@ class ModelRuntimeController internal constructor(
     }
 
     suspend fun upsert(config: ModelProviderConfig, credential: JSONObject? = null): ModelProviderSnapshot = mutate {
+        require(!config.protected) { "DeepSeek 官方的 API Key 使用专用入口管理" }
         backend.upsert(config.validated(), credential?.let(ModelProviderCredential::validate))
     }
     suspend fun remove(providerId: String): ModelProviderSnapshot = mutate { backend.remove(providerId) }
@@ -228,8 +238,11 @@ class ModelRuntimeController internal constructor(
 
     private suspend fun mutate(operation: () -> ModelProviderSnapshot): ModelProviderSnapshot = gate.withLock {
         requireIdle()
-        val persisted = withContext(Dispatchers.IO) { operation() }
-        publishProviders()
+        // Lock order: controller -> recovery journal -> vault. Release the
+        // journal before configuring/reading the worker or waiting for its IO.
+        val persisted = backend.withNativeReady { withContext(Dispatchers.IO) {
+            operation().also { publishProvidersReady() }
+        } }
         // The durable edit succeeds even if restarting/refetching its runtime fails afterwards.
         mutableState.update { it.copy(catalog = emptyList(), detail = "提供商配置已保存，请刷新目录") }
         if (running()) try {
@@ -242,6 +255,7 @@ class ModelRuntimeController internal constructor(
     }
 
     suspend fun login(providerId: String, authType: String) {
+        require(providerId != "deepseek") { "DeepSeek 官方的 API Key 使用专用入口管理" }
         require(authType in setOf("api_key", "oauth"))
         val task = gate.withLock {
             requireIdle()
@@ -273,8 +287,8 @@ class ModelRuntimeController internal constructor(
                 } catch (cancelled: CancellationException) {
                     mutableState.update { it.copy(detail = "认证已取消") }
                     throw cancelled
-                } catch (_: Exception) {
-                    val error = ModelRuntimeException("AUTHENTICATION_FAILED", "提供商认证失败，请检查账户、接口或重新授权")
+                } catch (failure: Exception) {
+                    val error = failure.asRuntimeError("AUTHENTICATION_FAILED", "提供商认证失败，请检查账户、接口或重新授权")
                     mutableState.update { it.copy(detail = error.message.orEmpty()) }
                     throw error
                 } finally {
@@ -312,17 +326,30 @@ class ModelRuntimeController internal constructor(
 
     /** Without stopActive=true a shutdown never interrupts an Android-owned task. */
     suspend fun shutdown(stopActive: Boolean = false) {
+        val stoppingCaller = currentCoroutineContext()[Job]
         val jobs = gate.withLock {
-            check(installTask?.isActive != true) { "请先取消或等待安装完成" }
+            check(!managementBusy) { "模型运行器正在维护或停止" }
+            check(installTask?.isCompleted != false) { "请先取消或等待安装完成" }
             if (!stopActive) requireIdle()
+            val stopping = sessions.values.toList() + listOfNotNull(authTask?.takeIf { stopActive && !it.isCompleted })
+            check(stopping.none { it === stoppingCaller } && currentCoroutineContext()[SessionLease]?.owner !== this) {
+                "请在任务外停止模型运行器"
+            }
             managementBusy = true
             mutableState.update { it.copy(status = ModelRuntimeStatus.STOPPING, detail = "正在停止模型运行器") }
-            sessions.values.toList().also { if (stopActive) authTask?.cancel() }
+            stopping.distinct()
         }
         try {
             if (stopActive) jobs.forEach { it.cancel(CancellationException("用户停止模型运行器")) }
             withContext(NonCancellable) { backend.stop() }
+            // Cancellation starts cleanup; only real caller completion proves it
+            // finished. Release management/journal locks before waiting, since
+            // session cleanup must reacquire the management gate itself.
+            withTimeout(30_000L) { jobs.forEach { it.join() } }
             mutableState.update { it.copy(status = ModelRuntimeStatus.READY, detail = "模型运行器已停止") }
+        } catch (_: TimeoutCancellationException) {
+            mutableState.update { it.copy(status = ModelRuntimeStatus.ERROR, detail = "任务或认证仍在清理，请稍后重试") }
+            throw ModelRuntimeException("WORKER_STOP_FAILED", "任务或认证仍在清理，请稍后重试")
         } catch (cancelled: CancellationException) {
             mutableState.update { it.copy(status = if (running()) ModelRuntimeStatus.RUNNING else ModelRuntimeStatus.READY,
                 detail = if (running()) "模型运行器仍在清理" else "模型运行器已停止") }
@@ -335,19 +362,24 @@ class ModelRuntimeController internal constructor(
 
     suspend fun <T> withSession(providerId: String, block: suspend () -> T): T {
         currentCoroutineContext()[SessionLease]?.let { lease ->
-            if (lease.owner === this && lease.providerId == providerId) return block()
+            if (lease.owner === this && lease.providerId == providerId) {
+                checkNativeReady()
+                return block()
+            }
         }
         ensureStarted()
         val id = UUID.randomUUID().toString()
         val job = currentCoroutineContext()[Job] ?: error("任务需要可取消的协程")
         gate.withLock {
-            check(!managementBusy && installTask?.isActive != true && authTask?.isActive != true) { "模型运行器正在维护或认证" }
+            check(!managementBusy && installTask?.isCompleted != false && authTask?.isCompleted != false) { "模型运行器正在维护或认证" }
             check(sessions.size < 3) { "模型任务已达到并发上限" }
-            val provider = backend.providers().providers.firstOrNull { it.id == providerId && it.enabled }
-                ?: throw ModelRuntimeException("PROVIDER_DISABLED", "所选提供商已删除或停用，请重新选择")
-            require(!provider.protected) { "DeepSeek 官方使用原生直接接入" }
-            sessions[id] = job
-            mutableState.update { it.copy(activeSessions = sessions.size) }
+            backend.withNativeReady {
+                val provider = backend.providers().providers.firstOrNull { it.id == providerId && it.enabled }
+                    ?: throw ModelRuntimeException("PROVIDER_DISABLED", "所选提供商已删除或停用，请重新选择")
+                require(!provider.protected) { "DeepSeek 官方使用原生直接接入" }
+                sessions[id] = job
+                mutableState.update { it.copy(activeSessions = sessions.size) }
+            }
         }
         try { return withContext(SessionLease(this, providerId)) { block() } } finally { withContext(NonCancellable) { gate.withLock {
             sessions.remove(id); mutableState.update { it.copy(activeSessions = sessions.size) }
@@ -370,6 +402,7 @@ class ModelRuntimeController internal constructor(
     }
 
     private suspend fun startLocked() {
+        checkNativeReady()
         val directory = installedDirectory() ?: throw ModelRuntimeException("COMPONENT_REQUIRED",
             "请安装模型运行组件，含 Node.js 与 Linux 基础环境；DeepSeek 官方不需要此组件")
         mutableState.update { it.copy(status = ModelRuntimeStatus.STARTING, detail = "正在启动模型运行器") }
@@ -397,12 +430,19 @@ class ModelRuntimeController internal constructor(
         return parsed
     }
 
-    private suspend fun publishProviders() = withContext(Dispatchers.IO) {
+    private suspend fun publishProviders() = backend.withNativeReady {
+        withContext(Dispatchers.IO) { publishProvidersReady() }
+    }
+
+    /** Caller owns the non-reentrant journal gate; do not call publishProviders() from here. */
+    private fun publishProvidersReady() {
         val snapshot = backend.providers()
         val credentials = snapshot.providers.map { it.id }.filter { backend.hasCredential(it) }.toSet()
         mutableState.update { it.copy(providers = snapshot, credentialProviders = credentials) }
     }
-    private fun requireIdle() { check(!managementBusy && sessions.isEmpty() && installTask?.isActive != true && authTask?.isActive != true) {
+
+    private suspend fun checkNativeReady() = backend.withNativeReady { Unit }
+    private fun requireIdle() { check(!managementBusy && sessions.isEmpty() && installTask?.isCompleted != false && authTask?.isCompleted != false) {
         "任务、安装或认证正在使用模型运行器，请先停止或等待完成"
     } }
     private fun running() = backend.processes.value.any { it.id == WORKER_ID && it.running }
@@ -508,6 +548,7 @@ private fun Exception.asRuntimeError(code: String, message: String) = this as? M
 
 private class AndroidModelRuntimeBackend(context: Context) : ModelRuntimeBackend {
     private val store = ModelProviderStore(context)
+    private val recovery = JournalModelRuntimeRecoveryAccess(AndroidOfficialCredentialJournal(context))
     private val runtime = LinuxRuntimeManager(context)
     private val installer = PiAiRuntimeInstaller(context, runtime)
     private val worker = PiAiNodeWorker(context, store, runtime)
@@ -519,6 +560,7 @@ private class AndroidModelRuntimeBackend(context: Context) : ModelRuntimeBackend
     override fun upsert(config: ModelProviderConfig, credential: JSONObject?) = store.upsert(config, credential)
     override fun remove(providerId: String) = store.remove(providerId)
     override fun reorder(order: List<String>) = store.reorder(order)
+    override suspend fun <T> withNativeReady(operation: suspend () -> T): T = recovery.withNativeReady(operation)
     override suspend fun refreshComponents() = runtime.refresh()
     override suspend fun installLinux(id: String, source: String) = runtime.install(id, source)
     override fun cancelLinuxInstall() = runtime.cancelInstall()

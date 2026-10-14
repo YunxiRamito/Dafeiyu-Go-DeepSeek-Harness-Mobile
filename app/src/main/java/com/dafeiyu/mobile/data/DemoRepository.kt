@@ -119,6 +119,15 @@ class DemoRepository : ViewModel() {
     var deepSeekModelError by mutableStateOf<String?>(null)
         private set
     private var deepSeekBalanceStore: BalanceStore? = null
+    private var officialCredentials: AndroidOfficialCredentialBinding? = null
+    private var officialCredentialBridge: DshSharedPersistenceBridge? = null
+    private var officialCredentialRuntime: LinuxRuntimeManager? = null
+    private val officialCredentialUi = OfficialCredentialRecoveryUiController { observeOfficialCredentials() }
+    @Volatile private var officialNativeConflictProof: OfficialCredentialNativeChoiceProof? = null
+    var officialCredentialState by mutableStateOf(OfficialCredentialUiState())
+        private set
+    var officialCredentialRecoveryPending by mutableStateOf(true)
+        private set
     private var modelProviderStore: ModelProviderStore? = null
     private var nativeTranscriptStore: NativeTranscriptStore? = null
     private var notificationMonitor: NativeNotificationMonitor? = null
@@ -134,6 +143,7 @@ class DemoRepository : ViewModel() {
     var backgroundTasks by mutableStateOf<BackgroundTaskEngine?>(null)
         private set
     private val taskClients = mutableSetOf<DeepSeekChatClient>()
+    private val officialCredentialCallers = java.util.concurrent.ConcurrentHashMap.newKeySet<Job>()
     private val taskCredentialBoundary = BackgroundTaskCredentialBoundary()
     @Volatile private var credentialGeneration = 0L
     private var activeStreamMessageId: String? = null
@@ -851,6 +861,25 @@ class DemoRepository : ViewModel() {
         deepSeekBalanceStore = balanceStore
         modelProviderStore = ModelProviderStore(context.applicationContext)
         val sharedBridge = DshSharedPersistenceBridge(context.applicationContext, runtime, installer)
+        officialCredentialBridge = sharedBridge
+        officialCredentialRuntime = runtime
+        officialCredentials = AndroidOfficialCredentialBinding(context.applicationContext, requireNotNull(modelProviderStore), balanceStore, sharedBridge)
+        // Recovery owns the local engine gate. Until completion, no native
+        // task or new credential edit may start using partially saved vaults.
+        viewModelScope.launch {
+            localEngineGate.withLock {
+                try {
+                    recoverOfficialCredentialsLocked(null, OfficialCredentialUiOperation.INITIALIZE)
+                    deepSeekConfigured = withContext(Dispatchers.IO) {
+                        requireNotNull(officialCredentials).withNativeReady { balanceStore.hasKey() }
+                    }
+                    if (deepSeekConfigured) restoreModelCatalog()
+                    notifyTaskConfiguration()
+                }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { updateNotice(officialCredentialState.message) }
+            }
+        }
         sharedDshConfiguration = DshSharedConfigurationAdapter(context.applicationContext, requireNotNull(modelProviderStore), sharedBridge)
         localDshHistory = LocalDshHistoryController(context.applicationContext, sharedBridge)
         nativeTranscriptStore = NativeTranscriptStore(context.applicationContext)
@@ -916,8 +945,9 @@ class DemoRepository : ViewModel() {
                 }
             }
         }
-        deepSeekClient = DeepSeekChatClient(balanceStore)
-        catalogClient = DeepSeekChatClient(balanceStore)
+        // Validation clients never read either vault. A real call captures a confirmed key under a short gate.
+        deepSeekClient = newOfficialClient(null)
+        catalogClient = newOfficialClient(null)
         pushSettings = PushSettingsController(context.applicationContext)
         viewModelScope.launch { pushSettings?.state?.collect { pushSettingsState = it } }
         dshRuntimeManager = DshRuntimeManager(context.applicationContext, runtime, installer)
@@ -952,12 +982,14 @@ class DemoRepository : ViewModel() {
                 backgroundTasks = BackgroundTaskEngine.open(
                     BackgroundTaskAndroidStore(context.applicationContext),
                     runner = BackgroundTaskRunner { request, emit ->
+                      withOfficialCredentialCaller {
+                        check(officialCredentialsReady()) { "official_credential_recovery_pending" }
                         val selected = modelChoices.firstOrNull { it.id == request.model && !it.isExample }
                             ?: error("model_unavailable")
-                        if (selected.runtimeModel != null) return@BackgroundTaskRunner runMultiProviderBackgroundTask(request, selected, emit)
+                        if (selected.runtimeModel != null) return@withOfficialCredentialCaller runMultiProviderBackgroundTask(request, selected, emit)
                         val generation = credentialGeneration
                         check(!taskCredentialBoundary.blocked && !deepSeekConfigurationBusy && deepSeekConfigured) { "configuration_changed" }
-                        val client = DeepSeekChatClient(balanceStore)
+                        val client = newOfficialClient(readOfficialCredentialForRequest(generation))
                         val reducer = AssistantStreamReducer(source = AssistantStreamSource.BACKEND)
                         var lastProgressAt = 0L
                         try {
@@ -1007,12 +1039,15 @@ class DemoRepository : ViewModel() {
                                 withContext(kotlinx.coroutines.NonCancellable + Dispatchers.Main.immediate) { taskClients.remove(client) }
                             }
                         }
+                      }
                     },
                     availability = { model ->
                         val choice = modelChoices.firstOrNull { it.id == model && !it.isExample }
                         val providerId = choice?.runtimeModel?.providerId
                         when {
                             connectionMode == "online" -> BackgroundTaskAvailability(false, "在线任务由电脑 DSH 调度，请在电脑会话中创建")
+                            !officialCredentialsReady() -> BackgroundTaskAvailability(false, "官方凭据事务待恢复，请先完成恢复")
+                            taskCredentialBoundary.blocked || deepSeekConfigurationBusy -> BackgroundTaskAvailability(false, "凭据修改或任务停止尚未完成")
                             choice == null -> BackgroundTaskAvailability(false, "请先获取可用模型")
                             providerId != null && !isModelProviderEnabled(providerId) -> BackgroundTaskAvailability(false, "请启用该模型提供商")
                             providerId != null && modelRuntime?.state?.value?.catalog?.firstOrNull { it.id == providerId }?.configured != true ->
@@ -1047,10 +1082,7 @@ class DemoRepository : ViewModel() {
                 workspaceSaveError = "已恢复本地恢复文件；请释放索引容量后重试保存，暂不发送新消息"
                 updateNotice(requireNotNull(workspaceSaveError))
             }
-            deepSeekConfigured = withContext(Dispatchers.IO) {
-                balanceStore.hasKey()
-            }
-            if (deepSeekConfigured) restoreModelCatalog()
+            // Initialization recovery owns the confirmed key flag/catalog, so a faster workspace read cannot overwrite it.
             notifyTaskConfiguration()
             val loadedAttachments = withContext(Dispatchers.IO) {
                 runCatching { checkNotNull(attachmentStore).list().map { previewAttachment(it, includeText = false) } }
@@ -2261,28 +2293,35 @@ class DemoRepository : ViewModel() {
 
     fun saveDeepSeekKey(value: String) {
         if (deepSeekBalanceStore == null || modelProviderStore == null) return
-        if (connectionMode != "local" || deepSeekConfigurationBusy || isResponding || localEngineSwitchBusy) return
+        if (connectionMode != "local" || deepSeekConfigurationBusy || localEngineSwitchBusy) return
+        if (!officialCredentialsReady()) { updateNotice(officialCredentialState.message); return }
+        val runningResponse = responseJob
+        cancelResponse(); catalogClient?.cancel()
         val generation = ++credentialGeneration
         deepSeekConfigurationBusy = true
         deepSeekModelError = null
         viewModelScope.launch {
             try {
-                stopTasksForCredentialChange()
-                persistOfficialCredential(value)
+                stopOfficialCredentialCallers(runningResponse)
+                persistOfficialCredential(value, OfficialCredentialUiOperation.SAVE)
                 if (generation == credentialGeneration) {
                     deepSeekConfigured = true
                     invalidateRemoteModels()
                     updateNotice("DeepSeek API Key 已安全保存")
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { deepSeekModelError = "无法安全保存 API Key，请重试" }
-            finally { deepSeekConfigurationBusy = false; notifyTaskConfiguration() }
+            catch (failure: Exception) {
+                officialCredentialUi.recordFailure(OfficialCredentialUiOperation.SAVE, failure.message)
+                deepSeekModelError = officialCredentialUi.state.value.message
+            }
+            finally { publishOfficialCredentialUiState(); deepSeekConfigurationBusy = false; notifyTaskConfiguration() }
         }
     }
 
     fun clearDeepSeekKey() {
         if (deepSeekBalanceStore == null || modelProviderStore == null) return
         if (connectionMode != "local" || deepSeekConfigurationBusy || localEngineSwitchBusy) return
+        if (!officialCredentialsReady()) { updateNotice(officialCredentialState.message); return }
         val runningResponse = responseJob
         cancelResponse()
         ++credentialGeneration
@@ -2290,62 +2329,399 @@ class DemoRepository : ViewModel() {
         deepSeekConfigurationBusy = true
         viewModelScope.launch {
             try {
-                withTimeout(30_000L) { runningResponse?.join() }
-                stopTasksForCredentialChange()
-                persistOfficialCredential(null)
+                stopOfficialCredentialCallers(runningResponse)
+                persistOfficialCredential(null, OfficialCredentialUiOperation.REMOVE)
                 deepSeekConfigured = false
                 invalidateRemoteModels()
                 deepSeekModelError = null
                 updateNotice("DeepSeek API Key 已清除")
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { deepSeekModelError = "无法清除 API Key，请重试" }
-            finally { deepSeekConfigurationBusy = false; notifyTaskConfiguration() }
+            catch (failure: Exception) {
+                officialCredentialUi.recordFailure(OfficialCredentialUiOperation.REMOVE, failure.message)
+                deepSeekModelError = officialCredentialUi.state.value.message
+            }
+            finally { publishOfficialCredentialUiState(); deepSeekConfigurationBusy = false; notifyTaskConfiguration() }
         }
     }
 
-    /** A failed native write rolls back only our revision, never another provider edit. */
-    private suspend fun persistOfficialCredential(value: String?) = localEngineGate.withLock {
-        dshRuntimeManager?.snapshot?.value?.accessUrl?.let { requireLocalDshIdle(it) }
+    /** Durable recovery replaces best-effort rollback across the two vaults. */
+    private suspend fun persistOfficialCredential(value: String?, operation: OfficialCredentialUiOperation) = localEngineGate.withLock {
         try {
-            withContext(NonCancellable + Dispatchers.IO) {
-                val providers = requireNotNull(modelProviderStore)
-                val balance = requireNotNull(deepSeekBalanceStore)
-                val key = value?.trim()?.also {
-                    require(it.isNotEmpty() && it.length <= 512 && it.none { c -> c.isWhitespace() || c.isISOControl() })
-                }
-                val credential = key?.let { JSONObject().put("type", "api_key").put("key", it) }
-                val before = providers.workerConfiguration()
-                val previousCredential = before.getJSONObject("credentials").optJSONObject("deepseek")
-                val previousKey = balance.readApiKeyForRequest()
-                val committed = providers.persistWorkerCredential("deepseek", credential, before.getLong("revision"))
-                try {
-                    if (key == null) balance.clearApiKey() else balance.setApiKey(key)
-                } catch (failure: Exception) {
-                    try {
-                        val current = balance.readApiKeyForRequest()
-                        check(current == key || current == previousKey) { "官方凭据在保存期间已变化" }
-                        if (current != previousKey) {
-                            if (previousKey == null) balance.clearApiKey() else balance.setApiKey(previousKey)
-                        }
-                        providers.persistWorkerCredential("deepseek", previousCredential, committed)
-                    } catch (rollback: Exception) {
-                        throw IllegalStateException("官方凭据回退未完成，请在模型页重新保存 API Key", rollback)
+            stopOfficialCredentialRuntime()
+            val binding = requireNotNull(officialCredentials)
+            withOfficialCredentialRecoveryService(binding.requiresDshRecovery()) { access -> recoverOfficialCredentialsLocked(access) }
+            val runtime = requireNotNull(officialCredentialRuntime)
+            val app = requireNotNull(applicationContext)
+            val outcome = trackOfficialCredentialAction(operation) {
+                // The actual runtime launch barrier covers this short native vault transaction.
+                // No model request, worker configuration, DSH startup or RPC is under the journal.
+                withContext(Dispatchers.IO) {
+                    runtime.withIdleDataMutation(listOf(java.io.File(app.filesDir, "dsh-home"))) {
+                        binding.coordinator().beginNative(value)
                     }
-                    throw failure
                 }
             }
+            requireOfficialCredentialCommit(outcome)
+        } catch (cancelled: CancellationException) { throw cancelled
+        } catch (failure: Exception) {
+            officialCredentialUi.recordFailure(operation, failure.message)
+            throw failure
         } finally {
-            if (modelRuntime?.state?.value?.busy != true) modelRuntime?.refresh()
+            publishOfficialCredentialUiState()
+            if (!officialCredentialRecoveryPending && modelRuntime?.state?.value?.busy != true) {
+                // A directory refresh cannot turn a committed credential write into a reported failure.
+                try { modelRuntime?.refresh() }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { updateNotice("凭据已确认，模型目录仍需重新读取") }
+            }
         }
     }
 
-    /** Explicit .dym export only. The UI explains that this object contains portable credentials. */
-    fun exportDymProviderConfiguration(): JSONObject {
-        val portable = requireNotNull(modelProviderStore) { "提供商存储尚未就绪" }.exportPortable()
-        deepSeekBalanceStore?.readApiKeyForRequest()?.let { key ->
-            portable.getJSONObject("credentials").put("deepseek", JSONObject().put("type", "api_key").put("key", key))
+    private suspend fun recoverOfficialCredentialsLocked(access: String?,
+        operation: OfficialCredentialUiOperation = OfficialCredentialUiOperation.RECOVER) = withContext(Dispatchers.IO) {
+        val binding = requireNotNull(officialCredentials)
+        val result = trackOfficialCredentialAction(operation) { binding.coordinator(access).recover() }
+        if (result is OfficialCredentialOutcome.Pending || !officialCredentialUi.state.value.nativeReady) {
+            error(officialCredentialUi.state.value.message)
         }
-        return portable
+    }
+
+    private suspend fun requireOfficialCredentialCommit(outcome: OfficialCredentialOutcome, settledAccess: String? = null) {
+        publishOfficialCredentialUiState()
+        when (outcome) {
+            is OfficialCredentialOutcome.Committed, is OfficialCredentialOutcome.NativeCommitted -> Unit
+            is OfficialCredentialOutcome.Pending -> error(officialCredentialUi.state.value.message)
+            OfficialCredentialOutcome.NoPending -> {
+                // A concurrent completed publication or a lost final journal response may leave no pending plan.
+                // Accept it only for a publication with an actual DSH endpoint and fresh durable equality proofs.
+                requireNoPendingCredentialProof(requireNotNull(settledAccess) { "NATIVE_NOT_CONFIRMED" })
+            }
+        }
+    }
+
+    private suspend fun requireNoPendingCredentialProof(access: String) = withContext(Dispatchers.IO) {
+        val binding = requireNotNull(officialCredentials)
+        suspend fun nativeProof() = binding.withDshReady {
+            val provider = requireNotNull(modelProviderStore).officialCredentialSnapshot()
+            val balance = requireNotNull(deepSeekBalanceStore).officialCredentialSnapshot()
+            check(provider.key == balance.key) { "NATIVE_VAULT_CONFLICT" }
+            provider to balance
+        }
+        val before = nativeProof()
+        val rpc = DshLocalConfigurationRpc()
+        val settings = rpc.call(access, "settings/describe", JSONObject())
+        val raw = requireNotNull(officialCredentialBridge).readCredentialDocument()
+        fun descriptor(value: JSONObject): JSONObject {
+            val rows = value.getJSONArray("namespaces")
+            return (0 until rows.length()).map { rows.getJSONObject(it) }
+                .filter { it.optString("ns") in setOf("llm-deepseek", "llm-deepseek-api-key") }.single()
+        }
+        val described = descriptor(settings)
+        val reference = DshSharedConfigurationMapping.deepSeekCredentialReference(settings)
+        val key = OfficialDeepSeekCredentialTransaction.nullableString(raw.getJSONObject("refs"), reference)
+        val checked = rpc.call(access, "settings/describe", JSONObject())
+        val checkedRaw = requireNotNull(officialCredentialBridge).readCredentialDocument()
+        val checkedDescriptor = descriptor(checked)
+        val after = nativeProof()
+        check(reference == DshSharedConfigurationMapping.deepSeekCredentialReference(checked) &&
+            described.getString("ns") == checkedDescriptor.getString("ns") && described.getLong("revision") == checkedDescriptor.getLong("revision") &&
+            raw.getString("revision") == checkedRaw.getString("revision") &&
+            sameOfficialNativeSnapshot(before.first, after.first) && sameOfficialNativeSnapshot(before.second, after.second) &&
+            key == before.first.key && dshRuntimeManager?.snapshot?.value?.accessUrl == access) { "NATIVE_NOT_CONFIRMED" }
+    }
+
+    private fun officialCredentialsReady(): Boolean = officialCredentialUi.state.value.nativeReady && !officialCredentialRecoveryPending &&
+        runCatching { officialCredentials?.hasPending() == false }.getOrDefault(false)
+
+    /** Only enums leave this read. An unfinished transaction may legitimately contain different native snapshots. */
+    private suspend fun observeOfficialCredentials(): OfficialCredentialUiObservation = withContext(Dispatchers.IO) {
+        val binding = requireNotNull(officialCredentials)
+        if (binding.hasPending()) {
+            officialNativeConflictProof = null
+            return@withContext OfficialCredentialUiObservation(
+                if (binding.requiresDshRecovery()) OfficialCredentialJournalStatus.DSH_PENDING else OfficialCredentialJournalStatus.NATIVE_PENDING,
+                OfficialCredentialNativePairStatus.MATCHED)
+        }
+        binding.withNativeReady {
+            val provider = requireNotNull(modelProviderStore).officialCredentialSnapshot()
+            val balance = requireNotNull(deepSeekBalanceStore).officialCredentialSnapshot()
+            val deferred = binding.hasDeferredPublication()
+            officialNativeConflictProof = if (provider.key != balance.key && !deferred)
+                OfficialCredentialNativeChoiceProof(provider.revision, balance.revision) else null
+            OfficialCredentialUiObservation(
+                if (deferred) OfficialCredentialJournalStatus.DEFERRED else OfficialCredentialJournalStatus.CLEAR,
+                if (provider.key == balance.key) OfficialCredentialNativePairStatus.MATCHED else OfficialCredentialNativePairStatus.CONFLICT)
+        }
+    }
+
+    private suspend fun publishOfficialCredentialUiState() = withContext(NonCancellable + Dispatchers.Main.immediate) {
+        // Only these two in-memory assignments are non-cancellable, never storage, RPC, model IO or task joins.
+        officialCredentialState = officialCredentialUi.state.value
+        officialCredentialRecoveryPending = !officialCredentialState.nativeReady
+    }
+
+    private suspend fun trackOfficialCredentialAction(operation: OfficialCredentialUiOperation,
+        action: suspend () -> OfficialCredentialOutcome): OfficialCredentialOutcome {
+        try { return officialCredentialUi.perform(operation) { publishOfficialCredentialUiState(); action() } }
+        finally { publishOfficialCredentialUiState() }
+    }
+
+    fun retryOfficialCredentialRecovery() = launchOfficialCredentialRecovery(OfficialCredentialUiOperation.RECOVER)
+
+    /** Public methods are called only by the model page's explicit confirmation dialogs. */
+    fun keepPhoneOfficialCredential() {
+        if (officialCredentialState.phoneChoiceAllowed) launchOfficialCredentialRecovery(OfficialCredentialUiOperation.KEEP_PHONE)
+    }
+
+    fun keepDshOfficialCredential() {
+        if (officialCredentialState.dshChoiceAllowed) launchOfficialCredentialRecovery(OfficialCredentialUiOperation.KEEP_DSH)
+    }
+
+    fun resolveNativeOfficialCredential(choice: OfficialCredentialNativeChoice) {
+        if (officialCredentialState.nativeChoiceAllowed) launchOfficialCredentialRecovery(OfficialCredentialUiOperation.RESOLVE_NATIVE, choice)
+    }
+
+    private fun launchOfficialCredentialRecovery(operation: OfficialCredentialUiOperation,
+        nativeChoice: OfficialCredentialNativeChoice? = null) {
+        if (connectionMode != "local" || deepSeekConfigurationBusy || localEngineSwitchBusy || workspaceDeletionBusy) return
+        if (officialCredentials == null) return
+        if (operation == OfficialCredentialUiOperation.RECOVER && !officialCredentialState.retryAllowed) return
+        val expectedNative = if (operation == OfficialCredentialUiOperation.RESOLVE_NATIVE) officialNativeConflictProof else null
+        val runningResponse = responseJob
+        ++credentialGeneration
+        cancelResponse(); catalogClient?.cancel()
+        deepSeekConfigurationBusy = true
+        deepSeekModelError = null
+        viewModelScope.launch {
+            try {
+                stopOfficialCredentialCallers(runningResponse)
+                localEngineGate.withLock {
+                    stopOfficialCredentialRuntime()
+                    val binding = requireNotNull(officialCredentials)
+                    if (operation == OfficialCredentialUiOperation.RESOLVE_NATIVE) {
+                        val choice = requireNotNull(nativeChoice)
+                        val proof = requireNotNull(expectedNative) { "NATIVE_CAS_CONFLICT" }
+                        // Revision proofs remain private and are rechecked by the coordinator before journaling.
+                        val baselines = withContext(Dispatchers.IO) {
+                            binding.withNativeReady {
+                                requireNotNull(modelProviderStore).officialCredentialSnapshot() to
+                                    requireNotNull(deepSeekBalanceStore).officialCredentialSnapshot()
+                            }
+                        }
+                        proof.requireCurrent(baselines.first, baselines.second)
+                        val runtime = requireNotNull(officialCredentialRuntime)
+                        val app = requireNotNull(applicationContext)
+                        val outcome = trackOfficialCredentialAction(operation) {
+                            withContext(Dispatchers.IO) {
+                                runtime.withIdleDataMutation(listOf(java.io.File(app.filesDir, "dsh-home"))) {
+                                    binding.coordinator().beginNativeResolution(when (choice) {
+                                        OfficialCredentialNativeChoice.PROVIDER -> OfficialNativeCredentialChoice.PROVIDER
+                                        OfficialCredentialNativeChoice.BALANCE -> OfficialNativeCredentialChoice.BALANCE
+                                        OfficialCredentialNativeChoice.CLEAR -> OfficialNativeCredentialChoice.CLEAR
+                                    }, proof.providerRevision, proof.balanceRevision)
+                                }
+                            }
+                        }
+                        requireOfficialCredentialCommit(outcome)
+                    } else {
+                        val needsDsh = operation in setOf(OfficialCredentialUiOperation.KEEP_PHONE, OfficialCredentialUiOperation.KEEP_DSH) ||
+                            binding.requiresDshRecovery() || binding.hasDeferredPublication()
+                        withOfficialCredentialRecoveryService(needsDsh) { access ->
+                            recoverOfficialCredentialsLocked(access, operation)
+                            if (operation == OfficialCredentialUiOperation.KEEP_DSH) {
+                                check(access != null) { "DSH_UNAVAILABLE" }
+                                trackOfficialCredentialAction(operation) {
+                                    requireNotNull(sharedDshConfiguration).readFromDsh(access, acceptDeferredConflict = true)
+                                    OfficialCredentialOutcome.NoPending
+                                }
+                                check(officialCredentialUi.state.value.nativeReady) { "NATIVE_NOT_CONFIRMED" }
+                            } else if (binding.hasDeferredPublication()) {
+                                check(access != null) { "DSH_UNAVAILABLE" }
+                                val outcome = trackOfficialCredentialAction(operation) {
+                                    // The true branch is reachable only from the confirmed KEEP_PHONE action.
+                                    binding.coordinator(access).publishDeferred(acceptDshConflict = operation == OfficialCredentialUiOperation.KEEP_PHONE)
+                                }
+                                requireOfficialCredentialCommit(outcome, access)
+                            }
+                        }
+                    }
+                    deepSeekConfigured = withContext(Dispatchers.IO) {
+                        binding.withNativeReady { requireNotNull(deepSeekBalanceStore).hasKey() }
+                    }
+                }
+                invalidateRemoteModels()
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                officialCredentialUi.recordFailure(operation, failure.message)
+                deepSeekModelError = officialCredentialUi.state.value.message
+            } finally { publishOfficialCredentialUiState(); deepSeekConfigurationBusy = false; notifyTaskConfiguration() }
+        }
+    }
+
+    /** Generic .dym credential helpers own their actual exclusive process lease, outside the native journal. */
+    internal suspend fun <T> withDymCredentialMutation(operation: suspend () -> T): T = withContext(Dispatchers.Main.immediate) {
+        check(connectionMode == "local" && !deepSeekConfigurationBusy && !localEngineSwitchBusy && !workspaceDeletionBusy) {
+            "请在本地模式等待当前配置保存后重试"
+        }
+        check(officialCredentialsReady()) { officialCredentialState.message }
+        val runningResponse = responseJob
+        ++credentialGeneration
+        cancelResponse(); catalogClient?.cancel()
+        deepSeekConfigurationBusy = true
+        try {
+            stopOfficialCredentialCallers(runningResponse)
+            localEngineGate.withLock {
+                stopOfficialCredentialRuntime()
+                val binding = requireNotNull(officialCredentials)
+                suspend fun requireShortNativeProof() = withContext(Dispatchers.IO) {
+                    binding.withNativeReady {
+                        check(requireNotNull(modelProviderStore).officialCredentialSnapshot().key ==
+                            requireNotNull(deepSeekBalanceStore).officialCredentialSnapshot().key) { "NATIVE_VAULT_CONFLICT" }
+                    }
+                }
+                requireShortNativeProof()
+                // The helper can acquire exclusiveRuntimeUse and start its process here without journal/launch-lock inversion.
+                val result = withContext(Dispatchers.IO) { operation() }
+                requireShortNativeProof()
+                officialCredentialUi.refresh(OfficialCredentialUiOperation.RESTORE)
+                result
+            }
+        } catch (cancelled: CancellationException) { throw cancelled
+        } catch (failure: Exception) {
+            officialCredentialUi.recordFailure(OfficialCredentialUiOperation.RESTORE, failure.message)
+            throw IllegalStateException(officialCredentialUi.state.value.message)
+        } finally { publishOfficialCredentialUiState(); deepSeekConfigurationBusy = false; notifyTaskConfiguration() }
+    }
+
+    /** Stop and join actual task callers before taking runtime or credential locks. */
+    private suspend fun stopOfficialCredentialCallers(runningResponse: Job?) {
+        awaitOfficialCredentialCallers(runningResponse, officialCredentialCallers.toList(),
+            stopBackground = { stopTasksForCredentialChange() },
+            awaitBackground = {
+                backgroundTasks?.tasks?.value.orEmpty().filter {
+                    it.status in setOf(BackgroundTaskStatus.QUEUED, BackgroundTaskStatus.RUNNING, BackgroundTaskStatus.STOPPING)
+                }.forEach { requireNotNull(backgroundTasks).awaitTerminal(it.id) }
+            })
+    }
+
+    /** Track the actual runner/HTTP caller over all model and tool rounds, without retaining the journal. */
+    private suspend fun <T> withOfficialCredentialCaller(block: suspend () -> T): T {
+        val caller = requireNotNull(currentCoroutineContext()[Job])
+        withContext(Dispatchers.Main.immediate) {
+            check(officialCredentialsReady() && !deepSeekConfigurationBusy && !localEngineSwitchBusy &&
+                !taskCredentialBoundary.blocked && connectionMode == "local") { "NATIVE_NOT_CONFIRMED" }
+            officialCredentialCallers.add(caller)
+        }
+        try { return block() }
+        finally { withContext(NonCancellable + Dispatchers.Main.immediate) { officialCredentialCallers.remove(caller) } }
+    }
+
+    private suspend fun readOfficialCredentialForRequest(expectedGeneration: Long): String? = withContext(Dispatchers.IO) {
+        requireNotNull(officialCredentials).withNativeReady {
+            check(expectedGeneration == credentialGeneration && officialCredentialsReady()) { "NATIVE_CHANGED" }
+            val provider = requireNotNull(modelProviderStore).officialCredentialSnapshot()
+            val balance = requireNotNull(deepSeekBalanceStore).officialCredentialSnapshot()
+            check(provider.key == balance.key) { "NATIVE_VAULT_CONFLICT" }
+            balance.key
+        }
+    }
+
+    private fun newOfficialClient(key: String?): DeepSeekChatClient = DeepSeekChatClient({ key }, DeepSeekChatClient.Config(),
+        { it.openConnection() as javax.net.ssl.HttpsURLConnection })
+
+    /** Only this explicit action performs a balance request; private generation proofs never enter UI state. */
+    suspend fun fetchOfficialBalance(): Result<DeepSeekBalanceClient.BalanceResult> = try {
+        withOfficialCredentialCaller {
+            val generation = credentialGeneration
+            val result = DeepSeekBalanceClient(DeepSeekBalanceClient.Config(),
+                keyProvider = { readOfficialCredentialForRequest(generation) }).fetchBalance()
+            check(generation == credentialGeneration && officialCredentialsReady() && !deepSeekConfigurationBusy) { "NATIVE_CHANGED" }
+            result
+        }
+    } catch (cancelled: CancellationException) { throw cancelled
+    } catch (_: Exception) { Result.failure(IllegalStateException("凭据状态已变化，请先完成恢复后重新查询")) }
+
+    /** Real callers have been cancelled and joined before this method. No journal mutex is held. */
+    private suspend fun stopOfficialCredentialRuntime() {
+        modelRuntime?.shutdown(stopActive = true)
+        connectPluginHost?.stop()
+        dshRuntimeManager?.stop()
+        check(requireNotNull(officialCredentialRuntime).managedProcesses.value.none { it.running }) { "TASKS_NOT_STOPPED" }
+    }
+
+    /** Retain the actual managed-process lease across every recovery RPC; never expose its WebView. */
+    private suspend fun <T> withOfficialCredentialRecoveryService(needsDsh: Boolean, action: suspend (String?) -> T): T {
+        if (!needsDsh) return action(null)
+        val manager = requireNotNull(dshRuntimeManager) { "DSH_UNAVAILABLE" }
+        try {
+            val service = try { manager.start(localDshWorkspace(selectedWorkspaceId)) }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { error("DSH_UNAVAILABLE") }
+            val access = requireNotNull(service.accessUrl) { "DSH_UNAVAILABLE" }
+            val pid = requireNotNull(service.pid) { "DSH_UNAVAILABLE" }
+            fun requireLease() {
+                check(requireNotNull(officialCredentialRuntime).managedProcesses.value.any {
+                    it.id == DshRuntimeManager.PROCESS_ID && it.pid == pid && it.running
+                } && manager.snapshot.value.pid == pid && manager.snapshot.value.accessUrl == access) { "DSH_UNAVAILABLE" }
+            }
+            requireLease(); requireLocalDshIdle(access)
+            val result = action(access)
+            requireLease()
+            return result
+        } finally { stopOfficialCredentialRecoveryService(manager) }
+    }
+
+    /** Only process cleanup is non-cancellable; the manager retains its lease if exit fails. */
+    private suspend fun stopOfficialCredentialRecoveryService(manager: DshRuntimeManager) =
+        withContext(NonCancellable + Dispatchers.IO) {
+            withTimeout(30_000L) { manager.stop() }
+            check(requireNotNull(officialCredentialRuntime).managedProcesses.value.none {
+                it.id == DshRuntimeManager.PROCESS_ID && it.running
+            }) { "TASKS_NOT_STOPPED" }
+        }
+
+    internal suspend fun <T> withOfficialCredentialsReadyForBackup(operation: suspend () -> T): T =
+        withContext(Dispatchers.IO) { requireNotNull(officialCredentials).withNativeReady(operation) }
+
+    /** Explicit .dym export only. The UI explains that this object contains portable credentials. */
+    suspend fun exportDymProviderConfiguration(): JSONObject = withOfficialCredentialsReadyForBackup {
+        val portable = requireNotNull(modelProviderStore) { "提供商存储尚未就绪" }.exportPortable()
+        val key = requireNotNull(deepSeekBalanceStore).readApiKeyForRequest()
+        check(OfficialCredentialPortable.key(portable) == key) { "官方凭据尚未一致，不能导出未确认的 Key" }
+        portable
+    }
+
+    internal suspend fun captureDymOfficialCredentials(configuration: JSONObject, retained: JSONObject?): JSONObject =
+        withContext(Dispatchers.IO) {
+            val store = requireNotNull(modelProviderStore)
+            suspend fun requireNativeSnapshot() = withOfficialCredentialsReadyForBackup {
+                check(store.read().revision == configuration.getLong("revision") &&
+                    OfficialCredentialPortable.key(configuration) == requireNotNull(deepSeekBalanceStore).readApiKeyForRequest()) {
+                    "提供商配置已变化，请重新导出"
+                }
+            }
+            requireNativeSnapshot()
+            val access = dshRuntimeManager?.snapshot?.value?.accessUrl
+                ?: return@withContext DymSharedCredentials.captureWithoutDsh(configuration, retained)
+            // These RPC/helper calls may await IO or acquire a process lease, so they run after releasing the native gate.
+            requireLocalDshIdle(access)
+            val rpc = DshLocalConfigurationRpc()
+            val settings = rpc.call(access, "settings/describe", JSONObject())
+            val raw = requireNotNull(officialCredentialBridge).readCredentialDocument()
+            val rows = settings.getJSONArray("namespaces")
+            val selected = (0 until rows.length()).map { rows.getJSONObject(it) }
+                .filter { it.optString("ns") in setOf("llm-deepseek", "llm-deepseek-api-key") }.single()
+            val checked = rpc.call(access, "settings/describe", JSONObject())
+            val checkedRows = checked.getJSONArray("namespaces")
+            val checkedSelected = (0 until checkedRows.length()).map { checkedRows.getJSONObject(it) }
+                .filter { it.optString("ns") == selected.getString("ns") }.single()
+            val checkedRaw = requireNotNull(officialCredentialBridge).readCredentialDocument()
+            check(checkedSelected.getLong("revision") == selected.getLong("revision") &&
+                DshSharedConfigurationMapping.deepSeekCredentialReference(checked) == DshSharedConfigurationMapping.deepSeekCredentialReference(settings) &&
+                checkedRaw.getString("revision") == raw.getString("revision") &&
+                dshRuntimeManager?.snapshot?.value?.accessUrl == access) { "备份源已变化，请重新导出" }
+            requireNativeSnapshot()
+            DymSharedCredentials.capture(raw, configuration, retained, DshSharedConfigurationMapping.deepSeekCredentialReference(settings))
     }
 
     /** Pause real execution before replacing credentials; keep both vaults consistent on a write failure. */
@@ -2353,7 +2729,7 @@ class DemoRepository : ViewModel() {
         if (deepSeekConfigurationBusy || workspaceDeletionBusy || localEngineSwitchBusy || connectionMode != "local") {
             return@withContext Result.failure(IllegalStateException("请在本地模式等待当前配置保存后重试"))
         }
-        val providers = modelProviderStore ?: return@withContext Result.failure(IllegalStateException("提供商存储尚未就绪"))
+        if (modelProviderStore == null) return@withContext Result.failure(IllegalStateException("提供商存储尚未就绪"))
         val balance = deepSeekBalanceStore ?: return@withContext Result.failure(IllegalStateException("凭据存储尚未就绪"))
         deepSeekConfigurationBusy = true
         ++credentialGeneration
@@ -2361,51 +2737,36 @@ class DemoRepository : ViewModel() {
         cancelResponse()
         catalogClient?.cancel()
         try {
-            withTimeout(30_000L) { runningJob?.join(); stopTasksForCredentialChange() }
-            localEngineGate.withLock { withContext(NonCancellable + Dispatchers.IO) {
-                val incoming = JSONObject(configuration.toString())
-                val deepseek = incoming.getJSONObject("credentials").optJSONObject("deepseek")
-                val key = deepseek?.let {
-                    require(it.getString("type") == "api_key") { "DeepSeek 官方仅接受 API Key" }
-                    it.getString("key").trim().also { value ->
-                        require(value.isNotEmpty() && value.length <= 512 && value.none { c -> c.isWhitespace() || c.isISOControl() }) {
-                            "备份中的 DeepSeek API Key 无效"
+            stopOfficialCredentialCallers(runningJob)
+            localEngineGate.withLock {
+                stopOfficialCredentialRuntime()
+                val binding = requireNotNull(officialCredentials)
+                withOfficialCredentialRecoveryService(binding.requiresDshRecovery()) { access -> recoverOfficialCredentialsLocked(access) }
+                val runtime = requireNotNull(officialCredentialRuntime)
+                val app = requireNotNull(applicationContext)
+                val outcome = trackOfficialCredentialAction(OfficialCredentialUiOperation.RESTORE) {
+                    withContext(Dispatchers.IO) {
+                        runtime.withIdleDataMutation(listOf(java.io.File(app.filesDir, "dsh-home"))) {
+                            binding.coordinator().beginPortableRestore(configuration)
                         }
                     }
                 }
-                val previous = providers.exportPortable()
-                val previousKey = balance.readApiKeyForRequest()
-                var writtenRevision: Long? = null
-                try {
-                    val imported = providers.importPortableIfRevision(incoming, previous.getLong("revision"))
-                    writtenRevision = imported.revision
-                    if (key == null) balance.clearApiKey() else balance.setApiKey(key)
-                    withContext(Dispatchers.Main.immediate) {
-                        modelProviderOrder = imported.providers.map { it.id }
-                        modelProviderEnabled = imported.providers.associate { it.id to it.enabled }
-                    }
-                } catch (error: Exception) {
-                    try {
-                        writtenRevision?.let { revision ->
-                            providers.importPortableIfRevision(previous, revision)
-                            val current = balance.readApiKeyForRequest()
-                            check(current == key || current == previousKey) { "官方凭据已变化，不能回退覆盖" }
-                            if (current != previousKey) {
-                                if (previousKey == null) balance.clearApiKey() else balance.setApiKey(previousKey)
-                            }
-                        }
-                    } catch (rollback: Exception) {
-                        throw IllegalStateException("凭据恢复失败且回退未完成，请重新检查提供商配置", rollback)
-                    }
-                    throw error
+                requireOfficialCredentialCommit(outcome)
+                val imported = withContext(Dispatchers.IO) { binding.withNativeReady { requireNotNull(modelProviderStore).read() } }
+                withContext(Dispatchers.Main.immediate) {
+                    modelProviderOrder = imported.providers.map { it.id }
+                    modelProviderEnabled = imported.providers.associate { it.id to it.enabled }
                 }
-            } }
-            deepSeekConfigured = withContext(Dispatchers.IO) { balance.hasKey() }
+            }
+            deepSeekConfigured = withContext(Dispatchers.IO) { requireNotNull(officialCredentials).withNativeReady { balance.hasKey() } }
             invalidateRemoteModels()
             Result.success(Unit)
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (error: Exception) { Result.failure(error) }
-        finally { deepSeekConfigurationBusy = false; notifyTaskConfiguration() }
+        catch (error: Exception) {
+            officialCredentialUi.recordFailure(OfficialCredentialUiOperation.RESTORE, error.message)
+            Result.failure(IllegalStateException(officialCredentialUi.state.value.message))
+        }
+        finally { publishOfficialCredentialUiState(); deepSeekConfigurationBusy = false; notifyTaskConfiguration() }
     }
 
     private suspend fun stopTasksForCredentialChange() = withContext(Dispatchers.Main.immediate) {
@@ -2474,7 +2835,8 @@ class DemoRepository : ViewModel() {
             model.inputModalities.any { it == "image" })
 
     fun refreshDeepSeekModels() {
-        val client = catalogClient ?: return
+        if (catalogClient == null) return
+        if (!officialCredentialsReady()) { updateNotice("请先完成官方凭据事务恢复"); return }
         if (deepSeekConfigurationBusy) return
         if (!deepSeekConfigured) { updateNotice("请先保存 DeepSeek API Key"); return }
         val generation = credentialGeneration
@@ -2482,6 +2844,9 @@ class DemoRepository : ViewModel() {
         deepSeekModelError = null
         viewModelScope.launch {
             try {
+                val client = newOfficialClient(readOfficialCredentialForRequest(generation))
+                catalogClient = client
+                // The snapshot read above releases the journal before model network IO.
                 val fetched = client.listModels()
                 if (generation != credentialGeneration) return@launch
                 val remembered = settingsPreferences?.getString("deepseek_selected_model", null)
@@ -2891,6 +3256,21 @@ class DemoRepository : ViewModel() {
         val manager = requireNotNull(dshRuntimeManager) { "DSH 服务管理器尚未初始化" }
         val baseline = workspaceSnapshot()
         val directory = localDshWorkspace(baseline.selectedWorkspaceId)
+        val credentials = requireNotNull(officialCredentials)
+        // Recovery-only startup provides a loopback RPC for an earlier DSH
+        // transaction; no new prompt, worker or imported history is executed.
+        val recoveryAccess = try {
+            if (credentials.requiresDshRecovery()) manager.snapshot.value.accessUrl
+                ?: requireNotNull(manager.start(directory).accessUrl) else manager.snapshot.value.accessUrl
+        } catch (cancelled: CancellationException) { throw cancelled
+        } catch (failure: Exception) {
+            officialCredentialUi.recordFailure(OfficialCredentialUiOperation.START_DSH, "DSH_UNAVAILABLE")
+            publishOfficialCredentialUiState()
+            throw failure
+        }
+        recoveryAccess?.let { requireLocalDshIdle(it) }
+        try { recoverOfficialCredentialsLocked(recoveryAccess, OfficialCredentialUiOperation.START_DSH) }
+        catch (failure: Throwable) { stopOfficialCredentialRecoveryService(manager); throw failure }
         if (sharedHistory) {
             check(!hasNativeRunningTasks()) { "本机任务尚未停止，不能共享运行中的历史" }
             val access = manager.snapshot.value.accessUrl
@@ -2904,30 +3284,38 @@ class DemoRepository : ViewModel() {
             published.warnings.firstOrNull()?.let(::updateNotice)
             check(workspaceSnapshot() == baseline) { "工作区或对话已变化，历史保留，请重新切换" }
         }
-        val started = manager.start(directory)
-        if (sharedHistory) {
+        val started = try { manager.start(directory) }
+        catch (cancelled: CancellationException) { throw cancelled
+        } catch (failure: Exception) {
+            officialCredentialUi.recordFailure(OfficialCredentialUiOperation.START_DSH, "DSH_UNAVAILABLE")
+            publishOfficialCredentialUiState()
+            throw failure
+        }
+        try {
             val access = requireNotNull(started.accessUrl) { "DSH 未提供已认证网页入口" }
-            try {
+            if (credentials.hasDeferredPublication()) {
+                requireLocalDshIdle(access)
+                requireOfficialCredentialCommit(trackOfficialCredentialAction(OfficialCredentialUiOperation.START_DSH) {
+                    credentials.coordinator(access).publishDeferred(acceptDshConflict = false)
+                }, access)
+            }
+            if (sharedHistory) {
                 lastDshProviderRevision = requireNotNull(sharedDshConfiguration).writeToDsh(access).revision
                 dshSharedConfigurationError = null
             }
-            catch (failure: Throwable) {
-                withContext(NonCancellable) { manager.stop() }
-                throw failure
-            }
+        }
+        catch (failure: Throwable) {
+            stopOfficialCredentialRecoveryService(manager)
+            throw failure
         }
     }
 
     private suspend fun synchronizeOfficialCredentialToVault() = withContext(Dispatchers.IO) {
-        val store = requireNotNull(modelProviderStore)
-        val portable = store.exportPortable()
-        val secrets = portable.getJSONObject("credentials")
-        val old = secrets.optJSONObject("deepseek")
-        val key = requireNotNull(deepSeekBalanceStore).readApiKeyForRequest()
-        val value = key?.let { JSONObject().put("type", "api_key").put("key", it) }
-        if (old?.toString() != value?.toString()) {
-            if (value == null) secrets.remove("deepseek") else secrets.put("deepseek", value)
-            store.importPortableIfRevision(portable, portable.getLong("revision"))
+        requireNotNull(officialCredentials).withNativeReady {
+            val key = requireNotNull(deepSeekBalanceStore).readApiKeyForRequest()
+            check(OfficialCredentialPortable.key(requireNotNull(modelProviderStore).exportPortable()) == key) {
+                "手机官方凭据尚未一致，请明确选择要保留的 Key"
+            }
         }
     }
 
@@ -2959,25 +3347,12 @@ class DemoRepository : ViewModel() {
         val access = manager.snapshot.value.accessUrl
         if (access != null) {
             requireLocalDshIdle(access)
+            recoverOfficialCredentialsLocked(access)
+            val beforeKey = readOfficialCredentialForRequest(credentialGeneration)
             val imported = requireNotNull(sharedDshConfiguration).readFromDsh(access)
-            var keyChanged = false
-            try {
-                withContext(Dispatchers.IO) {
-                    val secret = requireNotNull(modelProviderStore).exportPortable().getJSONObject("credentials").optJSONObject("deepseek")
-                    val balance = requireNotNull(deepSeekBalanceStore)
-                    val before = balance.readApiKeyForRequest()
-                    val after = secret?.let { require(it.getString("type") == "api_key"); it.getString("key") }
-                    keyChanged = before != after
-                    if (keyChanged) {
-                        if (after == null) balance.clearApiKey() else balance.setApiKey(after)
-                    }
-                    deepSeekConfigured = balance.hasKey()
-                }
-            } catch (failure: Exception) {
-                deepSeekConfigured = false
-                invalidateRemoteModels()
-                throw IllegalStateException("DSH 设置已读取，但官方凭据保存未完成，请在模型页重新保存 API Key", failure)
-            }
+            val afterKey = readOfficialCredentialForRequest(credentialGeneration)
+            val keyChanged = beforeKey != afterKey
+            deepSeekConfigured = afterKey != null
             modelProviderOrder = imported.providers.map { it.id }
             modelProviderEnabled = imported.providers.associate { it.id to it.enabled }
             if (keyChanged) invalidateRemoteModels()
@@ -3017,6 +3392,13 @@ class DemoRepository : ViewModel() {
                         val current = requireNotNull(modelProviderStore).read().revision
                         if (current == lastDshProviderRevision) return@withLock
                         val access = requireNotNull(dshRuntimeManager?.snapshot?.value?.accessUrl) { "DSH 服务已停止" }
+                        requireLocalDshIdle(access)
+                        recoverOfficialCredentialsLocked(access)
+                        val credentials = requireNotNull(officialCredentials)
+                        if (credentials.hasDeferredPublication()) requireOfficialCredentialCommit(
+                            trackOfficialCredentialAction(OfficialCredentialUiOperation.RECOVER) {
+                                credentials.coordinator(access).publishDeferred(acceptDshConflict = false)
+                            }, access)
                         lastDshProviderRevision = requireNotNull(sharedDshConfiguration).writeToDsh(access).revision
                         dshSharedConfigurationError = null
                         modelRuntime?.refresh()
@@ -3193,7 +3575,8 @@ class DemoRepository : ViewModel() {
     }
 
     private suspend fun sendMessageCommitted(text: String, caller: Job?): Boolean {
-        if (sendPending || workspaceDeletionBusy || localEngineSwitchBusy) return false
+        if (!officialCredentialsReady()) { updateNotice("官方凭据事务待恢复，草稿已保留"); return false }
+        if (sendPending || workspaceDeletionBusy || localEngineSwitchBusy || deepSeekConfigurationBusy) return false
         dshRuntimeManager?.snapshot?.value?.accessUrl?.let { access ->
             try { requireLocalDshIdle(access) }
             catch (cancelled: CancellationException) { throw cancelled }
@@ -3469,6 +3852,7 @@ class DemoRepository : ViewModel() {
     /** True when [message] is the latest failed official reply in the selected conversation. */
     fun canRetryResponse(message: ChatMessage): Boolean {
         if (connectionMode == "online") return false
+        if (!officialCredentialsReady() || deepSeekConfigurationBusy) return false
         val snapshot = message.streamSnapshot ?: return false
         val list = conversationMessages[selectedConversationId] ?: return false
         return message.role == "assistant" && snapshot.source == AssistantStreamSource.BACKEND &&
@@ -3635,7 +4019,7 @@ class DemoRepository : ViewModel() {
         conversationId: String, input: String, model: ModelChoice, option: ReasoningOption?,
         history: List<DeepSeekChatClient.HistoryMessage>,
     ) {
-        val client = deepSeekClient ?: return
+        if (deepSeekClient == null) return
         val modelId = model.id
         val reasoning = officialReasoning(model, option)
         val id = nextMessageId++
@@ -3669,8 +4053,12 @@ class DemoRepository : ViewModel() {
         val streaming = officialEngineStreaming
         messages += ChatMessage(id, "assistant", "正在连接 DeepSeek…", reducer.snapshot())
         isResponding = true
-        responseJob = viewModelScope.launch {
+        responseJob = viewModelScope.launchOfficialCredentialCaller(officialCredentialCallers) {
             try {
+                val client = newOfficialClient(readOfficialCredentialForRequest(requestCredential))
+                ensureActive()
+                check(generation == responseGeneration && requestCredential == credentialGeneration && !deepSeekConfigurationBusy)
+                deepSeekClient = client
                 OfficialToolSession.generate(
                     client,
                     DeepSeekChatClient.Request(
@@ -3720,7 +4108,7 @@ class DemoRepository : ViewModel() {
                 throw cancelled
             } catch (error: Exception) {
                 ensureActive()
-                if (generation != responseGeneration) return@launch
+                if (generation != responseGeneration) return@launchOfficialCredentialCaller
                 val sequence = reducer.snapshot().nextExpectedSequenceNumber ?: 0L
                 reducer.apply(
                     AssistantStreamEvent.MessageFailed(
@@ -3779,7 +4167,7 @@ class DemoRepository : ViewModel() {
         val streaming = officialEngineStreaming
         conversationMessages.getValue(conversationId).add(ChatMessage(id, "assistant", "正在连接 ${model.provider}…", reducer.snapshot()))
         isResponding = true
-        responseJob = viewModelScope.launch {
+        responseJob = viewModelScope.launchOfficialCredentialCaller(officialCredentialCallers) {
             try {
                 val context = withContext(Dispatchers.IO) {
                     nativeTranscriptStore?.prepare(conversationId, nativeModel, precedingMessageId, history)

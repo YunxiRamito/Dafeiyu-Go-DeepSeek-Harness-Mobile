@@ -175,7 +175,9 @@ export async function writeCredentials(bundleRoot, home, updates, guestHome = '/
     }
   }
   const before = await readCredentials(bundleRoot, home);
-  check(before.revision === updates.expectedRevision);
+  if (before.revision !== updates.expectedRevision) {
+    throw Object.assign(new Error('SHARED_CREDENTIAL_REVISION_CONFLICT'), { code: 'SHARED_CREDENTIAL_REVISION_CONFLICT' });
+  }
   const require = createRequire(path.join(path.resolve(bundleRoot), 'package.json'));
   const { Context, Service } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')).href);
   const { LocalCredentialProvider } = await loadPinned(bundleRoot, '@deepseek-ai/dsh-credentials-local');
@@ -194,7 +196,9 @@ export async function writeCredentials(bundleRoot, home, updates, guestHome = '/
     const reconcile = provider.reconcileFromDisk.bind(provider);
     provider.reconcileFromDisk = async () => {
       await reconcile();
-      check((await readCredentials(bundleRoot, home)).revision === expected);
+      if ((await readCredentials(bundleRoot, home)).revision !== expected) {
+        throw Object.assign(new Error('SHARED_CREDENTIAL_REVISION_CONFLICT'), { code: 'SHARED_CREDENTIAL_REVISION_CONFLICT' });
+      }
     };
     const refresh = async () => { expected = (await readCredentials(bundleRoot, home)).revision; applied++; };
     for (const item of updates.refs) {
@@ -265,7 +269,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     // only a fixed reason vocabulary; never forward its message or stack.
     const reasons = ['ENOENT', 'EACCES', 'EPERM', 'EINVAL', 'EBUSY', 'EAGAIN',
       'ERR_DLOPEN_FAILED', 'MODULE_NOT_FOUND', 'ERR_MODULE_NOT_FOUND',
-      'ERR_INVALID_ARG_VALUE', 'ERR_FLOCK_UNSUPPORTED_PLATFORM'];
+      'ERR_INVALID_ARG_VALUE', 'ERR_FLOCK_UNSUPPORTED_PLATFORM', 'SHARED_CREDENTIAL_REVISION_CONFLICT'];
     const reason = reasons.includes(failure?.code) ? failure.code : 'INVALID';
     process.stdout.write(JSON.stringify({ ok: false, code: 'SHARED_STORAGE_FAILED', reason }) + '\n');
     process.exitCode = 1;

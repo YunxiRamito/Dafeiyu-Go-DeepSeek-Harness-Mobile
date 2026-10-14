@@ -64,11 +64,14 @@ class DymBackupCoordinator(
         val preferences = if (selection.preferences) AndroidDymPreferences.capture(repository) else null
         val configuration = if (selection.providers) repository.exportDymProviderConfiguration() else null
         val retained = retainedStore.read()
-        var sharedCredentials = if (selection.providers) retained.sharedCredentials else null
-        if (selection.providers && configuration != null && withContext(Dispatchers.IO) { installer.current() != null }) {
-            try { sharedCredentials = DymSharedCredentials.capture(persistence.readCredentialDocument(), configuration, retained.sharedCredentials) }
+        // Even without DSH, normalize retained credentials to the current
+        // committed native value/tombstone. Never export a stale retained Key
+        // as authority over an explicit native deletion.
+        var sharedCredentials = configuration?.let { DymSharedCredentials.captureWithoutDsh(it, retained.sharedCredentials) }
+        if (selection.providers && configuration != null) {
+            try { sharedCredentials = repository.captureDymOfficialCredentials(configuration, retained.sharedCredentials) }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { warnings += "DSH 私有凭据未完成读取，已保留之前的跨端凭据并继续导出其他内容" }
+            catch (_: Exception) { warnings += "DSH 当前选择器未完成读取；已使用当前手机凭据或明确缺失，未恢复旧官方 Key" }
         }
         val directories = retained.directories.filterKeys { prefix ->
             when {
@@ -184,14 +187,19 @@ class DymBackupCoordinator(
             descriptions += "${backup.workspaces.size} 个工作区、${backup.conversations.size} 个可兼容会话"
             if (prepared.convertedPcSessions > 0) descriptions += "已转换 ${prepared.convertedPcSessions} 个 PC DSH 会话"
         }
-        val portableConfiguration = prepared.archive?.providerConfiguration ?: prepared.archive?.sharedCredentials?.let {
-            DymSharedCredentials.nativeConfiguration(it, repository.exportDymProviderConfiguration())
-        }
-        portableConfiguration?.let { configuration ->
+        try {
+            val portableConfiguration = prepared.archive?.providerConfiguration ?: prepared.archive?.sharedCredentials?.let {
+                DymSharedCredentials.nativeConfiguration(it, repository.exportDymProviderConfiguration())
+            }
             currentCoroutineContext().ensureActive()
-            repository.restoreDymProviderConfiguration(configuration)
-                .onSuccess { descriptions += "提供商配置与凭据" }
-                .onFailure { warnings += "提供商配置导入失败，其他有效内容已继续导入" }
+            portableConfiguration?.let { configuration ->
+                repository.restoreDymProviderConfiguration(configuration)
+                    .onSuccess { descriptions += "提供商配置与凭据" }
+                    .onFailure { warnings += "提供商配置导入失败，其他有效内容已继续导入" }
+            }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) {
+            warnings += "提供商配置或官方凭据尚未确认，其他有效内容已继续导入"
         }
         prepared.preferences?.let { plan ->
             currentCoroutineContext().ensureActive()
@@ -219,10 +227,15 @@ class DymBackupCoordinator(
                 archive.sharedCredentials?.let { credentials ->
                     if (installer.current() == null) warnings += "DSH 凭据已保留；安装匹配运行组件后重新导入以恢复到 DSH"
                     else try {
+                        repository.withDymCredentialMutation {
                         val before = persistence.readCredentialDocument()
+                        // Official refs are excluded by updates(). Their
+                        // value/tombstone was committed to the native vaults
+                        // above and is published through a later fresh-ref CAS.
                         persistence.writeCredentialDocument(DymSharedCredentials.updates(credentials, before.getString("revision"), archive.providerConfiguration),
                             exclusiveRuntimeUse = true)
-                        descriptions += "DSH 私有凭据（实际平台存储）"
+                        }
+                        descriptions += "其他 DSH 私有凭据（实际平台存储）；官方 Key 等待安全同步"
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (_: Exception) { warnings += "DSH 凭据恢复未完成，原始凭据已保留，其他有效内容已继续导入" }
                 }

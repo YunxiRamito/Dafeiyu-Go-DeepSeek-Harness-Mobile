@@ -1,6 +1,7 @@
 package com.dafeiyu.mobile.data
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -22,10 +23,17 @@ import javax.net.ssl.SSLException
  * retry automatically, cache the response, or write logs. The API key is read
  * from BalanceStore only for the duration of the request setup.
  */
-class DeepSeekBalanceClient(
-    private val balanceStore: BalanceStore,
+class DeepSeekBalanceClient private constructor(
+    private val keyProvider: suspend () -> String?,
     private val config: Config = Config(),
 ) {
+    constructor(balanceStore: BalanceStore, config: Config = Config()) : this(
+        { balanceStore.readApiKeyForRequest() }, config,
+    )
+
+    /** Repository supplies a confirmed snapshot under a short native gate; HTTPS runs after its release. */
+    internal constructor(config: Config, keyProvider: suspend () -> String?) : this(keyProvider, config)
+
     data class Config(
         val connectTimeoutMs: Int = DEFAULT_TIMEOUT_MS,
         val readTimeoutMs: Int = DEFAULT_TIMEOUT_MS,
@@ -69,7 +77,10 @@ class DeepSeekBalanceClient(
     /** Performs one explicit GET https://api.deepseek.com/user/balance call. */
     suspend fun fetchBalance(): Result<BalanceResult> = withContext(Dispatchers.IO) {
         try {
-            Result.success(fetchBalanceBlocking())
+            val apiKey = keyProvider()
+                ?: throw DeepSeekBalanceException(ErrorKind.MISSING_KEY, "未配置 DeepSeek API Key")
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            Result.success(fetchBalanceBlocking(apiKey))
         } catch (error: kotlinx.coroutines.CancellationException) {
             throw error
         } catch (error: DeepSeekBalanceException) {
@@ -93,9 +104,7 @@ class DeepSeekBalanceClient(
         }
     }
 
-    private fun fetchBalanceBlocking(): BalanceResult {
-        val apiKey = balanceStore.readApiKeyForRequest()
-            ?: throw DeepSeekBalanceException(ErrorKind.MISSING_KEY, "未配置 DeepSeek API Key")
+    private fun fetchBalanceBlocking(apiKey: String): BalanceResult {
         val connection = openConnection(apiKey)
         return try {
             val status = connection.responseCode

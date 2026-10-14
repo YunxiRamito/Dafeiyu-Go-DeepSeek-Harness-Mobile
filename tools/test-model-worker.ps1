@@ -2,7 +2,7 @@ param([string]$InstalledModulesRoot = 'G:\DeepSeek DSH', [switch]$GenerationChec
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $tempRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot '..\Temp_Android'))
-$testRoot = Join-Path $tempRoot 'qa\model-worker-0.1.25'
+$testRoot = Join-Path $tempRoot ('qa/model-worker/run-' + [Guid]::NewGuid().ToString('N'))
 $cacheRoot = Join-Path $tempRoot 'caches\gradle\caches\modules-2\files-2.1'
 New-Item -ItemType Directory -Force -Path $testRoot | Out-Null
 $env:TMP = $testRoot
@@ -25,9 +25,13 @@ $classpath = @($stdlib, $coroutines, $annotations, (Cached 'org.apache.commons\c
 $dataRoot = Join-Path $projectRoot 'app\src\main\java\com\dafeiyu\mobile\data'
 $sources = @('LinuxRuntimeContract.kt', 'LinuxSandboxContract.kt', 'LinuxSandboxVerifier.kt', 'LinuxArchiveExtractor.kt', 'LinuxRuntimeManager.kt', 'LinuxManagedProcess.kt',
     'ComponentDownloadClient.kt', 'ArtifactDownloader.kt', 'ModelProviderConfig.kt', 'ModelProviderStore.kt', 'PiAiNodeWorker.kt',
-    'PiAiRuntimeInstaller.kt', 'PiAiChatAdapter.kt', 'AssistantStreamProtocol.kt', 'ChatMessage.kt', 'DshProviderOrderProjection.kt') |
+    'ModelRuntimeController.kt',
+    'PiAiRuntimeInstaller.kt', 'PiAiChatAdapter.kt', 'AssistantStreamProtocol.kt', 'ChatMessage.kt', 'DshProviderOrderProjection.kt',
+    'OfficialDeepSeekCredentialTransaction.kt', 'OfficialCredentialPortable.kt', 'OfficialCredentialRecoveryGate.kt',
+    'OfficialCredentialJournalCodec.kt', 'AndroidOfficialCredentialJournal.kt') |
     ForEach-Object { Join-Path $dataRoot $_ }
 $javaRoot = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { 'C:\Program Files\Java\JDK21' }
+$sources += Join-Path $PSScriptRoot 'tests/model-worker/RecoveryFixture.kt'
 & (Join-Path $javaRoot 'bin\java.exe') '-Xmx256m' "-Djava.io.tmpdir=$testRoot" -cp $compilerClasspath `
     org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -Werror -no-stdlib -no-reflect -jvm-target 17 -classpath $classpath `
     -d (Join-Path $testRoot 'runtime-worker.jar') @sources 2>&1 | Tee-Object -FilePath (Join-Path $testRoot 'compile.log')
