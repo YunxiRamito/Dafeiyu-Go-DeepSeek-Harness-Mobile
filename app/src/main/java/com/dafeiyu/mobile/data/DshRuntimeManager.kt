@@ -16,12 +16,15 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +33,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 enum class DshServiceStatus { STOPPED, STARTING, RUNNING, STOPPING, ERROR }
 
@@ -84,6 +88,9 @@ class DshRuntimeManager private constructor(
     private val closed = AtomicBoolean(false)
 
     suspend fun refresh(): DshServiceSnapshot = withContext(Dispatchers.IO) {
+        shared.current?.takeIf { !it.process.isAlive }?.let { target ->
+            runCatching { cleanupSession(target) }.onFailure { reportCleanupFailure(target, it) }
+        }
         val session = shared.lock.withLock {
             shared.current?.takeIf { !it.process.isAlive }?.let { finishedLocked(it, null) }
             val target = shared.current
@@ -111,6 +118,7 @@ class DshRuntimeManager private constructor(
 
     suspend fun start(workspace: File? = null, requestedPort: Int? = null): DshServiceSnapshot = withContext(Dispatchers.IO) {
         check(!closed.get()) { "DSH 服务管理器已关闭" }
+        shared.current?.takeIf { !it.process.isAlive }?.let { cleanupSession(it) }
         val session = shared.lock.withLock {
             shared.current?.takeIf { !it.process.isAlive }?.let { finishedLocked(it, null) }
             if (shared.current != null) return@withLock null
@@ -121,15 +129,23 @@ class DshRuntimeManager private constructor(
             shared.snapshot.value = DshServiceSnapshot(status = DshServiceStatus.STARTING,
                 version = slot.manifest.dshVersion, port = port, baseUrl = "http://127.0.0.1:$port/", detail = "正在启动 DSH 服务")
             try {
-                val process = launchProcess(slot, port, workspace)
-                Session(epoch, process, slot, port).also { created ->
+                // Adopt the actual native handle before caller cancellation can
+                // leave it unowned. Health waiting remains cancellable below.
+                withContext(NonCancellable) {
+                    val process = launchProcess(slot, port, workspace)
+                    Session(epoch, process, slot, port).also { created ->
                     shared.current = created
                     shared.snapshot.value = shared.snapshot.value.copy(pid = process.pid)
-                    created.outputJob = shared.scope.launch { drain(created, process.output, false) }
-                    created.errorJob = shared.scope.launch { drain(created, process.errors, true) }
+                    created.outputJob = shared.scope.launch(start = CoroutineStart.LAZY) { drain(created, process.output, false) }
+                    created.errorJob = shared.scope.launch(start = CoroutineStart.LAZY) { drain(created, process.errors, true) }
+                    if (process.retainsPipeLease) process.registerPipeReaders(checkNotNull(created.outputJob), checkNotNull(created.errorJob))
+                    created.outputJob?.start()
+                    created.errorJob?.start()
                     created.exitJob = shared.scope.launch {
                         val exit = runCatching { process.awaitExit() }.getOrNull()
-                        shared.lock.withLock { finishedLocked(created, exit) }
+                        try { cleanupSession(created, exit) }
+                        catch (failure: Throwable) { reportCleanupFailure(created, failure) }
+                    }
                     }
                 }
             } catch (failure: Throwable) {
@@ -139,6 +155,7 @@ class DshRuntimeManager private constructor(
             }
         } ?: return@withContext refresh()
         try {
+            currentCoroutineContext().ensureActive()
             val health = waitForHealth(session)
             shared.lock.withLock {
                 ensureOwned(session)
@@ -165,8 +182,7 @@ class DshRuntimeManager private constructor(
         } ?: return@withContext snapshot.value
         withContext(NonCancellable) {
             try {
-                session.process.stop()
-                disposeReaders(session)
+                cleanupSession(session)
                 shared.lock.withLock {
                     if (shared.current === session) finishedLocked(session, null)
                     if (shared.epoch == session.epoch && shared.current == null) shared.snapshot.value = stopped(session)
@@ -236,11 +252,10 @@ class DshRuntimeManager private constructor(
     private suspend fun failAndStop(session: Session, failure: Throwable) = withContext(NonCancellable) {
         val cancelledByStop = session.stopRequested && failure is CancellationException
         session.stopRequested = true
-        val cleanup = runCatching { session.process.stop() }
-        if (!session.process.isAlive) disposeReaders(session)
+        val cleanup = runCatching { cleanupSession(session) }
         shared.lock.withLock {
-            if (shared.current === session && !session.process.isAlive) shared.current = null
-            if (shared.epoch == session.epoch && cancelledByStop && !session.process.isAlive) {
+            if (shared.current === session && session.cleanupComplete) shared.current = null
+            if (shared.epoch == session.epoch && cancelledByStop && session.cleanupComplete) {
                 shared.snapshot.value = stopped(session)
             } else if (shared.epoch == session.epoch) shared.snapshot.value = shared.snapshot.value.copy(
                 status = DshServiceStatus.ERROR,
@@ -253,7 +268,7 @@ class DshRuntimeManager private constructor(
     }
 
     private fun finishedLocked(session: Session, exit: Int?) {
-        if (shared.current !== session || session.process.isAlive) return
+        if (shared.current !== session || session.process.isAlive || !session.cleanupComplete) return
         shared.current = null
         shared.snapshot.value = if (session.stopRequested) stopped(session) else DshServiceSnapshot(
             status = DshServiceStatus.ERROR, version = session.slot.manifest.dshVersion,
@@ -263,6 +278,28 @@ class DshRuntimeManager private constructor(
     }
 
     private fun stopped(session: Session) = DshServiceSnapshot(version = session.slot.manifest.dshVersion, detail = "DSH 服务已停止")
+
+    /** A dead tracer still owns the runtime while its real reader Jobs are
+     * incomplete. Keep this session reachable for a later cleanup retry. */
+    private suspend fun cleanupSession(session: Session, exit: Int? = null) = withContext(NonCancellable + Dispatchers.IO) {
+        withTimeout(30_000) {
+            session.cleanupLock.withLock {
+                if (session.cleanupComplete) return@withLock
+                session.process.stop()
+                if (session.process.retainsPipeLease) session.process.awaitExit()
+                disposeReaders(session)
+                if (session.process.retainsPipeLease) session.process.completePipeCleanup()
+                session.cleanupComplete = true
+                shared.lock.withLock { finishedLocked(session, exit) }
+            }
+        }
+    }
+
+    private suspend fun reportCleanupFailure(session: Session, failure: Throwable) = shared.lock.withLock {
+        if (shared.current === session && !session.cleanupComplete) shared.snapshot.value = shared.snapshot.value.copy(
+            status = DshServiceStatus.ERROR, detail = "DSH 服务仍在清理，运行环境继续保留",
+            lastError = safeMessage(failure), healthCode = null, accessUrl = null)
+    }
 
     private suspend fun disposeReaders(session: Session) {
         session.outputJob?.cancelAndJoin()
@@ -300,6 +337,8 @@ class DshRuntimeManager private constructor(
     }
 
     private class Session(val epoch: Long, val process: LinuxManagedProcess, val slot: DshRuntimeSlot, val port: Int) {
+        val cleanupLock = Mutex()
+        @Volatile var cleanupComplete = false
         @Volatile var accessUrl: String? = null
         @Volatile var stopRequested = false
         val logs = Any()
@@ -369,7 +408,7 @@ class DshRuntimeManager private constructor(
                     "/dafeiyu-workspaces" to workspaces, "/dafeiyu-provider-order" to providerOrder,
                     "/dafeiyu-extension-packages" to mobileUi.sources,
                     DshArchiveLaunchContract.CONNECT_MOUNT to pluginSlot), workspace,
-                DshArchiveLaunchContract.environment(), guestWorkingDirectory = stableCwd,
+                DshArchiveLaunchContract.environment(), retainLeaseUntilPipesComplete = true, guestWorkingDirectory = stableCwd,
                 beforeStart = {
                     DshExtensionTransaction.requireReady(home)
                     DshArchiveLaunchContract.verifyOwningBundle(validated.directory, validated.manifest.dshVersion)

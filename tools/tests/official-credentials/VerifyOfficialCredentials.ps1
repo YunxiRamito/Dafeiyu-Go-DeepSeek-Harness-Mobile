@@ -1,8 +1,12 @@
-param([ValidateRange(256, 768)][int]$MaxHeapMiB = 384, [string]$InstalledModulesRoot = 'G:/DeepSeek DSH')
+param([ValidateRange(256, 768)][int]$MaxHeapMiB = 384, [string]$InstalledModulesRoot = 'G:/DeepSeek DSH', [switch]$CompileOnly, [string]$EvidenceRoot)
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
 $tempRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot '../Temp_Android'))
 $runRoot = Join-Path $tempRoot ('qa/official-credentials/run-' + [Guid]::NewGuid().ToString('N'))
+if ($EvidenceRoot) {
+    $runRoot = [IO.Path]::GetFullPath($EvidenceRoot)
+    if (!$runRoot.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Evidence must remain inside Temp_Android.' }
+}
 New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
 $env:TMP = $runRoot
 $env:TEMP = $runRoot
@@ -19,7 +23,12 @@ $annotations = Cached 'org.jetbrains/annotations'
 $compilerClasspath = @((Cached 'org.jetbrains.kotlin/kotlin-compiler-embeddable/2.1.20'), $stdlib, $coroutines,
     $annotations, (Cached 'org.jetbrains.kotlin/kotlin-reflect'), (Cached 'org.jetbrains.intellij.deps/trove4j')) -join ';'
 $compiled = Join-Path $tempRoot 'build/app/tmp/kotlin-classes/debug'
+if (!(Test-Path -LiteralPath (Join-Path $compiled 'com/dafeiyu/mobile/data/AndroidOfficialDshLaunchFactory.class'))) {
+    throw 'Current debug application classes are missing; build the current debug variant before focused official credential compilation.'
+}
 $classpath = @($compiled, $stdlib, $coroutines, $annotations, (Cached 'com.squareup.okhttp3/okhttp/4.12.0'),
+    (Cached 'org.apache.commons/commons-compress/1.27.1'), (Cached 'commons-io/commons-io/2.16.1'),
+    (Cached 'org.apache.commons/commons-lang3/3.16.0'),
     (Cached 'com.squareup.okio/okio-jvm/3.6.0'), (Join-Path $tempRoot 'qa/workspace-presence/json-20240303.jar'),
     (Join-Path $tempRoot 'toolchains/android-sdk/platforms/android-35/android.jar')) -join ';'
 $javaRoot = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { 'C:/Program Files/Java/JDK21' }
@@ -29,7 +38,10 @@ $dataRoot = Join-Path $projectRoot 'app/src/main/java/com/dafeiyu/mobile/data'
 $sources = @('BalanceStore.kt', 'ModelProviderStore.kt', 'DymSharedCredentials.kt',
     'OfficialDeepSeekCredentialTransaction.kt', 'OfficialCredentialRecoveryGate.kt',
     'OfficialCredentialPortable.kt', 'OfficialCredentialJournalCodec.kt',
-    'AndroidOfficialCredentialJournal.kt', 'AndroidOfficialCredentialBinding.kt') |
+    'AndroidOfficialCredentialJournal.kt', 'AndroidOfficialCredentialBinding.kt',
+    'OfficialDshStorageCredentialTransaction.kt', 'AndroidOfficialDshStorageAuthorizer.kt', 'AndroidOfficialDshControlledPort.kt',
+    'AndroidOfficialDshLaunchFactory.kt', 'AndroidDshNodeTraceeVerifier.kt',
+    'LinuxRuntimeManager.kt', 'LinuxManagedProcess.kt', 'LinuxManagedRuntimeIdentity.kt', 'LinuxManagedStartupOwnership.kt') |
     ForEach-Object { Join-Path $dataRoot $_ }
 $sources += Join-Path $PSScriptRoot 'OfficialCredentialChecks.kt'
 Write-Output "Official credential production-source evidence: $runRoot"
@@ -37,6 +49,7 @@ Write-Output "Official credential production-source evidence: $runRoot"
     org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -Werror -no-stdlib -no-reflect -jvm-target 17 `
     "-Xfriend-paths=$compiled" -classpath $classpath -d $candidateJar @sources *> (Join-Path $runRoot 'compile.log')
 if ($LASTEXITCODE -ne 0) { Get-Content -LiteralPath (Join-Path $runRoot 'compile.log'); throw 'Candidate strict focused compilation failed' }
+if ($CompileOnly) { Write-Output "PASS strict current official credential/factory/runtime source and fixture compilation only; remaining dependencies use current debug classes; no fixture, Keystore or model request executed; evidence $runRoot"; return }
 & $java "-Xmx${MaxHeapMiB}m" "-Djava.io.tmpdir=$runRoot" -cp "$candidateJar;$classpath" `
     com.dafeiyu.mobile.data.OfficialCredentialChecksKt $runRoot *> (Join-Path $runRoot 'results.log')
 if ($LASTEXITCODE -ne 0) { Get-Content -LiteralPath (Join-Path $runRoot 'results.log'); throw 'Candidate transaction/recovery checks failed' }

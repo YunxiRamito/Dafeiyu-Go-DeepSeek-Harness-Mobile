@@ -149,7 +149,8 @@ async function credentialDirectory(directory) {
 /** Uses the exact pinned provider's cross-process writer lock and renderers.
  * The pinned reconcile hook runs inside that lock and rejects a stale document
  * before each edit. A failure after an earlier edit is explicitly partial. */
-export async function writeCredentials(bundleRoot, home, updates, guestHome = '/dafeiyu-dsh-home') {
+export async function writeCredentials(bundleRoot, home, updates, guestHome = '/dafeiyu-dsh-home', controlledWriterGuard = null) {
+  check(controlledWriterGuard === null || typeof controlledWriterGuard === 'function');
   check(updates && Array.isArray(updates.refs) && Array.isArray(updates.records));
   check(updates.refs.length <= 128 && updates.records.length <= 254 && /^[a-f0-9]{64}$/.test(updates.expectedRevision));
   check(typeof guestHome === 'string' && guestHome === '/dafeiyu-dsh-home');
@@ -199,6 +200,10 @@ export async function writeCredentials(bundleRoot, home, updates, guestHome = '/
       if ((await readCredentials(bundleRoot, home)).revision !== expected) {
         throw Object.assign(new Error('SHARED_CREDENTIAL_REVISION_CONFLICT'), { code: 'SHARED_CREDENTIAL_REVISION_CONFLICT' });
       }
+      // The fixed provider invokes this hook while holding its actual
+      // cross-process credential lock, immediately before its renderer/write.
+      // A preflight Boolean outside that lock cannot authorize a write.
+      if (controlledWriterGuard !== null) await controlledWriterGuard();
     };
     const refresh = async () => { expected = (await readCredentials(bundleRoot, home)).revision; applied++; };
     for (const item of updates.refs) {

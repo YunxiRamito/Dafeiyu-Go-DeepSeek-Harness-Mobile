@@ -1,8 +1,12 @@
-param([string]$InstalledModulesRoot = 'G:\DeepSeek DSH', [switch]$GenerationChecks, [switch]$HttpFixtureChecks)
+param([string]$InstalledModulesRoot = 'G:\DeepSeek DSH', [switch]$GenerationChecks, [switch]$HttpFixtureChecks, [switch]$CompileOnly, [string]$EvidenceRoot)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $tempRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot '..\Temp_Android'))
 $testRoot = Join-Path $tempRoot ('qa/model-worker/run-' + [Guid]::NewGuid().ToString('N'))
+if ($EvidenceRoot) {
+    $testRoot = [IO.Path]::GetFullPath($EvidenceRoot)
+    if (!$testRoot.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Evidence must remain inside Temp_Android.' }
+}
 $cacheRoot = Join-Path $tempRoot 'caches\gradle\caches\modules-2\files-2.1'
 New-Item -ItemType Directory -Force -Path $testRoot | Out-Null
 $env:TMP = $testRoot
@@ -24,19 +28,22 @@ $classpath = @($stdlib, $coroutines, $annotations, (Cached 'org.apache.commons\c
     (Join-Path $tempRoot 'toolchains\android-sdk\platforms\android-35\android.jar')) -join ';'
 $dataRoot = Join-Path $projectRoot 'app\src\main\java\com\dafeiyu\mobile\data'
 $sources = @('LinuxRuntimeContract.kt', 'LinuxSandboxContract.kt', 'LinuxSandboxVerifier.kt', 'LinuxArchiveExtractor.kt', 'LinuxRuntimeManager.kt', 'LinuxManagedProcess.kt',
+    'LinuxManagedRuntimeIdentity.kt', 'LinuxManagedStartupOwnership.kt', 'ConnectionPackageValidator.kt',
     'ComponentDownloadClient.kt', 'ArtifactDownloader.kt', 'ModelProviderConfig.kt', 'ModelProviderStore.kt', 'PiAiNodeWorker.kt',
     'ModelRuntimeController.kt',
     'PiAiRuntimeInstaller.kt', 'PiAiChatAdapter.kt', 'AssistantStreamProtocol.kt', 'ChatMessage.kt', 'DshProviderOrderProjection.kt',
     'OfficialDeepSeekCredentialTransaction.kt', 'OfficialCredentialPortable.kt', 'OfficialCredentialRecoveryGate.kt',
-    'OfficialCredentialJournalCodec.kt', 'AndroidOfficialCredentialJournal.kt') |
+    'OfficialCredentialJournalCodec.kt', 'AndroidOfficialCredentialJournal.kt',
+    'OfficialDshStorageCredentialTransaction.kt', 'AndroidOfficialDshStorageAuthorizer.kt') |
     ForEach-Object { Join-Path $dataRoot $_ }
 $javaRoot = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { 'C:\Program Files\Java\JDK21' }
 $sources += Join-Path $PSScriptRoot 'tests/model-worker/RecoveryFixture.kt'
 & (Join-Path $javaRoot 'bin\java.exe') '-Xmx256m' "-Djava.io.tmpdir=$testRoot" -cp $compilerClasspath `
     org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -Werror -no-stdlib -no-reflect -jvm-target 17 -classpath $classpath `
-    -d (Join-Path $testRoot 'runtime-worker.jar') @sources 2>&1 | Tee-Object -FilePath (Join-Path $testRoot 'compile.log')
-if ($LASTEXITCODE -ne 0) { throw 'Runtime and worker Android API compilation failed' }
+    -d (Join-Path $testRoot 'runtime-worker.jar') @sources *> (Join-Path $testRoot 'compile.log')
+if ($LASTEXITCODE -ne 0) { Get-Content -LiteralPath (Join-Path $testRoot 'compile.log'); throw 'Runtime and worker Android API compilation failed' }
 Write-Output 'PASS production Linux/process/provider/worker strict Android 35 API compilation (no Android process launched)'
+if ($CompileOnly) { Write-Output "Compile only; no generation/HTTP fixtures executed; evidence $testRoot"; return }
 if ($GenerationChecks) {
     & (Join-Path $javaRoot 'bin\java.exe') '-Xmx256m' "-Djava.io.tmpdir=$testRoot" -cp $compilerClasspath `
         org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -Werror -no-stdlib -no-reflect -jvm-target 17 -classpath $classpath `

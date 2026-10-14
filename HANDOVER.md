@@ -1,4 +1,28 @@
-# 当前接续 · 0.1.30 官方凭据共享验证 · 2026-10-14
+# 当前接续 · 0.1.31 DSH 冷进程恢复整合 · 2026-10-14
+
+持续目标 active，当前节点为 Android 真正中断／冷进程恢复 → PC 早期启动与完整写入准入 → Aries 网页／手动产物／归档及余下清单。正式 **0.1.31 / code32** 已完成构建、固定身份校验、stable 发布、公网更新检查和独立 QA 覆盖安装；下一次生产修改递增为 0.1.32 / code33。主 App 真机推包继续暂停，本轮只操作独立 QA。
+
+正式构建 `build-release-0.1.31-cold-recovery-r1.log` **BUILD SUCCESSFUL，5m53s／56 tasks**，assembleRelease + lintRelease 完成；Lint 为 **0 error／179 warning／11 information**，不是无警告。APK `../Temp_Android/Dist/Dafeiyu-Go-Mobile-0.1.31.apk` **95,340,316 bytes**，SHA-256 **`054077516726b159963e4ada2e5a4554ee808bb297056e88272147866ae98ec0`**；aapt 核对 `com.dafeiyu.mobile`／0.1.31／code32、两个 ABI，apksigner v2 与固定发行证书 `d4341e66075d1e35909796cb5962b22f8aaed378ca50e057a1b25ed97fe0c64b` 一致。正式 APK 四个新 runtime assets 与实际冷恢复 debug 包逐字节一致，七份关键源与已测试构建末快照相同。证据 `qa/android-official-production-next/release-r1/acceptance.json` 及 `docs/frontend-build.json`。
+
+发布回执 `qa/android-release-0131-execute-20261014/receipt.json` **9 阶段均 exit0、completed=true**；保持实际 API 镜像及旧版本不变，新增不可变 0.1.31 后切 stable。公网 `qa/android-release-smoke-0131-20261014/report.json` **5/5 PASS**：实际 Android 的固定 CA／SPKI 清单校验、ApkVerifier／PackageManager 一致身份、生产下载和只附只读拦截器的同版下载器通过，实际八份 TLS Range body 最大重叠 8，最终摘要一致。QA `emulator-5558` 的正式包 `install --no-streaming -r` 成功，版本正确，MainActivity 已 resumed、PID31171、crash buffer 0 字节；安装瞬间首次 am start 仍处于 PackageUpdateActivity，不单靠它判定启动成功，随后单独复查实际 MainActivity 和进程。未清数据、未代授权限、未调用付费模型、未推 PKB110。此简短正式启动不是完整网页／长期视觉验收。
+
+已核对冻结存储桥、authorizer、coordinator、r2 HMAC client、最终 launch factory 与 Root 服务生命周期候选，备份后按确切所有权复制到生产。工厂冻结清单 `4b53ac14054e1159f3087e9c556b8cbcbfb1b8fe8a1de2ee160a3e52c42ab77e`，严格实际源码检查 7/7；五个 JVM Windows Node 子进程不代替 Android／PRoot 证据。实际 Android 已改用停止服务后的认证冷存储恢复，固定完整 runtime／native graph、未来 port／cwd／env；proofless 旧 pending 保留并明确拒绝，正常启动不先改写 pending profile。真实 reader 完成与三个私有管道关闭之前继续保留运行租约。整合回执在 `qa/android-official-production-next/`，实际后续 root 修正的最终摘要以新构建和设备回执为准，不复用早期候选摘要。
+
+首次实际 debug 构建 `build-cold-credentials-0.1.31-debug-r1.log` **2m18s／38 tasks**，androidTest `build-cold-credentials-0.1.31-test-r1.log` **1m6s／49 tasks** 均 BUILD SUCCESSFUL。首次 prepare `device-78f747e1538841ddb7f7a773e7c97a2d` 在第一项报 Failure，整次不是 PASS；定位到 controlled-ready 前尚无 PID 就核验 tracee，已改为先查 slot／runtime／lease、收到握手 PID 后查真实 tracee再重复准入，后续操作仍重核。r3／r4／r5／r6 均有成功构建，实际 prepare 继续暴露 version-only YAML 缺失 refs 的 collection 错误，以及 native vault 提交无变化排序仍重写 `order.json`，导致完整 launch proof 正确拒绝。所有旧失败及 UUID cleanup 记录保留，不能当恢复通过。
+
+已将实际安装与凭据操作串到同一 localEngineGate，join 在锁外，锁内重查 journal、真实任务与 caller；安装期间新请求阻断。保存 cwd 不同于当前选择时保留 pending，先显式恢复再切换目录；provider sync 也通过 startLocalDsh。r2 构建任务数组传递错误在编译前失败，日志保留。Kotlin 测试工具八条 compile-only 路径已补真实源码依赖并严格编译通过，证据 `qa/android-official-tool-input-next/`；只是源码编译，不是旧矩阵或设备运行。
+
+最新 r7 `build-cold-credentials-0.1.31-r7.log` **BUILD SUCCESSFUL，3m48s／67 tasks**。dev **116,880,380 bytes／`a22eca4627e4409635a26b89f48d755bb8b2b9e79ef9baf4565029eb81f44d7b`**，test **2,789,024 bytes／`48b6adab2170ddcf94d42eecefbbdda3e8ff468266535db8ad99765f47c0db66`**。两包已 `install --no-streaming -r` 覆盖独立 QA，四个新 asset 与生产原字节匹配；没有清数据、授权限或安装真机／正式包。
+
+排序投影现在严格读取有效 AtomicFile，顺序未变时保留其原字节及路由提交 revision，不随单纯凭据 vault revision 重写；真正顺序变化须更高 revision，版本倒退、同版本变顺序、损坏／超限／非整数／链接仍拒绝。真实 Android `qa/provider-order-idempotence-next/runs/device-eaa1d0cf3d34480c809fa28cf2a8563f/` **7/7 PASS、OK(1)、0.775s**，覆盖实际 Keystore／CAS／排序变更／版本拒绝／AtomicFile backup／四类符号链接；公共数据及原 aliases 保留，零别名删除。冷事务 prepare `device-914f7dddd0d84c32b12fd31ae9ba4e4d` **3/3 PASS、OK(1)、491.933s**，真实 stage-replace／select-replace／select-delete 写后丢失 coordinator 响应；matching Recover **12/12 PASS、OK(1)、258.12s**，实际新 Android PID 29114→29829、三种 pending 均以新 helper／真实 Node PID恢复，并通过未来启动绑定冲突保护、正常 DSH loopback RPC 读回和 UUID 清理。此专项的首个 Repo 恢复通过反射调用实际私有恢复入口，另外两项直接调用实际 binding；三者都不是完整 initializeWorkspaces 自动启动路径验收。正式 release／lint 已于上文完成，用户验收、arm64 和完整自动初始化恢复仍待完成。
+
+合法 YAML 缺 section 已使用 createNode，null section 只在经真实 parser 验证后作内存 proof 归一，保留注释和 metadata，读取不写盘。`qa/android-official-null-store-fix-next/` 有限实际源码检查的4合法读、2真实候选set／unset通过；另2项 refs:null 写仍被固定 SDK renderer 拒绝且原字节保持，不当成功。malformed 由实际 parser 拒绝。此项不代替 Android null writer 或完整 controlledStore 验收；固定 SDK atomic writer 不保证掉电 fsync。
+
+跨仓库：PC launch capture 与早期 launch 的各六份冻结源，只合入既有 237 文件隔离快照。最新完整 WinUI type build **32.95s／42 warnings／0 errors**，DLL SHA-256 `23340606261ef320515d1faec13aff7697b6e1d7b01641e0b8f90cf2279e322a`，实际四资源匹配、共享237文件 drift=0。42 warnings 包括 restricted Fixed routing 后未赋值字段，不能全部称既有警告。早期 focused actual DPAPI／FirstPipeInstance／固定 SDK／冷 .NET host **15/15**；只接受显式 Fixed port 和 None／Custom proxy，System／PAC／动态或缺配置拒绝，不猜端口。真实 retained pipe 接管继续在 `qa/pc-official-provider-handoff-next/` 推进，完整 writer／CLI／日常启动准入尚未完成；normalExecutionEnabled=false、bootstrapBound=false，未运行或发布 PC。稳定树、用户实例及共享 index 保留。本轮至此无后端修改／部署。
+
+继续审查发现 PC handoff r4 仍在异常 listener 路径保留 descriptor；候选修正在隔离 r5 目录推进，未合入集成树。完整入口接续只拥有 `qa/pc-official-all-entry-admission-next/`，实际 CLI／pnpm／npm 更新及数据写入口仍需统一准入和真实进程／reader 完成证明，normal gate 继续关闭。Aries 网页取消 r1 只有 Python 状态模型检查，不能当 Kotlin／协程或公网证据；主 Agent 指出 submit 内已发送但 ACK 丢失、清理自身 deadline 和 socket 错误边界，隔离 r2 正在补真实 Kotlin 专项；生产 RemoteDshWebClient 尚未修改。当前实际 Connect 是仓库已准备的 0.3.0 候选，不能把历史 0.2.0 写成当前双端唯一状态；新网页／文件／归档生产 capability 仍关闭。后端本次只发布 APK，不改 Connect／Aries 协议或服务器 API 镜像。
+
+# 上轮交付 · 0.1.30 官方凭据共享验证 · 2026-10-14
 
 持续功能对齐目标仍 active。最新执行顺序为主题链路（已交付）→ 离线更新恢复（已交付）→ 官方凭据本机共享与 PC 持久恢复 → Aries 网页／手动产物／归档及剩余清单。工具只支持修改既有目标状态，最新范围继续由 `docs/MOBILE-PC-PARITY-SPEC.md` 维护。正式 **0.1.30 / code31** 已构建、发布 stable 并覆盖安装 QA，提交为 **6268b90d04610a4cc426d84e0b86157af0987059**；下一版生产修改从 **0.1.31 / code32** 开始。主 App 真机推包仍暂停，调色盘安装已有授权但 PKB110 当前未连接。
 

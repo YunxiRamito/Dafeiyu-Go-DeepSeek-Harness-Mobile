@@ -108,6 +108,8 @@ internal class OfficialDeepSeekCredentialTransaction(
             val state = validatedJournal(journal.read())
             check(!state.has("pending")) { "PENDING_EXISTS" }
             check(!state.has("deferred")) { "DEFERRED_EXISTS" }
+            if (dsh is OfficialDshColdStoragePort) return@withLock OfficialDshStorageCredentialTransaction(
+                journal, providers, balance, dsh, transactionId).beginLocked(state, desired, acceptDshConflict)
             val providerBefore = providers.read()
             val balanceBefore = balance.read()
             check(providerBefore.key == balanceBefore.key) { "NATIVE_VAULT_CONFLICT" }
@@ -139,7 +141,14 @@ internal class OfficialDeepSeekCredentialTransaction(
         try {
             val state = validatedJournal(journal.read())
             if (!state.has("pending")) OfficialCredentialOutcome.NoPending
-            else if (state.getJSONObject("pending").has("kind")) advanceNative(state) else advance(state)
+            else if (state.getJSONObject("pending").has("kind")) advanceNative(state)
+            else if (state.getJSONObject("pending").has("dshStorage")) {
+                check(dsh is OfficialDshColdStoragePort) { "DSH_STORAGE_UNAVAILABLE" }
+                OfficialDshStorageCredentialTransaction(journal, providers, balance, dsh, transactionId).advanceLocked(state)
+            } else {
+                check(dsh !is OfficialDshColdStoragePort) { "DSH_DURABLE_PROOF_MISSING" }
+                advance(state)
+            }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { OfficialCredentialOutcome.Pending(null, safeCode(failure)) }
     }
@@ -209,6 +218,8 @@ internal class OfficialDeepSeekCredentialTransaction(
             val state = validatedJournal(journal.read())
             check(!state.has("pending")) { "PENDING_EXISTS" }
             val deferred = state.optJSONObject("deferred") ?: return@withLock OfficialCredentialOutcome.NoPending
+            if (dsh is OfficialDshColdStoragePort) return@withLock OfficialDshStorageCredentialTransaction(
+                journal, providers, balance, dsh, transactionId).publishDeferredLocked(state, acceptDshConflict)
             val desired = nullableString(deferred, "desired")
             val providerBefore = providers.read()
             val balanceBefore = balance.read()
@@ -477,15 +488,17 @@ internal class OfficialDeepSeekCredentialTransaction(
                     validatedNativePlan(pending)
                     return@let
                 }
-                val required = setOf("id", "step", "desired", "providerBefore", "balanceBefore", "namespace", "settingsBefore",
+                val commonRequired = setOf("id", "step", "desired", "providerBefore", "balanceBefore", "namespace",
                     "referenceBefore", "userReferenceBefore", "credentialBefore", "candidate", "initialDshConflictAccepted")
-                val optional = setOf("stagedRevision", "settingsCommitted", "providerCommitted", "balanceCommitted", "deferredId")
+                val required = if (pending.has("dshStorage")) commonRequired else commonRequired + "settingsBefore"
+                val optional = setOf("stagedRevision", "settingsCommitted", "providerCommitted", "balanceCommitted", "deferredId", "dshStorage")
                 require(required.all(pending::has) && pending.keys().asSequence().all { it in required || it in optional }) { "INVALID_JOURNAL" }
                 require(pending.get("initialDshConflictAccepted") is Boolean) { "INVALID_JOURNAL" }
                 require(pending.getString("id").matches(Regex("[a-f0-9]{32}")) && pending.getString("step") in phases &&
                     pending.getString("candidate") == "DAFEIYU_PROVIDER_DEEPSEEK_${pending.getString("id")}" &&
                     pending.getString("namespace") in setOf("llm-deepseek", "llm-deepseek-api-key") &&
-                    pending.getLong("settingsBefore") >= 0 && pending.getString("credentialBefore").matches(Regex("[a-f0-9]{64}"))) { "INVALID_JOURNAL" }
+                    (pending.has("dshStorage") || pending.getLong("settingsBefore") >= 0) &&
+                    pending.getString("credentialBefore").matches(Regex("[a-f0-9]{64}"))) { "INVALID_JOURNAL" }
                 val desired = nullableString(pending, "desired")
                 require(normalize(desired) == desired) { "INVALID_JOURNAL" }
                 snapshot(pending.getJSONObject("providerBefore")); snapshot(pending.getJSONObject("balanceBefore"))
@@ -493,14 +506,27 @@ internal class OfficialDeepSeekCredentialTransaction(
                 nullableString(pending, "userReferenceBefore")?.let { require(it.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))) { "INVALID_JOURNAL" } }
                 if (pending.getString("step") !in setOf("PREPARED", "STAGING")) require(pending.getString("stagedRevision").matches(Regex("[a-f0-9]{64}"))) { "INVALID_JOURNAL" }
                 if (pending.has("deferredId")) require(document.getJSONObject("deferred").getString("id") == pending.getString("deferredId")) { "INVALID_JOURNAL" }
+                if (pending.has("dshStorage")) {
+                    require(!pending.has("settingsBefore") && !pending.has("settingsCommitted")) { "INVALID_JOURNAL" }
+                    OfficialDshStorageProof.validatePending(pending)
+                }
             }
             if (document.has("pending")) require(document.optJSONObject("pending") != null) { "INVALID_JOURNAL" }
             document.optJSONObject("receipt")?.let { receipt ->
                 require(receipt.getString("id").matches(Regex("[a-f0-9]{32}")) &&
-                    owned.optString(receipt.getString("reference")) == receipt.getString("id") && receipt.getLong("settingsRevision") >= 0 &&
+                    owned.optString(receipt.getString("reference")) == receipt.getString("id") &&
+                    (if (receipt.has("dshStorage")) !receipt.has("settingsRevision") else receipt.getLong("settingsRevision") >= 0) &&
                     receipt.getString("namespace") in setOf("llm-deepseek", "llm-deepseek-api-key") && receipt.get("keyRemoved") is Boolean &&
                     receipt.get("oldReferenceRetained") is Boolean && receipt.getString("providerRevision").isNotEmpty() &&
                     receipt.getString("balanceRevision").isNotEmpty()) { "INVALID_JOURNAL" }
+                if (receipt.has("dshStorage")) {
+                    val proof = receipt.getJSONObject("dshStorage")
+                    require(proof.keys().asSequence().toSet() == setOf("schema", "realm", "bindingDigest", "profileRevision", "launchDigest", "environmentDigest", "runtimePinsDigest") &&
+                        proof.getInt("schema") == 1 && proof.getString("realm") == "android-dsh-storage-v1" &&
+                        listOf("bindingDigest", "profileRevision", "launchDigest", "environmentDigest", "runtimePinsDigest").all {
+                            proof.getString(it).matches(Regex("[a-f0-9]{64}"))
+                        }) { "INVALID_JOURNAL" }
+                }
             }
             if (document.has("receipt")) require(document.optJSONObject("receipt") != null) { "INVALID_JOURNAL" }
             document.optJSONObject("nativeReceipt")?.let { receipt ->
@@ -594,7 +620,9 @@ internal class OfficialDeepSeekCredentialTransaction(
             "OFFICIAL_KEY_CONFLICT", "DSH_CHANGED", "CANDIDATE_CHANGED", "NATIVE_NOT_CONFIRMED", "CREDENTIAL_CAS_CONFLICT", "STAGE_NOT_CONFIRMED",
             "SETTINGS_NOT_CONFIRMED", "NATIVE_CHANGED", "INVALID_JOURNAL", "OFFICIAL_NAMESPACE_INVALID", "SETTINGS_CAS_CONFLICT", "NATIVE_CAS_CONFLICT",
             "DEFERRED_EXISTS", "SOURCE_CHANGED", "INVALID_PORTABLE", "PORTABLE_NOT_SUPPORTED", "DSH_UNAVAILABLE")
-        private fun safeCode(failure: Exception): String = failure.message?.takeIf { it in knownCodes } ?: "STORAGE_OR_TRANSPORT_PENDING"
+        private fun safeCode(failure: Exception): String = failure.message?.takeIf {
+            it in knownCodes || it in setOf("DSH_STORAGE_UNAVAILABLE", "DSH_DURABLE_PROOF_MISSING")
+        } ?: "STORAGE_OR_TRANSPORT_PENDING"
         internal fun encryptedRevision(payload: ByteArray?): String = if (payload == null) "absent" else
             MessageDigest.getInstance("SHA-256").digest(payload).joinToString("") { "%02x".format(it) }
     }

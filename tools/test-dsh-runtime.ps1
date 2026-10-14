@@ -1,8 +1,12 @@
-param()
+param([switch]$CompileOnly, [string]$EvidenceRoot)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $tempRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot '..\Temp_Android'))
 $testRoot = Join-Path $tempRoot 'qa\local-dsh-0.1.25'
+if ($EvidenceRoot) {
+    $testRoot = [IO.Path]::GetFullPath($EvidenceRoot)
+    if (!$testRoot.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Evidence must remain inside Temp_Android.' }
+}
 $cacheRoot = Join-Path $tempRoot 'caches\gradle\caches\modules-2\files-2.1'
 New-Item -ItemType Directory -Force -Path $testRoot | Out-Null
 $env:TMP = $testRoot
@@ -24,9 +28,12 @@ $classpath = @($stdlib, $coroutines, $annotations, (Cached 'org.apache.commons\c
     (Join-Path $tempRoot 'toolchains\android-sdk\platforms\android-35\android.jar')) -join ';'
 $dataRoot = Join-Path $projectRoot 'app\src\main\java\com\dafeiyu\mobile\data'
 $sources = @('LinuxRuntimeContract.kt', 'LinuxSandboxContract.kt', 'LinuxSandboxVerifier.kt', 'LinuxArchiveExtractor.kt', 'LinuxRuntimeManager.kt', 'LinuxManagedProcess.kt',
+    'LinuxManagedRuntimeIdentity.kt', 'LinuxManagedStartupOwnership.kt',
     'ComponentDownloadClient.kt', 'ArtifactDownloader.kt', 'DshRuntimeManifest.kt', 'DshRuntimeInstaller.kt',
-    'DshRuntimeManager.kt', 'DshSandboxProbe.kt', 'DshExtensionTransaction.kt', 'DshProviderOrderProjection.kt',
-    'ModelProviderConfig.kt', 'ModelProviderStore.kt', 'ConnectionPluginPackage.kt', 'ConnectionPackageValidator.kt') | ForEach-Object { Join-Path $dataRoot $_ }
+    'DshRuntimeManager.kt', 'DshMobileUiPackage.kt', 'DshSandboxProbe.kt', 'DshExtensionTransaction.kt', 'DshProviderOrderProjection.kt',
+    'ModelProviderConfig.kt', 'ModelProviderStore.kt', 'ConnectionPluginPackage.kt', 'ConnectionPackageValidator.kt',
+    'OfficialDeepSeekCredentialTransaction.kt', 'OfficialDshStorageCredentialTransaction.kt', 'OfficialCredentialPortable.kt',
+    'OfficialCredentialJournalCodec.kt', 'AndroidOfficialCredentialJournal.kt', 'AndroidOfficialDshStorageAuthorizer.kt') | ForEach-Object { Join-Path $dataRoot $_ }
 $sources += Join-Path $PSScriptRoot 'tests\archive-startup\CompileDependencies.kt'
 $sources += Join-Path $PSScriptRoot 'tests\provider\android-api\Resources.kt'
 $test = Join-Path $PSScriptRoot 'tests\dsh-runtime\DshRuntimeChecks.kt'
@@ -39,8 +46,9 @@ Set-Content -LiteralPath $compileLog -Value ''
 Set-Content -LiteralPath $checksLog -Value ''
 & (Join-Path $javaRoot 'bin\java.exe') '-Xmx256m' "-Djava.io.tmpdir=$testRoot" -cp $compilerClasspath `
     org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -Werror -no-stdlib -no-reflect -jvm-target 17 -classpath $classpath `
-    -d $jar @sources $test $lifecycleTest 2>&1 | Tee-Object -FilePath $compileLog
-if ($LASTEXITCODE -ne 0) { throw 'DSH runtime strict Android 35 compilation failed' }
+    -d $jar @sources $test $lifecycleTest *> $compileLog
+if ($LASTEXITCODE -ne 0) { Get-Content -LiteralPath $compileLog; throw 'DSH runtime strict Android 35 compilation failed' }
+if ($CompileOnly) { Write-Output "PASS strict production runtime and fixture source compile only; no fixture or Android process executed; evidence $testRoot"; return }
 & (Join-Path $javaRoot 'bin\java.exe') '-Xmx256m' "-Djava.io.tmpdir=$testRoot" -cp ($jar + ';' + $classpath) com.dafeiyu.mobile.data.DshRuntimeChecksKt |
     Tee-Object -FilePath $checksLog
 if ($LASTEXITCODE -ne 0) { throw 'DSH runtime checks failed' }

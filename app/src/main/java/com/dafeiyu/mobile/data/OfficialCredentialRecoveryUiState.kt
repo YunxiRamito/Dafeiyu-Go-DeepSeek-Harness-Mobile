@@ -58,7 +58,7 @@ enum class OfficialCredentialNativeChoice { PROVIDER, BALANCE, CLEAR }
 
 enum class OfficialCredentialUiProblem {
     NONE, CANCELLED, NATIVE_CONFLICT, DSH_CONFLICT, DSH_UNAVAILABLE, STORE_CHANGED,
-    INVALID_JOURNAL, TASKS_NOT_STOPPED, UNCONFIRMED,
+    INVALID_JOURNAL, TASKS_NOT_STOPPED, DURABLE_PROOF_MISSING, UNCONFIRMED,
 }
 
 /** Public state contains enums only. Messages are fixed and never include exceptions or private snapshots. */
@@ -96,6 +96,8 @@ data class OfficialCredentialUiState(
     }
     val message: String get() = when {
         problem == OfficialCredentialUiProblem.TASKS_NOT_STOPPED -> "任务或运行进程尚未确认停止，未开始新的凭据写入；请停止任务后重试。"
+        problem == OfficialCredentialUiProblem.DURABLE_PROOF_MISSING ->
+            "此前的 DSH 事务缺少跨进程确认信息，无法自动恢复；原凭据和保存记录已保留。"
         phase == OfficialCredentialUiPhase.NATIVE_VAULT_CONFLICT ->
             "没有自动选择任一存储。执行与新的凭据修改已暂停；请明确选择模型配置、官方请求存储或清除两边，原值不会展示。"
         phase == OfficialCredentialUiPhase.NATIVE_PLAN_CONFLICT ->
@@ -105,7 +107,7 @@ data class OfficialCredentialUiState(
         phase == OfficialCredentialUiPhase.NATIVE_RECOVERY_REQUIRED ->
             "已持久化的保存或删除尚未完成确认。可重试原事务；相关执行与新的凭据修改已暂停。"
         phase == OfficialCredentialUiPhase.DSH_RECOVERY_REQUIRED ->
-            "原事务需要本机 DSH 的实际确认。重试可能启动恢复服务；不会提交模型任务。"
+            "原事务需要核对本机 DSH 的运行环境和已保存配置。恢复期间 DSH 服务会停止；不会提交模型任务。"
         phase == OfficialCredentialUiPhase.DSH_PUBLICATION_PENDING ->
             "官方轻引擎可使用已确认的手机凭据。进入本机 DSH 前需要完成同步；后台不会覆盖不同的 DSH 凭据。"
         problem == OfficialCredentialUiProblem.CANCELLED -> "操作已取消；如有未完成持久事务，可在此重新检查并恢复。"
@@ -197,7 +199,8 @@ internal class OfficialCredentialRecoveryUiController(
     private fun safeProblem(code: String?): OfficialCredentialUiProblem = when (code) {
         "NATIVE_VAULT_CONFLICT" -> OfficialCredentialUiProblem.NATIVE_CONFLICT
         "OFFICIAL_KEY_CONFLICT" -> OfficialCredentialUiProblem.DSH_CONFLICT
-        "DSH_UNAVAILABLE" -> OfficialCredentialUiProblem.DSH_UNAVAILABLE
+        "DSH_UNAVAILABLE", "DSH_STORAGE_UNAVAILABLE", "HOST_UNAVAILABLE" -> OfficialCredentialUiProblem.DSH_UNAVAILABLE
+        "DSH_DURABLE_PROOF_MISSING" -> OfficialCredentialUiProblem.DURABLE_PROOF_MISSING
         "NATIVE_CHANGED", "DSH_CHANGED", "SOURCE_CHANGED", "NATIVE_CAS_CONFLICT", "SETTINGS_CAS_CONFLICT",
         "CREDENTIAL_CAS_CONFLICT", "CANDIDATE_CHANGED" -> OfficialCredentialUiProblem.STORE_CHANGED
         "INVALID_JOURNAL" -> OfficialCredentialUiProblem.INVALID_JOURNAL

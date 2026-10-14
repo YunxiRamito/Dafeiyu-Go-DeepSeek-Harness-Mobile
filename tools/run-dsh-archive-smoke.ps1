@@ -1,5 +1,6 @@
 param(
     [switch]$CompileOnly,
+    [string]$EvidenceRoot,
     [string]$Serial,
     [string]$EvidenceName = 'dsh-archive-smoke-0.1.25',
     [string]$ExpectedManifest
@@ -8,7 +9,12 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $tempRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot '..\Temp_Android'))
 if ($EvidenceName -notmatch '^[A-Za-z0-9._-]{1,80}$') { throw 'Invalid evidence name' }
+$archiveRequestedEvidenceRoot = $EvidenceRoot
 $evidenceRoot = Join-Path $tempRoot ('qa\' + $EvidenceName)
+if ($archiveRequestedEvidenceRoot) {
+    $evidenceRoot = [IO.Path]::GetFullPath($archiveRequestedEvidenceRoot)
+    if (!$evidenceRoot.StartsWith($tempRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Evidence must remain inside Temp_Android.' }
+}
 New-Item -ItemType Directory -Force -Path $evidenceRoot | Out-Null
 $env:TMP = $evidenceRoot
 $env:TEMP = $evidenceRoot
@@ -42,18 +48,21 @@ if ($CompileOnly) {
         (Aar 'androidx.test.ext\junit\1.2.1' 'androidx-junit'), (Cached 'junit\junit\4.13.2')) -join ';'
     $dataRoot = Join-Path $projectRoot 'app\src\main\java\com\dafeiyu\mobile\data'
     $sources = @('LinuxRuntimeContract.kt', 'LinuxSandboxContract.kt', 'LinuxSandboxVerifier.kt', 'LinuxArchiveExtractor.kt',
-        'LinuxRuntimeManager.kt', 'LinuxManagedProcess.kt', 'ComponentDownloadClient.kt', 'ArtifactDownloader.kt',
-        'DshRuntimeManifest.kt', 'DshRuntimeInstaller.kt', 'DshRuntimeManager.kt', 'DshSandboxProbe.kt', 'DshExtensionTransaction.kt',
+        'LinuxRuntimeManager.kt', 'LinuxManagedProcess.kt', 'LinuxManagedRuntimeIdentity.kt', 'LinuxManagedStartupOwnership.kt',
+        'ComponentDownloadClient.kt', 'ArtifactDownloader.kt',
+        'DshRuntimeManifest.kt', 'DshRuntimeInstaller.kt', 'DshRuntimeManager.kt', 'DshMobileUiPackage.kt', 'DshSandboxProbe.kt', 'DshExtensionTransaction.kt',
         'DshProviderOrderProjection.kt', 'ModelProviderConfig.kt', 'ModelProviderStore.kt', 'ConnectionPluginPackage.kt',
-        'ConnectionPackageValidator.kt') | ForEach-Object { Join-Path $dataRoot $_ }
+        'ConnectionPackageValidator.kt', 'OfficialDeepSeekCredentialTransaction.kt', 'OfficialDshStorageCredentialTransaction.kt',
+        'OfficialCredentialPortable.kt', 'OfficialCredentialJournalCodec.kt', 'AndroidOfficialCredentialJournal.kt',
+        'AndroidOfficialDshStorageAuthorizer.kt') | ForEach-Object { Join-Path $dataRoot $_ }
     $sources += Join-Path $PSScriptRoot 'tests\archive-startup\CompileDependencies.kt'
     $sources += Join-Path $PSScriptRoot 'tests\provider\android-api\Resources.kt'
     $sources += Join-Path $projectRoot 'app\src\androidTest\java\com\dafeiyu\mobile\data\DshArchiveRuntimeSmoke.kt'
     $javaRoot = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { 'C:\Program Files\Java\JDK21' }
     & (Join-Path $javaRoot 'bin\java.exe') '-Xmx256m' "-Djava.io.tmpdir=$evidenceRoot" -cp $compiler `
         org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -Werror -no-stdlib -no-reflect -jvm-target 17 -classpath $classpath `
-        -d (Join-Path $evidenceRoot 'archive-instrumentation-android35.jar') @sources
-    if ($LASTEXITCODE -ne 0) { throw 'Archive instrumentation strict Android35/AndroidX compilation failed' }
+        -d (Join-Path $evidenceRoot 'archive-instrumentation-android35.jar') @sources *> (Join-Path $evidenceRoot 'compile.log')
+    if ($LASTEXITCODE -ne 0) { Get-Content -LiteralPath (Join-Path $evidenceRoot 'compile.log'); throw 'Archive instrumentation strict Android35/AndroidX compilation failed' }
     Write-Output 'PASS real production runtime and Android35/AndroidX archive instrumentation strict Werror compilation; no device or native CLI executed'
     return
 }

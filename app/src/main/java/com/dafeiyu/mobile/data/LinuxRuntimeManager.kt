@@ -57,8 +57,11 @@ class LinuxRuntimeManager(context: Context) {
         workspace: File? = null,
         environment: Map<String, String> = emptyMap(),
         exclusiveRuntimeUse: Boolean = false,
+        retainLeaseUntilPipesComplete: Boolean = false,
         guestWorkingDirectory: String? = null,
         beforeStart: (() -> Unit)? = null,
+        expectedRuntimeIdentity: LinuxManagedRuntimeIdentity? = null,
+        nativeProcessCreated: ((LinuxManagedStartupOwnership) -> Unit)? = null,
     ): LinuxManagedProcess = withContext(Dispatchers.IO) {
         require(id.matches(Regex("[a-z0-9][a-z0-9.-]{0,79}")))
         require(guestCommand.isNotEmpty() && guestCommand.size <= 64 && guestCommand.first().startsWith('/'))
@@ -99,7 +102,8 @@ class LinuxRuntimeManager(context: Context) {
         LinuxDshArchiveEnvironment.validate(environment, resolvedMounts.toMap())
         shared.operations.withLock {
             checkNoFailedCleanup()
-            if (exclusiveRuntimeUse) check(shared.managed.values.none { it.isAlive }) {
+            requireNoUnregisteredManagedOwnersLocked()
+            if (exclusiveRuntimeUse) check(shared.managed.values.none { it.holdsRuntimeLease }) {
                 "运行时仍有进程占用，请先停止服务和模型运行器"
             }
             unavailableReason()?.let { throw IOException(it) }
@@ -107,6 +111,7 @@ class LinuxRuntimeManager(context: Context) {
             prepareNative()
             check(!shared.managed.containsKey(id) && shared.managed.size < 4) { "已有同名服务或常驻进程达到上限" }
             val directory = activeRoot() ?: throw IOException("请先安装 Ubuntu 和 Node.js 组件")
+            expectedRuntimeIdentity?.let { requireRuntimeIdentityLocked(directory, it) }
             val native = File(app.applicationInfo.nativeLibraryDir)
             LinuxGuestMounts.prepare(directory, platformDirectoryBinds() + native.path +
                 listOfNotNull(resolvedWorkspace?.let { "/workspace" }) + resolvedMounts.map { it.first })
@@ -126,14 +131,7 @@ class LinuxRuntimeManager(context: Context) {
             val builder = ProcessBuilder(launch).directory(root)
             builder.environment().apply {
                 clear()
-                putAll(mapOf("ANDROID_ROOT" to "/system", "ANDROID_DATA" to "/data", "HOME" to "/root",
-                    "USER" to "root", "LOGNAME" to "root", "LANG" to "C.UTF-8", "TERM" to "dumb", "TMPDIR" to "/tmp",
-                    "PATH" to "/root/dsh-bin:/usr/local/bin:/usr/bin:/bin", "PROOT_TMP_DIR" to File(root, "tmp").path,
-                    "PROOT_LOADER" to File(native, "liblinux_prootloader.so").path,
-                    "PROOT_LOADER_32" to File(native, "liblinux_prootloader32.so").path,
-                    "LD_LIBRARY_PATH" to "${File(root, "lib").path}:${native.path}",
-                    "OTEL_SDK_DISABLED" to "true"))
-                putAll(environment)
+                putAll(managedEnvironment(environment, resolvedMounts.toMap()))
             }
             // The guard and OS launch share the same lock as exclusive data
             // helpers. A journal cannot be published between this check and
@@ -142,7 +140,23 @@ class LinuxRuntimeManager(context: Context) {
             val process = builder.start()
             shared.leasedResources[process] = listOfNotNull(directory, resolvedWorkspace) + resolvedMounts.map { it.second }
             var owner: OwnedProcess? = null
+            val startup = nativeProcessCreated?.let {
+                LinuxManagedStartupOwnership(process, stop = {
+                    shared.operations.withLock {
+                        if (process.isAlive) stop(process, owner ?: readOwner(pidFile, File(native, "liblinux_proot.so").path))
+                    }
+                }, release = { token ->
+                    shared.operations.withLock {
+                        check(!process.isAlive && shared.nativeStartups[token] === process && token.owns(process)) { "HOST_UNAVAILABLE" }
+                        shared.failedCleanup.remove(process)
+                        shared.leasedResources.remove(process)
+                        pidFile.delete()
+                        shared.nativeStartups.remove(token, process)
+                    }
+                }).also { token -> shared.nativeStartups[token] = process }
+            }
             try {
+                startup?.let { nativeProcessCreated?.invoke(it) }
                 val start = System.nanoTime()
                 while (process.isAlive && owner == null && System.nanoTime() - start < TimeUnit.SECONDS.toNanos(1)) {
                     currentCoroutineContext().ensureActive()
@@ -152,7 +166,20 @@ class LinuxRuntimeManager(context: Context) {
                 check(process.isAlive && owner != null) { "常驻进程启动失败或无法核实 PRoot 进程身份" }
                 val identity = checkNotNull(owner)
                 lateinit var managed: LinuxManagedProcess
-                managed = LinuxManagedProcess(id, identity.pid, directory.name, process) {
+                managed = LinuxManagedProcess(id, identity.pid, directory.name, process,
+                    retainLeaseUntilPipesComplete = retainLeaseUntilPipesComplete,
+                    releaseRetainedLease = { expected ->
+                        shared.operations.withLock {
+                            check(expected === managed && !process.isAlive && shared.managed[id] === managed &&
+                                (!exclusiveRuntimeUse || shared.exclusiveManaged[id] === managed) && shared.leasedResources.containsKey(process)) {
+                                "PIPE_CLEANUP_PENDING"
+                            }
+                            shared.managed.remove(id, managed)
+                            shared.exclusiveManaged.remove(id, managed)
+                            shared.leasedResources.remove(process)
+                            updateProcessSnapshot()
+                        }
+                    }) {
                     withContext(NonCancellable + Dispatchers.IO) { stop(process, identity) }
                 }
                 shared.managed[id] = managed
@@ -162,12 +189,22 @@ class LinuxRuntimeManager(context: Context) {
                     try { process.waitFor() }
                     finally {
                         pidFile.delete()
-                        shared.managed.remove(id, managed)
-                        shared.exclusiveManaged.remove(id, managed)
-                        shared.leasedResources.remove(process)
+                        // Retained workers report native exit promptly, but a
+                        // still-running pipe reader continues owning the exact
+                        // managed/exclusive/resource registrations until the
+                        // verified native completePipeCleanup release callback.
+                        if (!retainLeaseUntilPipesComplete) {
+                            shared.managed.remove(id, managed)
+                            shared.exclusiveManaged.remove(id, managed)
+                            shared.leasedResources.remove(process)
+                        }
                         updateProcessSnapshot()
                         managed.onExited()
                     }
+                }
+                startup?.let { token ->
+                    token.transferTo(managed)
+                    shared.nativeStartups.remove(token, process)
                 }
                 managed
             } catch (failure: Throwable) {
@@ -187,10 +224,128 @@ class LinuxRuntimeManager(context: Context) {
 
     suspend fun stopManagedProcess(id: String) { shared.managed[id]?.stop() }
 
+    /** This is the very same clear/rebuild source used by ProcessBuilder.
+     * The caller cannot substitute imported host or credential environment. */
+    internal fun managedLaunchEnvironment(environment: Map<String, String>, mounts: Map<String, File>): Map<String, String> =
+        managedEnvironment(environment, mounts)
+
+    private fun managedEnvironment(environment: Map<String, String>, mounts: Map<String, File>): Map<String, String> {
+        LinuxDshArchiveEnvironment.validate(environment, mounts)
+        val native = File(app.applicationInfo.nativeLibraryDir)
+        return mapOf("ANDROID_ROOT" to "/system", "ANDROID_DATA" to "/data", "HOME" to "/root",
+            "USER" to "root", "LOGNAME" to "root", "LANG" to "C.UTF-8", "TERM" to "dumb", "TMPDIR" to "/tmp",
+            "PATH" to "/root/dsh-bin:/usr/local/bin:/usr/bin:/bin", "PROOT_TMP_DIR" to File(root, "tmp").path,
+            "PROOT_LOADER" to File(native, "liblinux_prootloader.so").path,
+            "PROOT_LOADER_32" to File(native, "liblinux_prootloader32.so").path,
+            "LD_LIBRARY_PATH" to "${File(root, "lib").path}:${native.path}",
+            "OTEL_SDK_DISABLED" to "true") + environment.toMap()
+    }
+
+    /** Captures the actual published root, receipt, Node and native inputs;
+     * the returned object is local host data, never a journal/backup field. */
+    internal suspend fun captureManagedRuntimeIdentity(): LinuxManagedRuntimeIdentity = withContext(Dispatchers.IO) {
+        shared.operations.withLock {
+            checkNoFailedCleanup()
+            requireNoUnregisteredManagedOwnersLocked()
+            unavailableReason()?.let { throw IOException(it) }
+            ensureLayout(); prepareNative()
+            runtimeIdentityLocked(activeRoot() ?: error("HOST_UNAVAILABLE"))
+        }
+    }
+
+    /** Runs for every authenticated helper challenge, under the real shared
+     * operations mutex; a current pointer/hash mismatch never becomes approval. */
+    internal suspend fun requireManagedRuntimeIdentity(helper: LinuxManagedProcess, expected: LinuxManagedRuntimeIdentity) =
+        withContext(Dispatchers.IO) { shared.operations.withLock {
+            requireNoUnregisteredManagedOwnersLocked()
+            check(shared.managed[helper.info.id] === helper && shared.exclusiveManaged[helper.info.id] === helper &&
+                helper.isAlive && helper.holdsRuntimeLease) { "HOST_UNAVAILABLE" }
+            requireRuntimeIdentityLocked(activeRoot() ?: error("HOST_UNAVAILABLE"), expected)
+        } }
+
+    private fun requireRuntimeIdentityLocked(directory: File, expected: LinuxManagedRuntimeIdentity) {
+        check(runtimeIdentityLocked(directory) == expected) { "HOST_UNAVAILABLE" }
+    }
+
+    /** A cold application process has a new shared map. A private pid marker
+     * with a still-live, same-UID PRoot cannot be treated as synthetic idle.
+     * Do not delete markers or signal an unregistered/reused PID here. */
+    private fun requireNoUnregisteredManagedOwnersLocked() {
+        val executable = File(app.applicationInfo.nativeLibraryDir, "liblinux_proot.so").canonicalPath
+        for (marker in root.listFiles().orEmpty().filter { it.name.startsWith("pid-") }) {
+            require(marker.name.matches(Regex("pid-[a-fA-F0-9-]{36}")) && marker.isFile &&
+                !LinuxArchiveExtractor.isSymlink(marker) && marker.length() in 1..32 && marker.canonicalFile.parentFile == root.canonicalFile) {
+                "HOST_UNAVAILABLE"
+            }
+            val pid = marker.readText(Charsets.US_ASCII).trim().toIntOrNull()?.takeIf { it > 1 } ?: error("HOST_UNAVAILABLE")
+            if (!File("/proc/$pid").exists()) continue
+            val owner = ownedProcess(pid, executable)
+            if (owner != null) {
+                check(shared.managed.values.any { it.pid == pid && it.isAlive } &&
+                    shared.leasedResources.keys.any { native -> native.isAlive &&
+                        shared.managed.values.any { it.pid == pid && it.ownsProcess(native) } }) { "HOST_UNAVAILABLE" }
+            } else {
+                val status = File("/proc/$pid/status").inputStream().use { ConnectionPackageValidator.readBounded(it, 64 * 1024) }
+                    .toString(Charsets.US_ASCII)
+                val uid = status.lineSequence().single { it.startsWith("Uid:") }.substringAfter(':').trim()
+                    .split(Regex("\\s+")).first().toInt()
+                check(uid != android.os.Process.myUid() || Os.readlink("/proc/$pid/exe") != executable) { "HOST_UNAVAILABLE" }
+            }
+        }
+    }
+
+    private fun runtimeIdentityLocked(directory: File): LinuxManagedRuntimeIdentity {
+        for (suffix in listOf("", ".bak", ".new")) require(!LinuxArchiveExtractor.isSymlink(File(root, "active.json$suffix"))) {
+            "HOST_UNAVAILABLE"
+        }
+        val raw = active.openRead().use { ConnectionPackageValidator.readBounded(it, 8192) }
+        require(JSONObject(raw.toString(Charsets.UTF_8)).getString("slot") == directory.name) { "HOST_UNAVAILABLE" }
+        val node = File(directory, "usr/local/bin/node")
+        var cursor = node
+        while (cursor != directory) {
+            require(!LinuxArchiveExtractor.isSymlink(cursor)) { "HOST_UNAVAILABLE" }
+            cursor = cursor.parentFile ?: error("HOST_UNAVAILABLE")
+        }
+        require(node.isFile && node.length() in 1..192L * 1024 * 1024 &&
+            node.canonicalPath.startsWith(directory.canonicalPath + File.separator)) { "HOST_UNAVAILABLE" }
+        val native = File(app.applicationInfo.nativeLibraryDir)
+        val hashes = LinuxNativeRelease.hashes(Build.SUPPORTED_ABIS.firstOrNull() ?: error("HOST_UNAVAILABLE"))
+        for ((name, expected) in hashes) {
+            val file = File(native, name)
+            require(file.isFile && !LinuxArchiveExtractor.isSymlink(file) && file.inputStream().use { digest(it) } == expected) {
+                "HOST_UNAVAILABLE"
+            }
+        }
+        return LinuxManagedRuntimeIdentity(directory.canonicalFile, sha256(raw), node.canonicalFile,
+            node.inputStream().use { digest(it) }, native.canonicalFile,
+            sha256(hashes.toSortedMap().entries.joinToString("\n") { "${it.key}:${it.value}" }.toByteArray(Charsets.UTF_8)))
+    }
+
+    /** A controlled storage helper calls this for each authenticated lock-held
+     * challenge. The actual exclusive helper stays alive and registered; this
+     * method does not mark the runtime idle or release a filesystem lease.
+     * Failed cleanup or any other real process refuses the positive approval. */
+    internal suspend fun requireExclusiveManagedLease(helper: LinuxManagedProcess, mountedDirectories: List<File>) =
+        shared.operations.withLock {
+            val id = helper.info.id
+            check(shared.failedCleanup.keys.none { it.isAlive } && helper.isAlive &&
+                shared.managed[id] === helper && shared.exclusiveManaged[id] === helper &&
+                shared.managed.values.none { it !== helper && it.holdsRuntimeLease }) { "HOST_UNAVAILABLE" }
+            val owned = shared.leasedResources.entries.singleOrNull { (process, _) ->
+                process.isAlive && helper.ownsProcess(process)
+            } ?: error("HOST_UNAVAILABLE")
+            check(shared.leasedResources.keys.none { it !== owned.key && hasRetainedProcessLease(it) }) { "HOST_UNAVAILABLE" }
+            val leased = owned.value.map { it.canonicalFile }.toSet()
+            check(mountedDirectories.isNotEmpty() && mountedDirectories.all { directory ->
+                val target = directory.canonicalFile
+                !LinuxArchiveExtractor.isSymlink(directory) && directory.exists() && target in leased
+            } && helper.isAlive) { "HOST_UNAVAILABLE" }
+        }
+
     /** Includes processes whose failed startup could not yet be cleaned up. */
     internal fun hasProcessLease(directory: File): Boolean {
         val target = directory.canonicalFile
-        return shared.leasedResources.any { (process, resources) -> process.isAlive && resources.any { resource ->
+        return shared.leasedResources.any { (process, resources) -> hasRetainedProcessLease(process) && resources.any { resource ->
             val leased = resource.canonicalFile
             leased == target || leased.path.startsWith(target.path + File.separator)
         } }
@@ -201,7 +356,7 @@ class LinuxRuntimeManager(context: Context) {
     internal suspend fun <T> withIdleDataMutation(directories: List<File>, block: suspend () -> T): T =
         shared.operations.withLock {
             checkNoFailedCleanup()
-            check(shared.managed.values.none { it.isAlive }) { "运行时仍有进程占用，请先停止服务和模型运行器" }
+            check(shared.managed.values.none { it.holdsRuntimeLease }) { "运行时仍有进程占用，请先停止服务和模型运行器" }
             check(directories.none(::hasProcessLease)) { "目标数据目录仍被运行进程占用" }
             block()
         }
@@ -852,9 +1007,13 @@ class LinuxRuntimeManager(context: Context) {
     }
 
     private fun checkNoFailedCleanup() {
+        check(shared.nativeStartups.isEmpty()) { "上次实际进程启动清理尚未完成，运行环境继续保留" }
         check(shared.failedCleanup.keys.none { it.isAlive }) { "上次 PRoot 清理尚未完成；仍保留运行环境，请等待进程退出" }
-        check(shared.exclusiveManaged.values.none { it.isAlive }) { "正在写入共享记录，请等待持久化进程完成" }
+        check(shared.exclusiveManaged.values.none { it.holdsRuntimeLease }) { "正在写入共享记录或仍在清理管道，请等待实际完成" }
     }
+
+    private fun hasRetainedProcessLease(process: Process): Boolean = process.isAlive ||
+        shared.managed.values.any { it.ownsProcess(process) && it.holdsRuntimeLease }
 
     private fun hasFailedLease(directory: File): Boolean = shared.failedCleanup.any { (process, leased) ->
         process.isAlive && leased.canonicalFile == directory.canonicalFile
@@ -899,6 +1058,7 @@ class LinuxRuntimeManager(context: Context) {
     }
 
     private fun unavailableReason(): String? = when {
+        shared.exclusiveManaged.values.any { it.holdsRuntimeLease } -> "持久化进程或管道清理尚未完成；运行环境仍被真实租约占用"
         Build.SUPPORTED_ABIS.firstOrNull() !in setOf("arm64-v8a", "x86_64") -> "此发行资源支持原生 arm64-v8a / x86_64；当前主架构 ${Build.SUPPORTED_ABIS.firstOrNull().orEmpty()} 暂不支持，不能使用 ARM 翻译执行 PRoot"
         app.applicationInfo.nativeLibraryDir == null -> "APK 原生执行目录不可用"
         !File(app.applicationInfo.nativeLibraryDir, "liblinux_proot.so").isFile -> "APK 未包含已校验的 PRoot 原生执行器；请安装完整发行包"
@@ -979,6 +1139,7 @@ class LinuxRuntimeManager(context: Context) {
     }
 
     private class Shared {
+        val nativeStartups = ConcurrentHashMap<LinuxManagedStartupOwnership, Process>()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val operations = Mutex()
         val startLock = Mutex()
